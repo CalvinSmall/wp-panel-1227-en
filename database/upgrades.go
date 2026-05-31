@@ -4,15 +4,14 @@
 //
 //   - migrations.go   全量建表 + 种子数据，给全新安装用，始终代表数据库的最新状态。
 //                     每次启动都会完整执行一遍（依赖 IF NOT EXISTS / OR IGNORE 保证幂等）。
-//   - upgrades.go     增量升级步骤，给老版本升级用。仅在版本落后时执行一次。
+//   - upgrades.go     增量升级步骤，给老版本升级用。仅在版本落后时顺序执行。
 //
-// 日常开发流程：
+// 数据库变更流程：
 //
-//   1. 新功能需要数据库变更时（新表、新字段、新种子行等），在 migrations.go 对应位置
-//      添加等价的 CREATE / INSERT 语句。
-//   2. 同时在 upgrades.go 末尾追加一条 Upgrade 条目。
-//   3. 发布正式版本后，upgrades.go 中属于该版本的条目可以删除；但 migrations.go 中的
-//      对应语句需要永久保留（它们是新装数据库的起点）。
+//   1. 在 migrations.go 对应位置添加 CREATE / INSERT 语句（新装用）。
+//   2. 在 upgrades.go 末尾追加 Upgrade 条目（升级用）。
+//   3. 升级条目永久保留，严禁删除。用户可能跨多个版本升级，删除升级条目会导致
+//      老版本跳过必要的 ALTER TABLE 等增量迁移。
 //
 // 运行时逻辑（main.go 启动 → database.Open → RunMigrations → RunUpgrades）：
 //
@@ -51,7 +50,8 @@ func RegisterUpgrade(version string, fn func() error) {
 	registeredFuncs[version] = fn
 }
 
-// upgrades 按版本顺序排列（旧→新）。v1.0.0 正式版清空历史，后续新版本在此追加。
+// upgrades 按版本顺序排列（旧→新），永久保留，严禁删除旧条目（跨版本升级依赖完整迁移链）。
+// v1.0.0 正式版发布时清空过一次历史，此后所有升级条目持续累积。
 var upgrades = []Upgrade{
 	{
 		Version:     "1.0.1",
