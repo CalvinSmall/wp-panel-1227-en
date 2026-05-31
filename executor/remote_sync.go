@@ -22,14 +22,14 @@ func SyncBackupToRemote(localFile string) {
 		FROM remote_backup_settings WHERE id = 1`).Scan(
 		&enabled, &host, &port, &username, &authType, &password, &remotePath, &keepLocal)
 	if err != nil {
-		syncLog(fmt.Sprintf("读取远程备份设置失败: %v", err), "failed")
+		syncLog("", fmt.Sprintf("读取远程备份设置失败: %v", err), "failed")
 		return
 	}
 	if enabled == 0 {
 		return
 	}
 	if host == "" {
-		syncLog("远程备份已启用但未填写服务器地址", "failed")
+		syncLog("", "远程备份已启用但未填写服务器地址", "failed")
 		return
 	}
 	if remotePath == "" {
@@ -45,11 +45,11 @@ func SyncBackupToRemote(localFile string) {
 	if authType == "key" {
 		keyPath := "/www/server/panel/remote_backup_key"
 		if _, err := os.Stat(keyPath); err != nil {
-			syncLog("SSH 密钥不存在: "+keyPath, "failed")
+			syncLog("", "SSH 密钥不存在: "+keyPath, "failed")
 			return
 		}
 		if err := os.Chmod(keyPath, 0600); err != nil {
-				syncLog(fmt.Sprintf("SSH 密钥权限设置失败: %v", err), "failed")
+				syncLog("", fmt.Sprintf("SSH 密钥权限设置失败: %v", err), "failed")
 				return
 			}
 		cmd = exec.Command("rsync", "-avzR",
@@ -57,7 +57,7 @@ func SyncBackupToRemote(localFile string) {
 			src, dest)
 	} else {
 		if _, err := exec.LookPath("sshpass"); err != nil {
-			syncLog("sshpass 未安装", "failed")
+			syncLog("", "sshpass 未安装", "failed")
 			return
 		}
 		cmd = exec.Command("sshpass", "-e", "rsync", "-avzR",
@@ -65,23 +65,28 @@ func SyncBackupToRemote(localFile string) {
 			src, dest)
 		cmd.Env = append(os.Environ(), "SSHPASS="+password)
 	}
-	out, err := cmd.CombinedOutput()
 	relPath := strings.TrimPrefix(localFile, backupsRoot+"/")
+	domain, _, _ := strings.Cut(relPath, "/")
+
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		syncLog(fmt.Sprintf("远程同步失败: %s — %s", relPath, strings.TrimSpace(string(out))), "failed")
+		syncLog(domain, fmt.Sprintf("远程同步失败: %s — %s", relPath, strings.TrimSpace(string(out))), "failed")
 		return
 	}
-	syncLog(fmt.Sprintf("远程同步成功: %s", relPath), "success")
+	syncLog(domain, fmt.Sprintf("远程同步成功: %s", relPath), "success")
 
 	if keepLocal == 0 {
 		os.Remove(localFile)
 	}
 }
 
-func syncLog(msg string, status string) {
+func syncLog(domain string, msg string, status string) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	fmt.Printf("[WP-Panel] %s %s\n", timestamp, msg)
+	if domain == "" {
+		domain = "—"
+	}
 	database.GetDB().Exec(
 		"INSERT INTO operation_logs (operation, target, status, message) VALUES (?, ?, ?, ?)",
-		"远程备份", "", status, msg)
+		"远程备份", domain, status, msg)
 }
