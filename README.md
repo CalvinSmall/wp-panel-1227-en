@@ -39,7 +39,7 @@ apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://r
 **国内服务器**：GitHub 无法访问时，使用国内优化版脚本：
 
 ```bash
-wget -qO- https://gh.wp-panel.org/https://raw.githubusercontent.com/naibabiji/wp-panel/main/install-cn.sh | bash
+apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://gh.wp-panel.org/https://raw.githubusercontent.com/naibabiji/wp-panel/main/install-cn.sh | bash
 ```
 
 安装完成后输出面板地址和两层登录凭据（BasicAuth + Web 登录）。
