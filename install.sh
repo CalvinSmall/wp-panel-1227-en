@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 # ============================================================
 # WP Panel 安装脚本 — 适用于 Debian 13 (Trixie)，建议使用纯净系统
+# 自动为 PHP 8.3 源选择官方源或国内镜像源，兼容海外和国内 VPS
 # ============================================================
 
 RED='\033[0;31m'
@@ -18,10 +20,194 @@ BIN_PATH="/usr/local/bin/wp-panel"
 SERVICE_PATH="/etc/systemd/system/wp-panel.service"
 PANEL_PORT=8888
 MYSQL_PASS=""
+GHPROXY="https://gh.wp-panel.org"
+PREFER_CN=false
+PHP_SOURCE_MODE="${WP_PANEL_PHP_SOURCE:-auto}"
+
+if [[ "${WP_PANEL_PREFER_CN_MIRROR:-0}" == "1" ]] || [[ "${WP_PANEL_PREFER_CN_MIRROR:-}" == "true" ]]; then
+    PREFER_CN=true
+fi
 
 log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+systemctl_enable_best_effort() {
+    local svc="$1"
+    if ! systemctl enable "$svc"; then
+        log_warn "${svc} 开机自启设置失败，继续安装。安装后可手动检查: systemctl enable ${svc}"
+    fi
+}
+
+systemctl_start_required() {
+    local svc="$1"
+    if ! systemctl start "$svc"; then
+        journalctl -u "$svc" -n 20 --no-pager 2>/dev/null || true
+        log_error "${svc} 启动失败，请根据上方日志排查"
+    fi
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --prefer-cn|--cn)
+            PREFER_CN=true
+            shift
+            ;;
+        --php-source)
+            if [[ $# -lt 2 ]]; then
+                log_error "--php-source 需要指定 official、ustc、sjtu 或 auto"
+            fi
+            PHP_SOURCE_MODE="$2"
+            shift 2
+            ;;
+        --php-source=*)
+            PHP_SOURCE_MODE="${1#*=}"
+            shift
+            ;;
+        *)
+            log_warn "未知参数已忽略: $1"
+            shift
+            ;;
+    esac
+done
+
+# 异常退出时显示友好反馈提示
+trap 'e=$?; if [[ $e -ne 0 ]]; then echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; echo -e "${RED}  安装未完成${NC}"; echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; echo -e "  请将上方错误信息截图发送至："; echo -e "  blog@naibabiji.com"; echo -e "  微信 vv15_zhi"; echo ""; fi' EXIT
+
+# ============================================================
+# PHP 8.3 源选择（官方源 + 国内镜像多重兜底）
+# ============================================================
+
+set_php_source_meta() {
+    case "$1" in
+        official)
+            PHP_SOURCE_LABEL="Ondřej Surý 官方源"
+            PHP_KEY_URL="https://packages.sury.org/debsuryorg-archive-keyring.deb"
+            PHP_REPO_URL="https://packages.sury.org/php/"
+            ;;
+        ustc)
+            PHP_SOURCE_LABEL="中科大 PHP Sury 镜像"
+            PHP_KEY_URL="https://mirrors.ustc.edu.cn/sury/debsuryorg-archive-keyring.deb"
+            PHP_REPO_URL="https://mirrors.ustc.edu.cn/sury/php/"
+            ;;
+        sjtu)
+            PHP_SOURCE_LABEL="上海交大 PHP Sury 镜像"
+            PHP_KEY_URL="https://mirror.sjtu.edu.cn/sury/debsuryorg-archive-keyring.deb"
+            PHP_REPO_URL="https://mirror.sjtu.edu.cn/sury/php/"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+download_file() {
+    local url="$1"
+    local output="$2"
+    local timeout="${3:-30}"
+
+    rm -f "$output"
+    if command -v curl &>/dev/null; then
+        curl -fsSL --connect-timeout "$timeout" -o "$output" "$url" 2>/dev/null && [[ -s "$output" ]] && return 0
+    fi
+    if command -v wget &>/dev/null; then
+        wget -q -T "$timeout" -O "$output" "$url" 2>/dev/null && [[ -s "$output" ]] && return 0
+    fi
+    rm -f "$output"
+    return 1
+}
+
+php_package_available() {
+    local pkg="$1"
+    local candidate=""
+
+    candidate=$(LC_ALL=C apt-cache policy "$pkg" 2>/dev/null | awk '/Candidate:/ {print $2; exit}' || true)
+    if [[ -n "$candidate" ]] && [[ "$candidate" != "(none)" ]]; then
+        return 0
+    fi
+
+    LC_ALL=C apt-cache show "$pkg" >/dev/null 2>&1
+}
+
+configure_php_source() {
+    local source_id="$1"
+    local codename="$2"
+    local keyring_file="/usr/share/keyrings/debsuryorg-archive-keyring.gpg"
+    local tmp_key="/tmp/debsuryorg-archive-keyring.deb"
+    local apt_log="/tmp/wp-panel-apt-update.log"
+
+    set_php_source_meta "$source_id" || return 1
+    log_info "尝试 PHP 源: ${PHP_SOURCE_LABEL}"
+
+    if download_file "$PHP_KEY_URL" "$tmp_key" 20; then
+        if ! dpkg -i "$tmp_key" >/dev/null 2>&1; then
+            rm -f "$tmp_key"
+            log_warn "${PHP_SOURCE_LABEL} GPG key 安装失败"
+            return 1
+        fi
+        rm -f "$tmp_key"
+    else
+        if [[ -f "$keyring_file" ]]; then
+            log_warn "${PHP_SOURCE_LABEL} GPG key 下载失败，将复用本机已有 keyring"
+        else
+            log_warn "${PHP_SOURCE_LABEL} GPG key 下载失败"
+            return 1
+        fi
+    fi
+
+    cat > /etc/apt/sources.list.d/php.sources << PHPSOURCESEOF
+Types: deb
+URIs: ${PHP_REPO_URL}
+Suites: ${codename}
+Components: main
+Signed-By: ${keyring_file}
+PHPSOURCESEOF
+
+    if apt-get update > "$apt_log" 2>&1 && \
+        php_package_available php8.3-cli && \
+        php_package_available php8.3-fpm; then
+        rm -f "$apt_log"
+        log_info "PHP 源可用: ${PHP_SOURCE_LABEL}"
+        return 0
+    fi
+
+    log_warn "${PHP_SOURCE_LABEL} 不可用，准备尝试下一个 PHP 源"
+    if [[ -f "$apt_log" ]]; then
+        tail -n 8 "$apt_log" 2>/dev/null || true
+    fi
+    rm -f "$apt_log"
+    return 1
+}
+
+select_php_source() {
+    local codename="$1"
+    local candidates=()
+
+    case "$PHP_SOURCE_MODE" in
+        auto|"")
+            if $PREFER_CN; then
+                candidates=(ustc sjtu official)
+            else
+                candidates=(official ustc sjtu)
+            fi
+            ;;
+        official|ustc|sjtu)
+            candidates=("$PHP_SOURCE_MODE")
+            ;;
+        *)
+            log_warn "未知 PHP 源模式 ${PHP_SOURCE_MODE}，回退到 auto"
+            candidates=(official ustc sjtu)
+            ;;
+    esac
+
+    for source_id in "${candidates[@]}"; do
+        if configure_php_source "$source_id" "$codename"; then
+            return 0
+        fi
+    done
+
+    log_error "所有 PHP 8.3 源均不可用。请检查网络、DNS、证书时间，或稍后重试。"
+}
 
 # ============================================================
 # 卸载函数（定义在前，兼容管道执行）
@@ -73,7 +259,7 @@ do_purge() {
     read -p "  > " confirm < /dev/tty 2>/dev/null || true
     if [[ "$confirm" != "yes" ]]; then
         log_info "已取消"
-        return 1
+        return 0
     fi
 
     echo ""
@@ -141,34 +327,89 @@ fi
 log_info "权限检查通过"
 
 # ============================================================
-# 重复安装检测
+# 重复安装/残留安装检测
 # ============================================================
-if [[ -f "$CONFIG_FILE" ]] && [[ -f "$BIN_PATH" ]]; then
+INSTALL_COMPLETE=false
+INSTALL_TRACES=false
+
+if [[ -f "$CONFIG_FILE" ]] && [[ -s "$BIN_PATH" ]] && [[ -x "$BIN_PATH" ]]; then
+    INSTALL_COMPLETE=true
+fi
+
+if [[ -e "$CONFIG_FILE" ]] || [[ -e "$BIN_PATH" ]] || [[ -d "$INSTALL_DIR" ]] || [[ -f "$SERVICE_PATH" ]]; then
+    INSTALL_TRACES=true
+fi
+
+if $INSTALL_COMPLETE; then
     echo ""
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}  检测到 WP Panel 已安装${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "  1) 卸载面板（${GREEN}保留网站/数据库/SSL/软件${NC}）"
-    echo -e "  2) 彻底清空（${RED}删除所有数据并卸载软件${NC}）"
-    echo -e "  3) 退出"
+    echo -e "  1) 卸载后重新安装（${GREEN}保留网站/数据库/SSL/软件${NC}）"
+    echo -e "  2) 仅卸载面板（${GREEN}保留网站/数据库/SSL/软件${NC}）"
+    echo -e "  3) 彻底清空（${RED}删除所有数据并卸载软件${NC}）"
+    echo -e "  4) 退出"
     echo ""
     echo -e "  输入数字后回车进行选择。"
 
     read -p "  > " choice < /dev/tty 2>/dev/null || read choice
 
-    case "${choice:-3}" in
+    case "${choice:-4}" in
         1)
             do_uninstall
+            log_info "开始重新安装..."
             ;;
         2)
+            do_uninstall
+            exit 0
+            ;;
+        3)
             do_purge
+            exit 0
             ;;
         *)
             echo -e "${GREEN}已取消，面板保持现有状态${NC}"
+            exit 0
             ;;
     esac
-    exit 0
+elif $INSTALL_TRACES; then
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}  检测到 WP Panel 上次安装未完成或存在残留${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  1) 继续/修复安装（${GREEN}默认推荐${NC}）"
+    echo -e "  2) 清理面板残留后重新安装（${GREEN}保留网站/数据库/SSL/软件${NC}）"
+    echo -e "  3) 仅卸载面板残留（${GREEN}保留网站/数据库/SSL/软件${NC}）"
+    echo -e "  4) 彻底清空（${RED}删除所有数据并卸载软件${NC}）"
+    echo -e "  5) 退出"
+    echo ""
+    echo -e "  直接回车将继续/修复安装。"
+
+    read -p "  > " choice < /dev/tty 2>/dev/null || read choice
+
+    case "${choice:-1}" in
+        1)
+            log_info "继续/修复安装..."
+            ;;
+        2)
+            do_uninstall
+            log_info "开始重新安装..."
+            ;;
+        3)
+            do_uninstall
+            exit 0
+            ;;
+        4)
+            do_purge
+            exit 0
+            ;;
+        *)
+            echo -e "${GREEN}已取消，系统保持现有状态${NC}"
+            exit 0
+            ;;
+    esac
 fi
 
 # ============================================================
@@ -202,26 +443,25 @@ fi
 # ============================================================
 log_info "配置 APT 源..."
 export DEBIAN_FRONTEND=noninteractive
+DEBIAN_CODENAME=""
+if command -v lsb_release &>/dev/null; then
+    DEBIAN_CODENAME=$(lsb_release -sc 2>/dev/null || true)
+fi
+if [[ -z "$DEBIAN_CODENAME" ]] && [[ -f /etc/os-release ]]; then
+    DEBIAN_CODENAME=$(grep '^VERSION_CODENAME=' /etc/os-release 2>/dev/null | cut -d= -f2 || true)
+fi
+if [[ -z "$DEBIAN_CODENAME" ]]; then
+    log_error "无法识别 Debian 版本代号"
+fi
+log_info "Debian 版本: ${DEBIAN_CODENAME}"
+
 apt-get update
 
 # 安装基础依赖
 apt-get install -y curl wget unzip ca-certificates gnupg lsb-release
 
-# Ondřej Surý PHP 8.3 源（deb822 格式 + keyring 包）
-if [[ ! -f /etc/apt/sources.list.d/php.sources ]]; then
-    curl -sSLo /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb
-    dpkg -i /tmp/debsuryorg-archive-keyring.deb
-    rm -f /tmp/debsuryorg-archive-keyring.deb
-    cat > /etc/apt/sources.list.d/php.sources << PHPSOURCESEOF
-Types: deb
-URIs: https://packages.sury.org/php/
-Suites: $(lsb_release -sc)
-Components: main
-Signed-By: /usr/share/keyrings/debsuryorg-archive-keyring.gpg
-PHPSOURCESEOF
-fi
-
-apt-get update
+# 只对 PHP 8.3 源做多重兜底；Debian/Nginx/MariaDB/Redis 继续走系统默认源。
+select_php_source "$DEBIAN_CODENAME"
 
 # ============================================================
 # 安装基础组件
@@ -319,11 +559,13 @@ fi
 # ============================================================
 log_info "配置 MariaDB..."
 
-systemctl start mariadb
-systemctl enable mariadb
+systemctl_start_required mariadb
+systemctl_enable_best_effort mariadb
 
 # 优先读取已有密码（防止上次安装中断导致密码不一致）
-MYSQL_PASS=$(grep -o '"root_password": "[^"]*"' "$CONFIG_FILE" 2>/dev/null | cut -d'"' -f4)
+if [[ -f "$CONFIG_FILE" ]]; then
+    MYSQL_PASS=$(grep -o '"root_password": "[^"]*"' "$CONFIG_FILE" 2>/dev/null | cut -d'"' -f4 || true)
+fi
 if [[ -z "$MYSQL_PASS" ]]; then
     MYSQL_PASS=$(head -c 24 /dev/urandom | sha256sum | head -c 32)
 fi
@@ -355,7 +597,7 @@ table_open_cache = 128
 max_connections = 30
 performance_schema = OFF
 MARIADBEOF
-    systemctl restart mariadb
+    systemctl restart mariadb || systemctl_start_required mariadb
 fi
 
 # ============================================================
@@ -390,19 +632,23 @@ chmod 644 "$CERT_FILE"
 log_info "自签名证书已生成（有效期 10 年）"
 
 # ============================================================
-# 下载 WordPress 备份
+# 下载 WordPress 备用包
 # ============================================================
 log_info "下载 WordPress 备用包..."
 WP_ZIP="$INSTALL_DIR/packages/wordpress.zip"
+WP_ZIP_TMP="${WP_ZIP}.download"
 for i in 1 2 3; do
-    if wget -q -T 60 -O "$WP_ZIP" "https://wordpress.org/latest.zip" 2>/dev/null; then
+    if download_file "https://wordpress.org/latest.zip" "$WP_ZIP_TMP" 60; then
+        mv "$WP_ZIP_TMP" "$WP_ZIP"
         log_info "WordPress 下载完成"
         break
     fi
     log_warn "下载失败，重试 ($i/3)..."
     sleep 3
 done
-if [[ ! -f "$WP_ZIP" ]]; then
+rm -f "$WP_ZIP_TMP"
+if [[ ! -s "$WP_ZIP" ]]; then
+    rm -f "$WP_ZIP"
     log_warn "WordPress 下载失败，将在首次建站时使用联网下载"
 fi
 
@@ -506,21 +752,48 @@ log_info "部署面板二进制..."
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GITHUB_RELEASE="https://github.com/naibabiji/wp-panel/releases/latest/download/wp-panel"
+GHPROXY_RELEASE="${GHPROXY}/${GITHUB_RELEASE}"
 
-if [[ -f "$SCRIPT_DIR/wp-panel" ]]; then
+install_downloaded_binary() {
+    local url="$1"
+    local label="$2"
+    local tmp_bin="/tmp/wp-panel.$$.download"
+
+    log_info "尝试下载面板二进制: ${label}"
+    if download_file "$url" "$tmp_bin" 60; then
+        chmod +x "$tmp_bin"
+        mv "$tmp_bin" "$BIN_PATH"
+        log_info "面板二进制下载完成: ${label}"
+        return 0
+    fi
+    rm -f "$tmp_bin"
+    log_warn "${label} 下载失败"
+    return 1
+}
+
+if [[ -s "$SCRIPT_DIR/wp-panel" ]]; then
     cp "$SCRIPT_DIR/wp-panel" "$BIN_PATH"
     chmod +x "$BIN_PATH"
     log_info "面板二进制已部署（本地文件）"
 else
-    log_info "从 GitHub Releases 下载最新版本..."
-    if wget -q -T 30 -O "$BIN_PATH" "$GITHUB_RELEASE" 2>/dev/null; then
-        chmod +x "$BIN_PATH"
-        log_info "面板二进制下载完成"
+    DOWNLOAD_OK=false
+    if $PREFER_CN; then
+        install_downloaded_binary "$GHPROXY_RELEASE" "gh.wp-panel.org 反代" && DOWNLOAD_OK=true
+        if ! $DOWNLOAD_OK; then
+            install_downloaded_binary "$GITHUB_RELEASE" "GitHub Releases 直连" && DOWNLOAD_OK=true
+        fi
     else
-        log_warn "GitHub Releases 下载失败（网络问题或暂无发布版本）"
+        install_downloaded_binary "$GITHUB_RELEASE" "GitHub Releases 直连" && DOWNLOAD_OK=true
+        if ! $DOWNLOAD_OK; then
+            install_downloaded_binary "$GHPROXY_RELEASE" "gh.wp-panel.org 反代" && DOWNLOAD_OK=true
+        fi
+    fi
+
+    if ! $DOWNLOAD_OK; then
         log_error "无法获取正式版二进制。解决方案：
-  1. 检查服务器能否访问 GitHub Releases
-  2. 或手动下载 release 附件 wp-panel 后，和 install.sh 放在同一目录重新运行"
+  1. 检查服务器能否访问 GitHub Releases 或 gh.wp-panel.org
+  2. 手动下载 release 附件 wp-panel 后，和 install.sh 放在同一目录重新运行
+  3. 或在本机编译后上传：go build -o wp-panel ."
     fi
 fi
 
@@ -551,8 +824,8 @@ WantedBy=multi-user.target
 SYSTEMDEOF
 
 systemctl daemon-reload
-systemctl enable wp-panel
-systemctl start wp-panel
+systemctl_enable_best_effort wp-panel
+systemctl_start_required wp-panel
 
 # ============================================================
 # 端口监听检测
