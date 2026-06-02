@@ -47,6 +47,78 @@ systemctl_start_required() {
     fi
 }
 
+# ============================================================
+# 系统内核优化（BBR+FQ、TCP 缓冲、连接队列、文件描述符）
+# ============================================================
+apply_system_tuning() {
+    log_info "应用系统内核优化..."
+
+    SYSCTL_FILE="/etc/sysctl.d/99-wp-panel.conf"
+    CPU_CORES=$(nproc)
+
+    cat > "$SYSCTL_FILE" << 'SYSCTLEOF'
+# WP Panel — 网络与内核优化
+
+# ── 连接队列 ──
+net.core.somaxconn = 65535
+net.ipv4.tcp_max_syn_backlog = 8192
+net.core.netdev_max_backlog = 16384
+
+# ── TCP 缓冲区 ──
+net.core.rmem_default = 262144
+net.core.wmem_default = 262144
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+
+# ── TIME-WAIT 优化 ──
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.ip_local_port_range = 1024 65535
+
+# ── Keepalive ──
+net.ipv4.tcp_keepalive_time = 300
+net.ipv4.tcp_keepalive_intvl = 30
+net.ipv4.tcp_keepalive_probes = 5
+
+# ── BBR 辅助参数 ──
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_notsent_lowat = 16384
+
+# ── 基础安全 ──
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_timestamps = 1
+SYSCTLEOF
+
+    # BBR + FQ: 仅 2 核及以上机器开启（单核 VPS CPU 争抢时 BBR 吞吐量会暴跌）
+    if [[ $CPU_CORES -ge 2 ]]; then
+        cat >> "$SYSCTL_FILE" << 'BBREOF'
+
+# ── BBR 拥塞控制 + FQ 调度 ──
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+BBREOF
+        modprobe tcp_bbr 2>/dev/null || true
+        log_info "BBR + FQ 已启用（${CPU_CORES} 核 CPU）"
+    else
+        log_info "单核 CPU，跳过 BBR（避免 CPU 争抢副作用）"
+    fi
+
+    sysctl --system >/dev/null 2>&1
+
+    # 文件描述符限制
+    if ! grep -q "nofile 65535" /etc/security/limits.conf 2>/dev/null; then
+        cat >> /etc/security/limits.conf << 'LIMITSEOF'
+* soft nofile 65535
+* hard nofile 65535
+LIMITSEOF
+    fi
+
+    log_info "系统内核优化完成"
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --prefer-cn|--cn)
@@ -293,6 +365,12 @@ do_purge() {
     done
     systemctl daemon-reload
     echo -e "  ${GREEN}✓${NC} systemd 已清理"
+
+    echo -e "  → 恢复系统内核参数..."
+    rm -f /etc/sysctl.d/99-wp-panel.conf
+    sysctl --system >/dev/null 2>&1
+    sed -i '/nofile 65535/d' /etc/security/limits.conf 2>/dev/null || true
+    echo -e "  ${GREEN}✓${NC} 内核参数已恢复"
 
     echo -e "  → 删除面板文件..."
     rm -f "$BIN_PATH"
@@ -826,6 +904,8 @@ SYSTEMDEOF
 systemctl daemon-reload
 systemctl_enable_best_effort wp-panel
 systemctl_start_required wp-panel
+
+apply_system_tuning
 
 # ============================================================
 # 端口监听检测
