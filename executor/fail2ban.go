@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 )
 
 var syncMu sync.Mutex
+var recordPersistBan = AddPersistBan
 
 func deployFail2ban(whitelistIPs string, maxRetry, findTime, banTime int) error {
 	jailDir := "/etc/fail2ban/jail.d"
@@ -63,7 +65,7 @@ func deployFail2ban(whitelistIPs string, maxRetry, findTime, banTime int) error 
 enabled = true
 filter = wppanel
 action = nftables-multiport[name=wppanel, port="http,https"]
-         wppanel-nginx
+         wppanel-nginx[name=wppanel]
 logpath = /www/wwwlogs/*/access.log
           /www/wwwlogs/*/error.log
 maxretry = %d
@@ -75,7 +77,7 @@ ignoreip = %s
 enabled = true
 filter = wppanel-404
 action = nftables-multiport[name=wppanel-404, port="http,https"]
-         wppanel-nginx
+         wppanel-nginx[name=wppanel-404]
 logpath = /www/wwwlogs/*/access.log
 maxretry = 30
 findtime = 60
@@ -99,7 +101,7 @@ ignoreip = %s
 
 	actionConfig := `# WP Panel Generated - DO NOT EDIT MANUALLY
 [Definition]
-actionban = /usr/local/bin/wp-panel --banip-nginx <ip>
+actionban = /usr/local/bin/wp-panel --banip-nginx <ip> --record-fail2ban <ip> --ban-jail <name>
 actionunban = /usr/local/bin/wp-panel --unbanip-nginx <ip>
 `
 
@@ -163,11 +165,28 @@ func ensureLogFiles() {
 	touch("/var/log/auth.log")
 }
 
+func ensureSiteLogFiles(logDir string) {
+	if strings.TrimSpace(logDir) == "" {
+		return
+	}
+	touch(filepath.Join(logDir, "access.log"))
+	touch(filepath.Join(logDir, "error.log"))
+}
+
 func touch(path string) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err == nil {
 		f.Close()
 	}
+}
+
+func ReloadFail2ban() error {
+	if _, err := executeCommand("fail2ban-client", "reload"); err != nil {
+		if _, activeErr := executeCommand("systemctl", "is-active", "--quiet", "fail2ban"); activeErr == nil {
+			return fmt.Errorf("reload fail2ban failed: %w", err)
+		}
+	}
+	return nil
 }
 
 func executeRefreshWhitelist(task *Task) TaskResult {
@@ -396,14 +415,23 @@ func SyncFail2banBans() {
 	}
 }
 
-// RecordFail2banBan 在 Fail2ban 触发封禁时立即写入数据库记录。
-// 由 main.go 中 --banip-nginx CLI 调用，确保在管理员查看封禁列表之前记录已存在。
-func RecordFail2banBan(ip string) {
+func RecordFail2banBan(ip, jail string) error {
 	db := database.GetDB()
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
 
-	jail := detectFail2banJail(ip)
+	ip = strings.TrimSpace(ip)
+	if net.ParseIP(ip) == nil {
+		return fmt.Errorf("invalid IP: %s", ip)
+	}
+
+	jail = normalizeFail2banJail(jail)
 	if jail == "" {
-		jail = "wppanel"
+		jail = detectFail2banJail(ip)
+		if jail == "" {
+			jail = "wppanel"
+		}
 	}
 
 	now := time.Now()
@@ -435,14 +463,26 @@ func RecordFail2banBan(ip string) {
 		}
 	}
 
-	db.Exec(
+	if _, err := db.Exec(
 		`INSERT INTO firewall_bans (ip_address, ban_level, reason, source_jail, ban_count, expires_at)
 		 VALUES (?, ?, ?, ?, ?, `+expiresVal+`)`,
 		ip, banLevel, reason, jail, prevBans+1,
-	)
+	); err != nil {
+		return err
+	}
 
 	if banLevel >= 3 {
-		AddPersistBan(ip)
+		recordPersistBan(ip)
+	}
+	return nil
+}
+
+func normalizeFail2banJail(jail string) string {
+	switch strings.TrimSpace(jail) {
+	case "wppanel", "wppanel-404", "wppanel-sshd":
+		return strings.TrimSpace(jail)
+	default:
+		return ""
 	}
 }
 

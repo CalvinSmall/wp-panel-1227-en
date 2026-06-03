@@ -38,22 +38,16 @@ func main() {
 	unbanAll := flag.Bool("unban-all", false, "一键清空所有IP封禁记录")
 	banIPNginx := flag.String("banip-nginx", "", "将指定 IP 加入 Nginx 黑名单")
 	unbanIPNginx := flag.String("unbanip-nginx", "", "从 Nginx 黑名单移除指定 IP")
+	recordFail2banIP := flag.String("record-fail2ban", "", "记录 Fail2ban 封禁 IP")
+	banJail := flag.String("ban-jail", "", "Fail2ban jail 名称")
 	fileBackup := flag.String("file-backup", "", "执行文件备份: siteID:mode")
 	runAutoBackup := flag.Bool("run-auto-backup", false, "手动触发自动备份（测试用）")
 	showInfo := flag.Bool("info", false, "查看面板信息")
 	flag.Parse()
 
-	// Nginx 层面的封禁/解封无需数据库，立即执行以确保防护生效。
-	// 数据库记录在下方 DB 初始化完成后补充。
-	if *banIPNginx != "" {
-		if err := executor.AddNginxBan(*banIPNginx); err != nil {
-			log.Fatalf("Nginx 封禁失败: %v", err)
-		}
-	}
-	if *unbanIPNginx != "" {
-		if err := executor.RemoveNginxBan(*unbanIPNginx); err != nil {
-			log.Fatalf("Nginx 解封失败: %v", err)
-		}
+	if *banIPNginx != "" || *unbanIPNginx != "" || *recordFail2banIP != "" {
+		handleFail2banCLI(*configPath, *banIPNginx, *unbanIPNginx, *recordFail2banIP, *banJail)
+		return
 	}
 
 	cfg, err := config.LoadConfig(*configPath)
@@ -98,16 +92,6 @@ func main() {
 	executor.AutoDeployPluginUpdates(PluginFS)
 	if err := database.RunUpgrades(); err != nil {
 		log.Fatalf("数据库升级失败: %v", err)
-	}
-
-	// Fail2ban 通过 actionban 调用 --banip-nginx 时，补充写入数据库记录。
-	// Nginx 层面的封禁已在上方提前执行，此处仅补录数据库审计记录。
-	if *banIPNginx != "" {
-		executor.RecordFail2banBan(*banIPNginx)
-		return
-	}
-	if *unbanIPNginx != "" {
-		return
 	}
 
 	if *resetAdmin {
@@ -235,6 +219,37 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("正在关闭面板...")
+}
+
+func handleFail2banCLI(configPath, banIP, unbanIP, recordIP, jail string) {
+	if banIP != "" {
+		if err := executor.AddNginxBan(banIP); err != nil {
+			log.Fatalf("Nginx 封禁失败: %v", err)
+		}
+	}
+	if unbanIP != "" {
+		if err := executor.RemoveNginxBan(unbanIP); err != nil {
+			log.Fatalf("Nginx 解封失败: %v", err)
+		}
+	}
+	if recordIP == "" {
+		return
+	}
+
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		log.Fatalf("加载配置失败: %v", err)
+	}
+	if err := database.Open(cfg.SQLite.Path); err != nil {
+		log.Fatalf("打开数据库失败: %v", err)
+	}
+	defer database.Close()
+	if err := database.RunMigrations(); err != nil {
+		log.Fatalf("数据库迁移失败: %v", err)
+	}
+	if err := executor.RecordFail2banBan(recordIP, jail); err != nil {
+		log.Fatalf("Fail2ban 封禁记录失败: %v", err)
+	}
 }
 
 func seedAdminUser(cfg *config.Config) {

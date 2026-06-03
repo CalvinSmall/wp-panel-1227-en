@@ -513,7 +513,7 @@ func (h *WebsiteHandler) ViewLogs(c *gin.Context) {
 	content := tailFile(cleanPath, lines)
 	if content == "" {
 		if logType == "access" {
-			content = "（访问日志：Nginx 默认关闭 access_log 以提升性能，如需启用请在 Nginx 配置中开启）"
+			content = "（暂无异常访问日志；默认仅记录 4xx/5xx 请求，正常访问不会写入 access.log）"
 		} else {
 			content = "（暂无错误日志，网站运行正常）"
 		}

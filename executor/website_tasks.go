@@ -89,6 +89,7 @@ func executeCreateSite(task *Task) TaskResult {
 			return TaskResult{Success: false, Message: "创建目录失败"}
 		}
 	}
+	ensureSiteLogFiles(logDir)
 	rollbacks = append(rollbacks, rollbackStep{"删除网站目录 " + webRoot, func() error {
 		os.RemoveAll(webRoot)
 		return nil
@@ -169,16 +170,17 @@ func executeCreateSite(task *Task) TaskResult {
 	}})
 
 	nginxData := &NginxSiteData{
-		Domain:      domain,
-		Aliases:     payload.Aliases,
-		ServerNames: allServerNames,
-		WebRoot:     webRoot,
-		LogDir:      logDir,
-		SystemUser:  systemUser,
-		UseSSL:      false,
-		PHPProxy:    "unix:" + phpSockPath,
-		SiteType:    payload.SiteType,
-		TemplateVer: "v1.0",
+		Domain:        domain,
+		Aliases:       payload.Aliases,
+		ServerNames:   allServerNames,
+		WebRoot:       webRoot,
+		LogDir:        logDir,
+		SystemUser:    systemUser,
+		UseSSL:        false,
+		PHPProxy:      "unix:" + phpSockPath,
+		SiteType:      payload.SiteType,
+		TemplateVer:   "v1.0",
+		AccessLogMode: "error_only",
 	}
 
 	nginxConfig, err := engine.RenderNginxConfig(nginxData)
@@ -226,18 +228,19 @@ func executeCreateSite(task *Task) TaskResult {
 		}
 
 		sslData := &NginxSiteData{
-			Domain:      domain,
-			Aliases:     payload.Aliases,
-			ServerNames: allServerNames,
-			WebRoot:     webRoot,
-			LogDir:      logDir,
-			SystemUser:  systemUser,
-			UseSSL:      true,
-			SSLCertPath: certPath,
-			SSLKeyPath:  keyPath,
-			PHPProxy:    "unix:" + phpSockPath,
-			SiteType:    payload.SiteType,
-			TemplateVer: "v1.0",
+			Domain:        domain,
+			Aliases:       payload.Aliases,
+			ServerNames:   allServerNames,
+			WebRoot:       webRoot,
+			LogDir:        logDir,
+			SystemUser:    systemUser,
+			UseSSL:        true,
+			SSLCertPath:   certPath,
+			SSLKeyPath:    keyPath,
+			PHPProxy:      "unix:" + phpSockPath,
+			SiteType:      payload.SiteType,
+			TemplateVer:   "v1.0",
+			AccessLogMode: "error_only",
 		}
 
 		httpsConfig, sslErr := engine.RenderNginxConfig(sslData)
@@ -285,6 +288,9 @@ func executeCreateSite(task *Task) TaskResult {
 		rollback()
 		log.Printf("写入数据库失败: %v", err)
 		return TaskResult{Success: false, Message: "写入数据库失败"}
+	}
+	if err := ReloadFail2ban(); err != nil {
+		log.Printf("Fail2ban reload skipped after site create: %v", err)
 	}
 
 	sslMsg := ""
