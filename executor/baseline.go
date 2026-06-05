@@ -34,13 +34,26 @@ max_input_vars = 2000
 
 func ensureNginxBaseline() {
 	path := "/etc/nginx/conf.d/wppanel.conf"
-	if _, err := os.Stat(path); err == nil {
+	data, err := os.ReadFile(path)
+
+	if err != nil {
+		// 文件不存在，创建完整配置
+		content := `# WP Panel — WordPress 安全基线 (安装时自动生成)
+client_max_body_size 64m;
+server_names_hash_bucket_size 128;
+`
+		os.WriteFile(path, []byte(content), 0644)
+		exec.Command("nginx", "-s", "reload").Run()
 		return
 	}
-	content := `# WP Panel — WordPress 安全基线 (安装时自动生成)
-client_max_body_size 64m;
-`
-	os.WriteFile(path, []byte(content), 0644)
+
+	// 文件已存在，检查是否缺少 server_names_hash_bucket_size
+	content := string(data)
+	if !strings.Contains(content, "server_names_hash_bucket_size") {
+		content = strings.TrimRight(content, "\n") + "\nserver_names_hash_bucket_size 128;\n"
+		os.WriteFile(path, []byte(content), 0644)
+		exec.Command("nginx", "-s", "reload").Run()
+	}
 }
 
 func ensureNginxSSLDefaultServer() {
