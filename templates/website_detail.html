@@ -71,7 +71,7 @@
                 <div x-show="site.site_type === 'wordpress'">
                     <dt class="text-sm text-gray-400">表前缀</dt>
                     <dd class="flex items-center space-x-2 mt-1">
-                        <input type="text" x-model="editTablePrefix" class="input-field text-sm font-mono py-1 w-40" placeholder="如 wp_ 或 wp_abc123_">
+                        <input type="text" x-model="editTablePrefix" class="input-field text-sm font-mono py-1 w-28" placeholder="如 wp_">
                         <button @click="detectTablePrefix()" :disabled="detectingPrefix" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;" x-text="detectingPrefix ? '检测中...' : '自动检测'"></button>
                     </dd>
                     <p class="text-xs text-gray-500 mt-1">搬家后如数据库表前缀与 wp-config.php 不一致，可在此修改。点击「自动检测」从数据库读取实际前缀。</p>
@@ -79,6 +79,7 @@
             </dl>
             <button @click="dbPasswordModal = true" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">修改密码</button>
             <button @click="fixWPConfig()" :disabled="dbSubmitting" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #14532d; color: #86efac;" x-text="dbSubmitting ? '处理中...' : '同步数据库信息'"></button>
+            <a :href="(document.body.dataset.panelPrefix || '') + '/files?site_id=' + site.id" class="text-sm py-1.5 px-3 rounded ml-2 inline-block" style="background-color: #1e3a5f; color: #93c5fd;">文件管理</a>
             <button @click="openSiteURLModal()" x-show="site.site_type === 'wordpress'" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #1e3a5f; color: #93c5fd;">修改站点URL</button>
             <button @click="clearDatabase()" :disabled="dbSubmitting" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #7f1d1d; color: #fca5a5;" x-text="dbSubmitting ? '清空中...' : '清空数据库'"></button>
 
@@ -584,14 +585,14 @@ function websiteDetail() {
         },
         async fixWPConfig() {
             const parts = ['将使用当前数据库名和用户名覆盖 wp-config.php 中的 DB_NAME 和 DB_USER'];
-            if (this.editTablePrefix && this.editTablePrefix !== this.site.table_prefix) {
+            if (this.editTablePrefix) {
                 parts.push('同时更新 $table_prefix 为 ' + this.editTablePrefix);
             }
             if (!await confirmModal(parts.join('，') + '，确认继续？')) return;
             this.dbSubmitting = true;
             try {
                 const body = {};
-                if (this.editTablePrefix && this.editTablePrefix !== this.site.table_prefix) {
+                if (this.editTablePrefix) {
                     body.table_prefix = this.editTablePrefix;
                 }
                 const r = await api('/websites/' + this.site.id + '/fix-wp-config', { method: 'POST', body });
