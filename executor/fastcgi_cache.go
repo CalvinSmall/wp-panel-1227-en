@@ -124,6 +124,7 @@ func ClearSiteCache(siteID int) {
 func RegenerateSiteNginx(siteID int) {
 	db := database.GetDB()
 	var domain, aliases, siteType, systemUser, webRoot, logDir, accessLogMode, cacheKey, templateVer string
+	var phpPoolPath, nginxConfPath string
 	var sslEnabled, fCacheEnabled, xmlrpcEnabled int
 	var fCacheTTL int
 	var sslCertPath, sslKeyPath string
@@ -131,9 +132,9 @@ func RegenerateSiteNginx(siteID int) {
 	err := db.QueryRow(
 		`SELECT domain, aliases, site_type, system_user, web_root, log_dir, ssl_enabled,
 		        access_log_mode, fastcgi_cache_enabled, fastcgi_cache_ttl, fastcgi_cache_key,
-		        ssl_cert_path, ssl_key_path, template_version, xmlrpc_enabled
+		        ssl_cert_path, ssl_key_path, template_version, xmlrpc_enabled, php_pool_path, nginx_conf_path
 		 FROM websites WHERE id = ?`, siteID,
-	).Scan(&domain, &aliases, &siteType, &systemUser, &webRoot, &logDir, &sslEnabled, &accessLogMode, &fCacheEnabled, &fCacheTTL, &cacheKey, &sslCertPath, &sslKeyPath, &templateVer, &xmlrpcEnabled)
+	).Scan(&domain, &aliases, &siteType, &systemUser, &webRoot, &logDir, &sslEnabled, &accessLogMode, &fCacheEnabled, &fCacheTTL, &cacheKey, &sslCertPath, &sslKeyPath, &templateVer, &xmlrpcEnabled, &phpPoolPath, &nginxConfPath)
 	if err != nil || domain == "" {
 		return
 	}
@@ -162,7 +163,7 @@ func RegenerateSiteNginx(siteID int) {
 		LogDir:        logDir,
 		SystemUser:    systemUser,
 		SiteType:      siteType,
-		PHPProxy:      "unix:" + filepath.Join(cfg.Paths.PHPFPMSock, domain+".sock"),
+		PHPProxy:      "unix:" + phpSocketPath(cfg, phpPoolPath, domain),
 		TemplateVer:   templateVer,
 		AccessLogMode: accessLogMode,
 		UseSSL:        sslEnabled == 1,
@@ -182,9 +183,7 @@ func RegenerateSiteNginx(siteID int) {
 		return
 	}
 
-	nginxConfPath := filepath.Join(cfg.Paths.NginxSitesAvailable, domain+".conf")
-	nginxEnabledPath := filepath.Join(cfg.Paths.NginxSitesEnabled, domain+".conf")
-	if err := engine.ApplyNginxConfig(config, nginxConfPath, nginxEnabledPath); err != nil {
+	if err := engine.ApplyNginxConfig(config, nginxConfPath, nginxEnabledPath(cfg, nginxConfPath, domain)); err != nil {
 		fmt.Fprintf(os.Stderr, "应用Nginx配置失败(site %d): %v\n", siteID, err)
 		return
 	}
@@ -214,7 +213,7 @@ func RegenerateAllSitesNginx() {
 // 用于 open_basedir 等模板变更后批量刷新旧站点。
 func RegenerateAllSitesFPM() {
 	db := database.GetDB()
-	rows, err := db.Query("SELECT id, domain, system_user, web_root, log_dir FROM websites")
+	rows, err := db.Query("SELECT id, domain, system_user, web_root, log_dir, php_pool_path FROM websites")
 	if err != nil {
 		log.Printf("[FPM重建] 查询网站列表失败: %v", err)
 		return
@@ -226,8 +225,8 @@ func RegenerateAllSitesFPM() {
 
 	for rows.Next() {
 		var siteID int
-		var domain, systemUser, webRoot, logDir string
-		if err := rows.Scan(&siteID, &domain, &systemUser, &webRoot, &logDir); err != nil {
+		var domain, systemUser, webRoot, logDir, phpPoolPath string
+		if err := rows.Scan(&siteID, &domain, &systemUser, &webRoot, &logDir, &phpPoolPath); err != nil {
 			continue
 		}
 		if err := ensureSitePrimaryGroup(systemUser); err != nil {
@@ -235,11 +234,14 @@ func RegenerateAllSitesFPM() {
 			continue
 		}
 
+		poolName := phpPoolName(phpPoolPath, domain)
 		phpData := &PHPFPMPoolData{
 			Domain:     domain,
+			PoolName:   poolName,
 			SystemUser: systemUser,
 			WebRoot:    webRoot,
 			SocketPath: cfg.Paths.PHPFPMSock,
+			SocketName: poolName,
 		}
 		phpConfig, err := engine.RenderPHPFPMPool(phpData)
 		if err != nil {
@@ -247,8 +249,7 @@ func RegenerateAllSitesFPM() {
 			continue
 		}
 
-		poolPath := filepath.Join(cfg.Paths.PHPFPMPool, domain+".conf")
-		if err := engine.ApplyPHPFPMPool(phpConfig, poolPath, logDir); err != nil {
+		if err := engine.ApplyPHPFPMPool(phpConfig, phpPoolPath, logDir); err != nil {
 			log.Printf("[FPM重建] %s: 应用配置失败: %v", domain, err)
 			continue
 		}

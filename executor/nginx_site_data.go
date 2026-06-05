@@ -35,7 +35,7 @@ func nginxDataFromSite(site *models.Website) *NginxSiteData {
 		SiteType:      site.SiteType,
 		SSLCertPath:   site.SSLCertPath,
 		SSLKeyPath:    site.SSLKeyPath,
-		PHPProxy:      "unix:" + filepath.Join(cfg.Paths.PHPFPMSock, site.Domain+".sock"),
+		PHPProxy:      "unix:" + phpSocketPath(cfg, site.PHPPoolPath, site.Domain),
 		TemplateVer:   templateVer,
 		AccessLogMode: accessLogMode,
 		FCacheEnabled: site.FCacheEnabled,

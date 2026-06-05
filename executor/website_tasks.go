@@ -107,10 +107,14 @@ func executeCreateSite(task *Task) TaskResult {
 	logDir := filepath.Join(cfg.Paths.WWWLogs, domain)
 	dbName := "db_" + siteName
 	dbUser := "user_" + siteName
-	phpPoolPath := filepath.Join(cfg.Paths.PHPFPMPool, domain+".conf")
-	nginxConfPath := filepath.Join(cfg.Paths.NginxSitesAvailable, domain+".conf")
-	nginxEnabledPath := filepath.Join(cfg.Paths.NginxSitesEnabled, domain+".conf")
-	phpSockPath := filepath.Join(cfg.Paths.PHPFPMSock, domain+".sock")
+	configBase := siteConfigBaseName(siteName)
+	phpPoolPath := filepath.Join(cfg.Paths.PHPFPMPool, configBase+".conf")
+	nginxConfPath := filepath.Join(cfg.Paths.NginxSitesAvailable, configBase+".conf")
+	nginxEnabledPath := filepath.Join(cfg.Paths.NginxSitesEnabled, configBase+".conf")
+	phpSockPath := filepath.Join(cfg.Paths.PHPFPMSock, configBase+".sock")
+	if err := validateUnixSocketPath(phpSockPath); err != nil {
+		return TaskResult{Success: false, Message: err.Error()}
+	}
 
 	if err := ensureCreateSiteResourcesAvailable(systemUser, webRoot, logDir, dbName, dbUser, phpPoolPath, nginxConfPath, nginxEnabledPath, phpSockPath); err != nil {
 		log.Printf("站点资源名冲突 domain=%s: %v", domain, err)
@@ -200,9 +204,11 @@ func executeCreateSite(task *Task) TaskResult {
 
 	phpData := &PHPFPMPoolData{
 		Domain:     domain,
+		PoolName:   configBase,
 		SystemUser: systemUser,
 		WebRoot:    webRoot,
 		SocketPath: cfg.Paths.PHPFPMSock,
+		SocketName: configBase,
 	}
 	phpConfig, err := engine.RenderPHPFPMPool(phpData)
 	if err != nil {
@@ -387,7 +393,7 @@ func executeDeleteSite(task *Task) TaskResult {
 	_ = dropMariaDBDatabase(site.DBName, site.DBUser, cfg)
 
 	os.Remove(site.PHPPoolPath)
-	enabledPath := filepath.Join(cfg.Paths.NginxSitesEnabled, site.Domain+".conf")
+	enabledPath := nginxEnabledPath(cfg, site.NginxConfPath, site.Domain)
 	os.Remove(enabledPath)
 	os.Remove(site.NginxConfPath)
 
@@ -501,28 +507,25 @@ func executeUpdateDomains(task *Task) TaskResult {
 		oldNginxConf := site.NginxConfPath
 		oldPHPPool := site.PHPPoolPath
 		oldCertDir := filepath.Join(cfg.Paths.Certificates, oldDomain)
-		oldEnabledLink := filepath.Join(cfg.Paths.NginxSitesEnabled, oldDomain+".conf")
+		oldEnabledLink := nginxEnabledPath(cfg, oldNginxConf, oldDomain)
 
 		newWebRoot := filepath.Join(cfg.Paths.WWWRoot, newDomain)
 		newLogDir := filepath.Join(cfg.Paths.WWWLogs, newDomain)
-		newNginxConf := filepath.Join(cfg.Paths.NginxSitesAvailable, newDomain+".conf")
-		newPHPPool := filepath.Join(cfg.Paths.PHPFPMPool, newDomain+".conf")
+		newNginxConf := oldNginxConf
+		newPHPPool := oldPHPPool
 		newCertDir := filepath.Join(cfg.Paths.Certificates, newDomain)
-		newEnabledLink := filepath.Join(cfg.Paths.NginxSitesEnabled, newDomain+".conf")
+		newEnabledLink := nginxEnabledPath(cfg, newNginxConf, newDomain)
+		poolName := phpPoolName(newPHPPool, newDomain)
+		if err := validateUnixSocketPath(phpSocketPath(cfg, newPHPPool, newDomain)); err != nil {
+			return TaskResult{Success: false, Message: err.Error()}
+		}
 		os.Remove(oldEnabledLink)
-		if _, err := os.Stat(newEnabledLink); err == nil {
+		if newEnabledLink != oldEnabledLink {
 			os.Remove(newEnabledLink)
 		}
 
 		nginxReload := func() { exec.Command("nginx", "-s", "reload").Run() }
-
-		if err := os.Rename(oldNginxConf, newNginxConf); err != nil {
-			nginxReload()
-			log.Printf("重命名 Nginx 配置文件失败: %v", err)
-			return TaskResult{Success: false, Message: "重命名 Nginx 配置文件失败"}
-		}
 		nginxRB := rollbackStep{"恢复Nginx配置", func() error {
-			os.Rename(newNginxConf, oldNginxConf)
 			os.Symlink(oldNginxConf, oldEnabledLink)
 			nginxReload()
 			return nil
@@ -530,13 +533,14 @@ func executeUpdateDomains(task *Task) TaskResult {
 		rollbacks = append(rollbacks, nginxRB)
 
 		oldPoolContent, _ := os.ReadFile(oldPHPPool)
-		os.Remove(oldPHPPool)
 		engine := NewTemplateEngine(cfg.Panel.BackupDir)
 		phpData := &PHPFPMPoolData{
 			Domain:     newDomain,
+			PoolName:   poolName,
 			SystemUser: site.SystemUser,
 			WebRoot:    newWebRoot,
 			SocketPath: cfg.Paths.PHPFPMSock,
+			SocketName: poolName,
 		}
 		phpConfig, err := engine.RenderPHPFPMPool(phpData)
 		if err != nil {
@@ -654,7 +658,7 @@ func executeUpdateDomains(task *Task) TaskResult {
 	}
 
 	if err := engine.ApplyNginxConfig(nginxConfig, site.NginxConfPath,
-		filepath.Join(cfg.Paths.NginxSitesEnabled, newDomain+".conf")); err != nil {
+		nginxEnabledPath(cfg, site.NginxConfPath, newDomain)); err != nil {
 		log.Printf("应用 Nginx 配置失败: %v", err)
 		return TaskResult{Success: false, Message: "应用 Nginx 配置失败"}
 	}

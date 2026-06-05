@@ -136,6 +136,11 @@ func (h *WebsiteHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
 		return
 	}
+	if w.SiteType == "wordpress" {
+		if prefix, err := executor.ReadWPTablePrefix(w.WebRoot); err == nil {
+			w.TablePrefix = prefix
+		}
+	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(w))
 }

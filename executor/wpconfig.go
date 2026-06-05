@@ -114,6 +114,33 @@ require_once ABSPATH . 'wp-settings.php';
 	return os.WriteFile(configPath, []byte(config), 0600)
 }
 
+func ReadWPTablePrefix(webRoot string) (string, error) {
+	configPath := filepath.Join(webRoot, "wp-config.php")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", err
+	}
+	prefix, ok := extractWPTablePrefix(string(content))
+	if !ok {
+		return "", fmt.Errorf("未找到 table_prefix 定义")
+	}
+	return prefix, nil
+}
+
+func extractWPTablePrefix(content string) (string, bool) {
+	for _, pattern := range []string{
+		`(?m)\$table_prefix\s*=\s*'([^']*)'\s*;`,
+		`(?m)\$table_prefix\s*=\s*"([^"]*)"\s*;`,
+	} {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(content)
+		if len(matches) == 2 {
+			return matches[1], true
+		}
+	}
+	return "", false
+}
+
 func wpCacheKeySalt(domain string) string {
 	domain = strings.ToLower(strings.TrimSpace(domain))
 	if domain == "" {

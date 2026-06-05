@@ -34,9 +34,11 @@ type NginxSiteData struct {
 
 type PHPFPMPoolData struct {
 	Domain     string
+	PoolName   string
 	SystemUser string
 	WebRoot    string
 	SocketPath string
+	SocketName string
 }
 
 type TemplateEngine struct {
@@ -88,6 +90,12 @@ func (e *TemplateEngine) RenderNginxConfig(data *NginxSiteData) (string, error) 
 }
 
 func (e *TemplateEngine) RenderPHPFPMPool(data *PHPFPMPoolData) (string, error) {
+	if data.PoolName == "" {
+		data.PoolName = data.Domain
+	}
+	if data.SocketName == "" {
+		data.SocketName = data.PoolName
+	}
 	tmpl, err := template.New("php_fpm_pool").Parse(phpFPMPoolTemplate)
 	if err != nil {
 		return "", fmt.Errorf("模板解析失败: %w", err)
@@ -504,11 +512,11 @@ server {
 const phpFPMPoolTemplate = `; WP Panel Generated — v1.0
 ; Site: {{.Domain}}
 
-[{{.Domain}}]
+[{{.PoolName}}]
 user = {{.SystemUser}}
 group = {{.SystemUser}}
 
-listen = {{.SocketPath}}/{{.Domain}}.sock
+listen = {{.SocketPath}}/{{.SocketName}}.sock
 listen.owner = www-data
 listen.group = www-data
 listen.mode = 0660

@@ -23,6 +23,7 @@ type Website struct {
 	LogDir             string        `json:"log_dir"`
 	DBName             string        `json:"db_name"`
 	DBUser             string        `json:"db_user"`
+	TablePrefix        string        `json:"table_prefix"`
 	PHPPoolPath        string        `json:"php_pool_path"`
 	NginxConfPath      string        `json:"nginx_conf_path"`
 	SiteType           string        `json:"site_type"`

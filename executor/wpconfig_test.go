@@ -57,3 +57,13 @@ func TestGenerateWPTablePrefix(t *testing.T) {
 		t.Fatalf("expected random table prefixes, got %q twice", first)
 	}
 }
+
+func TestExtractWPTablePrefix(t *testing.T) {
+	prefix, ok := extractWPTablePrefix("<?php\n$table_prefix = 'wp_ab12cd34_';\n")
+	if !ok {
+		t.Fatal("expected table prefix to be detected")
+	}
+	if prefix != "wp_ab12cd34_" {
+		t.Fatalf("unexpected table prefix: %q", prefix)
+	}
+}

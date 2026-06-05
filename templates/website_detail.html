@@ -68,6 +68,7 @@
             <dl class="space-y-3 mb-4">
                 <div><dt class="text-sm text-gray-400">数据库名</dt><dd class="text-white font-mono text-sm" x-text="site.db_name"></dd></div>
                 <div><dt class="text-sm text-gray-400">用户名</dt><dd class="text-white font-mono text-sm" x-text="site.db_user"></dd></div>
+                <div x-show="site.site_type === 'wordpress'"><dt class="text-sm text-gray-400">表前缀</dt><dd class="text-white font-mono text-sm" x-text="site.table_prefix || '未检测到'"></dd></div>
             </dl>
             <button @click="dbPasswordModal = true" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">修改密码</button>
             <button @click="fixWPConfig()" :disabled="dbSubmitting" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #14532d; color: #86efac;" x-text="dbSubmitting ? '处理中...' : '同步数据库信息'"></button>

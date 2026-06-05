@@ -30,6 +30,11 @@ func IsValidDomain(domain string) bool {
 	if len(domain) < 3 || len(domain) > 253 {
 		return false
 	}
+	for _, label := range strings.Split(domain, ".") {
+		if len(label) == 0 || len(label) > 63 {
+			return false
+		}
+	}
 	re := regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`)
 	return re.MatchString(domain)
 }
