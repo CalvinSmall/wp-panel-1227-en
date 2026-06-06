@@ -358,8 +358,21 @@
                             </td>
                         </tr>
                     </template>
+                    <tr x-show="logs.length === 0">
+                        <td colspan="4" class="table-cell text-center text-gray-500 py-8">暂无操作日志</td>
+                    </tr>
                 </tbody>
             </table>
+        </div>
+        <div x-show="logTotalPages > 1" class="flex items-center justify-between mt-4 pt-3 border-t border-gray-700/50">
+            <span class="text-sm text-gray-400" x-text="`共 ${logTotal} 条记录`"></span>
+            <div class="flex items-center space-x-1">
+                <button @click="logGoPage(logPage-1)" :disabled="logPage <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+                <template x-for="p in logPageNumbers" :key="p">
+                    <button @click="logGoPage(p)" :class="p === logPage ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'" class="px-3 py-1 text-sm rounded" x-text="p"></button>
+                </template>
+                <button @click="logGoPage(logPage+1)" :disabled="logPage >= logTotalPages" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+            </div>
         </div>
     </div>
 </div>
@@ -605,8 +618,34 @@ function versionCheck() {
 function operationLogs() {
     return {
         logs: [],
+        logPage: 1,
+        logTotalPages: 1,
+        logTotal: 0,
         async fetchLogs() {
-            try { const r = await api('/settings/logs'); if (r.success) this.logs = r.data || []; } catch(e) {}
+            try {
+                const r = await api('/settings/logs?page=' + this.logPage);
+                if (r.success) {
+                    this.logs = r.data?.data || r.data || [];
+                    this.logTotal = r.data?.total || this.logs.length;
+                    this.logPage = r.data?.page || 1;
+                    this.logTotalPages = r.data?.total_pages || 1;
+                }
+            } catch(e) {}
+        },
+        logGoPage(p) {
+            if (p < 1 || p > this.logTotalPages) return;
+            this.logPage = p;
+            this.fetchLogs();
+        },
+        get logPageNumbers() {
+            const pages = [];
+            const total = this.logTotalPages;
+            const current = this.logPage;
+            let start = Math.max(1, current - 2);
+            let end = Math.min(total, start + 4);
+            if (end - start < 4) start = Math.max(1, end - 4);
+            for (let i = start; i <= end; i++) pages.push(i);
+            return pages;
         }
     }
 }

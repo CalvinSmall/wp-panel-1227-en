@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/naibabiji/wp-panel/database"
 	"github.com/naibabiji/wp-panel/executor"
@@ -15,19 +16,45 @@ type FirewallHandler struct{}
 
 func (h *FirewallHandler) ListBans(c *gin.Context) {
 	db := database.GetDB()
-	if c.Query("history") != "1" {
+	isHistory := c.Query("history") == "1"
+
+	if !isHistory {
 		executor.SyncFail2banBans()
 		executor.CleanExpiredBans()
 	}
 
-	query := `SELECT id, ip_address, ban_level, reason, source_jail, banned_at, expires_at, unbanned_at, ban_count, is_manual
-	 FROM firewall_bans WHERE unbanned_at IS NULL AND (expires_at IS NULL OR expires_at > datetime('now')) ORDER BY banned_at DESC`
-	if c.Query("history") == "1" {
-		query = `SELECT id, ip_address, ban_level, reason, source_jail, banned_at, expires_at, unbanned_at, ban_count, is_manual
-		 FROM firewall_bans ORDER BY banned_at DESC LIMIT 30`
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	perPage := 30
+	search := strings.TrimSpace(c.Query("search"))
+
+	var where string
+	var args []interface{}
+
+	if isHistory {
+		where = "1=1"
+	} else {
+		where = "unbanned_at IS NULL AND (expires_at IS NULL OR expires_at > datetime('now'))"
 	}
 
-	rows, err := db.Query(query)
+	if search != "" {
+		where += " AND ip_address LIKE ?"
+		args = append(args, "%"+search+"%")
+	}
+
+	var total int
+	countArgs := make([]interface{}, len(args))
+	copy(countArgs, args)
+	db.QueryRow("SELECT COUNT(*) FROM firewall_bans WHERE "+where, countArgs...).Scan(&total)
+
+	offset := (page - 1) * perPage
+	query := `SELECT id, ip_address, ban_level, reason, source_jail, banned_at, expires_at, unbanned_at, ban_count, is_manual
+	 FROM firewall_bans WHERE ` + where + ` ORDER BY banned_at DESC LIMIT ? OFFSET ?`
+	args = append(args, perPage, offset)
+
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
 		return
@@ -49,7 +76,18 @@ func (h *FirewallHandler) ListBans(c *gin.Context) {
 		bans = []models.FirewallBan{}
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(bans))
+	totalPages := (total + perPage - 1) / perPage
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
+		"data":       bans,
+		"total":      total,
+		"page":       page,
+		"per_page":   perPage,
+		"total_pages": totalPages,
+	}))
 }
 
 func (h *FirewallHandler) Unban(c *gin.Context) {

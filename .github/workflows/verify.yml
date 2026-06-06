@@ -1,0 +1,38 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test
+        run: |
+          packages=$(go list ./... | grep -v '/scratch$')
+          go test $packages
+
+      - name: Vet
+        run: |
+          packages=$(go list ./... | grep -v '/scratch$')
+          go vet $packages
+
+      - name: Build
+        run: go build .

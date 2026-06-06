@@ -125,7 +125,13 @@
     </div>
 
     <div class="card mb-6">
-        <h3 class="text-lg font-semibold text-white mb-4">当前封禁列表</h3>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-white">当前封禁列表</h3>
+            <div class="flex items-center space-x-2">
+                <input type="text" x-model="searchIP" @keydown.enter="page=1;fetchBans()" class="input-field text-sm py-1.5 w-48" placeholder="搜索 IP 地址...">
+                <button @click="page=1;fetchBans()" class="btn-secondary text-xs py-1.5 px-3">搜索</button>
+            </div>
+        </div>
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="border-b border-gray-700">
@@ -166,9 +172,19 @@
                 </tbody>
             </table>
         </div>
+        <div x-show="totalPages > 1" class="flex items-center justify-between mt-4 pt-3 border-t border-gray-700/50">
+            <span class="text-sm text-gray-400" x-text="`共 ${total} 条记录`"></span>
+            <div class="flex items-center space-x-1">
+                <button @click="goPage(page-1)" :disabled="page <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+                <template x-for="p in pageNumbers" :key="p">
+                    <button @click="goPage(p)" :class="p === page ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'" class="px-3 py-1 text-sm rounded" x-text="p"></button>
+                </template>
+                <button @click="goPage(page+1)" :disabled="page >= totalPages" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+            </div>
+        </div>
     </div>
 
-    <div class="card" x-data="{history:[], loaded:false}" x-init="api('/firewall/bans?history=1').then(r => { if (r.success) history = r.data || []; loaded = true }).catch(e => {})">
+    <div class="card" x-data="{history:[], loaded:false}" x-init="api('/firewall/bans?history=1').then(r => { if (r.success) history = r.data?.data || r.data || []; loaded = true }).catch(e => {})">
         <h3 class="text-lg font-semibold text-white mb-4">历史封禁记录（最近30条）</h3>
         <div class="overflow-x-auto">
             <table class="w-full">
@@ -213,8 +229,37 @@ function firewallManager() {
         banDuration: '600',
         banSubmitting: false,
         showRules: false,
+        searchIP: '',
+        page: 1,
+        totalPages: 1,
+        total: 0,
         async fetchBans() {
-            try { const r = await api('/firewall/bans'); if (r.success) this.bans = r.data || []; } catch(e) {}
+            try {
+                let url = '/firewall/bans?page=' + this.page;
+                if (this.searchIP.trim()) url += '&search=' + encodeURIComponent(this.searchIP.trim());
+                const r = await api(url);
+                if (r.success) {
+                    this.bans = r.data?.data || r.data || [];
+                    this.total = r.data?.total || this.bans.length;
+                    this.page = r.data?.page || 1;
+                    this.totalPages = r.data?.total_pages || 1;
+                }
+            } catch(e) {}
+        },
+        goPage(p) {
+            if (p < 1 || p > this.totalPages) return;
+            this.page = p;
+            this.fetchBans();
+        },
+        get pageNumbers() {
+            const pages = [];
+            const total = this.totalPages;
+            const current = this.page;
+            let start = Math.max(1, current - 2);
+            let end = Math.min(total, start + 4);
+            if (end - start < 4) start = Math.max(1, end - 4);
+            for (let i = start; i <= end; i++) pages.push(i);
+            return pages;
         },
         banLevelText(l) { return ['','限速','临时10分钟','临时24小时','临时30天','永久封禁'][l] || '未知'; },
         banLevelClass(l) { return ['','badge-info','badge-warning','badge-danger','badge-danger','badge-danger'][l] || 'badge-info'; },

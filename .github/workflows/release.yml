@@ -21,6 +21,10 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Prepare static assets
         run: |
           mkdir -p static/css static/js bin
@@ -33,8 +37,15 @@ jobs:
           chmod +x bin/tailwindcss
           bin/tailwindcss -i input.css -o static/css/main.css --minify
 
+      - name: Test
+        run: |
+          packages=$(go list ./... | grep -v '/scratch$')
+          go test $packages
+
       - name: Static check
-        run: go vet ./...
+        run: |
+          packages=$(go list ./... | grep -v '/scratch$')
+          go vet $packages
 
       - name: Build binary
         run: |

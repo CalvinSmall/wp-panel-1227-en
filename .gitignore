@@ -6,6 +6,7 @@
 
 
 # Go
+.gocache/
 
 # 系统
 .DS_Store
@@ -26,6 +27,9 @@ setup.sh
 # Wrangler
 stats-worker/.wrangler/
 stats-worker/wrangler.toml
+
+# Docs（本地参考，不提交）
+docs/
 
 # Scratch
 scratch/

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -232,9 +233,20 @@ func (h *SettingsHandler) TestProxy(c *gin.Context) {
 
 func (h *SettingsHandler) GetOperationLogs(c *gin.Context) {
 	db := database.GetDB()
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	perPage := 100
+
+	var total int
+	db.QueryRow("SELECT COUNT(*) FROM operation_logs").Scan(&total)
+
+	offset := (page - 1) * perPage
 	rows, err := db.Query(
 		`SELECT id, operation, target, status, message, created_at
-		 FROM operation_logs ORDER BY created_at DESC LIMIT 50`,
+		 FROM operation_logs ORDER BY created_at DESC LIMIT ? OFFSET ?`, perPage, offset,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
@@ -254,7 +266,18 @@ func (h *SettingsHandler) GetOperationLogs(c *gin.Context) {
 		logs = []models.OperationLog{}
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(logs))
+	totalPages := (total + perPage - 1) / perPage
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
+		"data":        logs,
+		"total":       total,
+		"page":        page,
+		"per_page":    perPage,
+		"total_pages": totalPages,
+	}))
 }
 
 func GetPanelTitle() string {
