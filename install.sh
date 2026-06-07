@@ -552,6 +552,7 @@ apt-get install -y \
     redis-server \
     fail2ban \
     nftables \
+    sshpass \
     rsyslog \
     cron \
     php8.3-fpm \

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/naibabiji/wp-panel/database"
@@ -33,6 +34,8 @@ const (
 	binaryName  = "wp-panel"
 	installPath = "/usr/local/bin/wp-panel"
 )
+
+var updateMu sync.Mutex
 
 func getGithubProxy() string {
 	var v string
@@ -82,6 +85,11 @@ func (h *UpdateHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("仅支持 Linux 服务器更新"))
 		return
 	}
+	if !updateMu.TryLock() {
+		c.JSON(http.StatusConflict, models.ErrorResponse("已有更新任务正在执行，请稍后再试"))
+		return
+	}
+	defer updateMu.Unlock()
 
 	proxy := getGithubProxy()
 
@@ -136,7 +144,10 @@ func (h *UpdateHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("下载失败"))
 		return
 	}
-	os.Chmod(newBinary, 0755)
+	if err := os.Chmod(newBinary, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("设置新版本权限失败"))
+		return
+	}
 
 	// Verify SHA256
 	shaFile := filepath.Join(tmpDir, binaryName+".sha256")
@@ -160,37 +171,37 @@ func (h *UpdateHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// Backup old binary
-	backupPath := installPath + ".bak"
-	if _, err := os.Stat(installPath); err == nil {
-		os.Rename(installPath, backupPath)
+	if err := preflightBinary(newBinary); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("新版本预检失败"))
+		return
 	}
 
-	// Copy new binary (cannot os.Rename cross-filesystem from /tmp)
-	src, err := os.Open(newBinary)
-	if err != nil {
-		os.Rename(backupPath, installPath)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换失败，已回滚"))
+	backupPath := versionedBackupPath(h.CurrentVersion)
+	if err := copyFile(installPath, backupPath, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("备份旧版本失败"))
 		return
 	}
-	defer src.Close()
-	dst, err := os.Create(installPath)
-	if err != nil {
-		src.Close()
-		os.Rename(backupPath, installPath)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换失败，已回滚"))
+
+	stagedBinary := installPath + ".new"
+	os.Remove(stagedBinary)
+	if err := copyFile(newBinary, stagedBinary, 0755); err != nil {
+		os.Remove(stagedBinary)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("暂存新版本失败"))
 		return
 	}
-	if _, err := io.Copy(dst, src); err != nil {
-		dst.Close()
-		src.Close()
-		os.Remove(installPath)
-		os.Rename(backupPath, installPath)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换失败，已回滚"))
+	if err := os.Rename(stagedBinary, installPath); err != nil {
+		os.Remove(stagedBinary)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换失败，旧版本仍保留"))
 		return
 	}
-	dst.Close()
-	os.Chmod(installPath, 0755)
+	if err := os.Chmod(installPath, 0755); err != nil {
+		if rbErr := copyFile(backupPath, installPath, 0755); rbErr != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换后权限设置失败，且自动回滚失败"))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换后权限设置失败，已回滚"))
+		return
+	}
 
 	// Restart service
 	go func() {
@@ -204,7 +215,8 @@ func (h *UpdateHandler) Update(c *gin.Context) {
 }
 
 func downloadFile(url, dest string) error {
-	resp, err := http.Get(url)
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Get(url)
 	if err != nil {
 		return err
 	}
@@ -214,14 +226,21 @@ func downloadFile(url, dest string) error {
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	out, err := os.Create(dest)
+	out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
-	return err
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		out.Close()
+		os.Remove(dest)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		os.Remove(dest)
+		return err
+	}
+	return nil
 }
 
 func verifySHA256(filePath, shaFile string) error {
@@ -229,7 +248,14 @@ func verifySHA256(filePath, shaFile string) error {
 	if err != nil {
 		return err
 	}
-	expected := strings.Fields(string(data))[0]
+	fields := strings.Fields(string(data))
+	if len(fields) == 0 {
+		return fmt.Errorf("SHA256 文件为空")
+	}
+	expected := fields[0]
+	if len(expected) != sha256.Size*2 {
+		return fmt.Errorf("SHA256 长度异常")
+	}
 
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -238,12 +264,81 @@ func verifySHA256(filePath, shaFile string) error {
 	defer f.Close()
 
 	h := sha256.New()
-	io.Copy(h, f)
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
 	actual := fmt.Sprintf("%x", h.Sum(nil))
 
 	if !strings.EqualFold(expected, actual) {
 		return fmt.Errorf("SHA256 不匹配")
 	}
+	return nil
+}
+
+func preflightBinary(path string) error {
+	// Depends on the --info flag registered in main.go; keep this lightweight
+	// so updates fail before replacing the current binary when a build is broken.
+	cmd := exec.Command(path, "--info")
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func versionedBackupPath(currentVersion string) string {
+	version := sanitizeBackupPart(currentVersion)
+	if version == "" {
+		version = "unknown"
+	}
+	ts := time.Now().UTC().Format("20060102-150405")
+	return fmt.Sprintf("%s.bak.%s.%s", installPath, version, ts)
+}
+
+func sanitizeBackupPart(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func copyFile(srcPath, dstPath string, mode os.FileMode) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	copied := false
+	dstClosed := false
+	defer func() {
+		if !dstClosed {
+			dst.Close()
+		}
+		if !copied {
+			os.Remove(dstPath)
+		}
+	}()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return err
+	}
+	if err := dst.Close(); err != nil {
+		return err
+	}
+	dstClosed = true
+	if err := os.Chmod(dstPath, mode); err != nil {
+		return err
+	}
+	copied = true
 	return nil
 }
 

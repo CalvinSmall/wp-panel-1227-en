@@ -2,8 +2,11 @@ package executor
 
 import (
 	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -36,12 +39,8 @@ func executeCreateBackup(task *Task) TaskResult {
 		return TaskResult{Success: false, Message: "无法读取 MariaDB root 密码"}
 	}
 
-	cmd := exec.Command("bash", "-c",
-		fmt.Sprintf("mysqldump -u root %s | gzip > %s", site.DBName, filePath))
-	cmd.Env = append(os.Environ(), "MYSQL_PWD="+dbPass)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return TaskResult{Success: false, Message: fmt.Sprintf("备份失败: %s", string(out))}
+	if err := dumpDatabaseToGzip(site.DBName, dbPass, filePath); err != nil {
+		return TaskResult{Success: false, Message: "备份失败: " + err.Error()}
 	}
 
 	info, _ := os.Stat(filePath)
@@ -239,12 +238,8 @@ func executeAutoBackups() {
 		filename := fmt.Sprintf("%s_%s.sql.gz", domain, ts)
 		filePath := filepath.Join(backupDir, filename)
 
-		cmd := exec.Command("bash", "-c",
-			fmt.Sprintf("mysqldump -u root %s | gzip > %s", dbName, filePath))
-		cmd.Env = append(os.Environ(), "MYSQL_PWD="+dbPass)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Printf("自动备份失败 [%s]: %s", domain, string(out))
+		if err := dumpDatabaseToGzip(dbName, dbPass, filePath); err != nil {
+			log.Printf("自动备份失败 [%s]: %v", domain, err)
 			failCount++
 			continue
 		}
@@ -278,6 +273,74 @@ func getKeepCount(siteID int) int {
 		return 7
 	}
 	return kc
+}
+
+func dumpDatabaseToGzip(dbName, dbPass, filePath string) error {
+	if !isValidMySQLIdentifier(dbName) {
+		return fmt.Errorf("数据库名异常，已拒绝执行")
+	}
+
+	if err := os.MkdirAll(filepath.Dir(filePath), 0700); err != nil {
+		return fmt.Errorf("创建备份目录失败: %w", err)
+	}
+
+	outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return fmt.Errorf("创建备份文件失败: %w", err)
+	}
+	keepFile := false
+	fileClosed := false
+	defer func() {
+		if !fileClosed {
+			outFile.Close()
+		}
+		if !keepFile {
+			os.Remove(filePath)
+		}
+	}()
+
+	cmd := exec.Command("mysqldump", "-u", "root", dbName)
+	cmd.Env = append(os.Environ(), "MYSQL_PWD="+dbPass)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("准备导出失败: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("启动 mysqldump 失败: %w", err)
+	}
+
+	gz := gzip.NewWriter(outFile)
+	copyErr := error(nil)
+	if _, err := io.Copy(gz, stdout); err != nil {
+		copyErr = err
+	}
+	closeGzipErr := gz.Close()
+	closeFileErr := outFile.Close()
+	fileClosed = true
+	waitErr := cmd.Wait()
+
+	if copyErr != nil {
+		return fmt.Errorf("写入备份失败: %w", copyErr)
+	}
+	if closeGzipErr != nil {
+		return fmt.Errorf("完成 gzip 写入失败: %w", closeGzipErr)
+	}
+	if closeFileErr != nil {
+		return fmt.Errorf("保存备份文件失败: %w", closeFileErr)
+	}
+	if waitErr != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = waitErr.Error()
+		}
+		return fmt.Errorf("mysqldump 失败: %s", msg)
+	}
+
+	keepFile = true
+	return nil
 }
 
 func cleanupOldBackups(siteID int, domain string, keepCount int) {

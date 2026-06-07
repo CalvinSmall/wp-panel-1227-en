@@ -168,15 +168,9 @@ func main() {
 	// WordPress safety baseline (idempotent, only writes if not present)
 	executor.EnsureWordPressBaseline()
 	executor.EnsureWPCommand()
-	// 确保 sshpass 已安装（远程备份密码认证需要）
+	// 远程备份密码认证依赖 sshpass；启动路径只提示，不自动修改服务器软件状态。
 	if _, err := exec.LookPath("sshpass"); err != nil {
-		log.Println("sshpass 未安装，正在安装...")
-		exec.Command("apt-get", "update").Run()
-		if err := exec.Command("apt-get", "install", "-y", "sshpass").Run(); err != nil {
-			log.Printf("sshpass 安装失败，远程备份密码认证功能不可用: %v", err)
-		} else {
-			log.Println("sshpass 安装完成")
-		}
+		log.Println("sshpass 未安装，远程备份密码认证功能不可用；请通过安装脚本或包管理器手动安装")
 	}
 	executor.StartProcessGuard()
 	executor.StartAlertMonitor(Version)
