@@ -111,6 +111,20 @@
                     <button @click="checkUpdate()" :disabled="checking" class="btn-secondary text-xs" x-text="checking ? '检查中...' : '检查更新'"></button>
                     <button @click="doUpdate()" x-show="hasUpdate" :disabled="updating" class="btn-primary text-xs" x-text="updating ? '更新中...' : '立即更新'"></button>
                 </div>
+                <div x-show="updating || updateStatus.running || updateStatus.completed || updateStatus.error" class="mt-3 p-3 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs" :class="updateStatus.error ? 'text-red-400' : 'text-gray-300'" x-text="updateStatusText()"></span>
+                        <span class="text-xs text-gray-500" x-text="progressLabel()"></span>
+                    </div>
+                    <div class="h-2 rounded overflow-hidden" style="background-color: #020617;">
+                        <div class="h-full transition-all duration-300" :style="'width: ' + progressPercent() + '%; background-color: ' + (updateStatus.error ? '#dc2626' : '#059669')"></div>
+                    </div>
+                    <div x-show="updateStatus.stage === 'download_binary' && updateStatus.has_total" class="flex justify-between mt-2 text-xs text-gray-500">
+                        <span x-text="formatBytes(updateStatus.downloaded_bytes || 0)"></span>
+                        <span x-text="formatBytes(updateStatus.total_bytes || 0)"></span>
+                    </div>
+                    <p x-show="updating && !updateStatus.error && !updateStatus.completed" class="text-xs text-yellow-500 mt-2">更新期间请勿关闭或刷新页面。</p>
+                </div>
                 <p x-show="updateError" class="text-xs text-red-400 mt-2" x-text="updateError"></p>
             </div>
 
@@ -622,6 +636,11 @@ function versionCheck() {
         checking: false,
         updating: false,
         updateError: "",
+        updateStatus: { running: false, completed: false, stage: "idle", message: "", percent: 0, download_percent: 0, downloaded_bytes: 0, total_bytes: 0, has_total: false, error: "" },
+        pollTimer: null,
+        updateStarting: false,
+        pollStartedAt: 0,
+        maxPollMs: 12 * 60 * 1000,
         async fetchVersion() {
             try {
                 const r = await api("/update/check");
@@ -641,15 +660,101 @@ function versionCheck() {
             if (!this.hasUpdate && !this.updateError) showToast("已是最新版本", "success");
             this.checking = false;
         },
+        progressPercent() {
+            const percent = Number(this.updateStatus.percent || 0);
+            return Math.max(0, Math.min(100, percent));
+        },
+        progressLabel() {
+            if (this.updateStatus.stage === "download_binary" && this.updateStatus.has_total) {
+                return (this.updateStatus.download_percent || 0) + "%";
+            }
+            return this.progressPercent() + "%";
+        },
+        updateStatusText() {
+            if (this.updateStatus.error) return this.updateStatus.error;
+            if (this.updateStatus.stage === "download_binary") {
+                if (this.updateStatus.has_total) {
+                    return (this.updateStatus.message || "正在下载更新包...") + " " + (this.updateStatus.download_percent || 0) + "%";
+                }
+                if (this.updateStatus.downloaded_bytes > 0) {
+                    return (this.updateStatus.message || "正在下载更新包...") + " 已下载 " + formatBytes(this.updateStatus.downloaded_bytes);
+                }
+            }
+            return this.updateStatus.message || "正在准备更新...";
+        },
+        async fetchUpdateStatus() {
+            const prefix = document.body.dataset.panelPrefix || "";
+            try {
+                const resp = await fetch(prefix + "/api/update/status", {
+                    headers: { "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content || "" },
+                });
+                if (!resp.ok) throw new Error("status " + resp.status);
+                const r = await resp.json();
+                if (r.success) {
+                    const nextStatus = Object.assign({}, this.updateStatus, r.data || {});
+                    if (this.updateStarting && !nextStatus.running) {
+                        return;
+                    }
+                    if (nextStatus.running) this.updateStarting = false;
+                    this.updateStatus = nextStatus;
+                    if (!this.updateStatus.running && this.pollTimer && (!this.updating || this.updateStatus.completed || this.updateStatus.error)) {
+                        clearInterval(this.pollTimer);
+                        this.pollTimer = null;
+                    }
+                }
+            } catch(e) {
+                if (this.updating) {
+                    this.updateStatus = Object.assign({}, this.updateStatus, {
+                        running: true,
+                        message: "面板正在重启或暂时无法连接...",
+                        percent: Math.max(this.progressPercent(), 98),
+                    });
+                }
+            }
+            if (this.updating && this.pollStartedAt && Date.now() - this.pollStartedAt > this.maxPollMs) {
+                if (this.pollTimer) {
+                    clearInterval(this.pollTimer);
+                    this.pollTimer = null;
+                }
+                this.updateStarting = false;
+                this.updating = false;
+                this.updateStatus = Object.assign({}, this.updateStatus, {
+                    running: false,
+                    error: "更新状态查询超时，请刷新页面确认面板状态。",
+                });
+            }
+        },
+        startStatusPolling() {
+            if (this.pollTimer) clearInterval(this.pollTimer);
+            this.updateStarting = true;
+            this.pollStartedAt = Date.now();
+            this.fetchUpdateStatus();
+            this.pollTimer = setInterval(() => this.fetchUpdateStatus(), 1000);
+        },
         async doUpdate() {
             if (!await confirmModal("确认更新到 " + this.latestVersion + "？更新期间面板将短暂不可用。")) return;
             this.updating = true;
+            this.updateError = "";
+            this.updateStatus = { running: true, completed: false, stage: "fetch_release", message: "正在准备更新...", percent: 5, download_percent: 0, downloaded_bytes: 0, total_bytes: 0, has_total: false, error: "" };
+            this.startStatusPolling();
             try {
                 const r = await api("/update/do", { method: "POST" });
+                this.updateStarting = false;
+                await this.fetchUpdateStatus();
+                if (!this.updateStatus.completed) {
+                    this.updateStatus = Object.assign({}, this.updateStatus, { running: false, completed: true, message: this.updateStatus.message || "更新完成，面板正在重启...", percent: 100, error: "" });
+                }
                 showToast(r.data?.message || "更新已启动", "success");
                 this.updateError = "更新完成，面板正在重启，3 秒后自动刷新...";
                 setTimeout(() => { location.reload(); }, 3000);
-            } catch(e) { showToast(e.message, "error"); this.updating = false; }
+            } catch(e) {
+                this.updateStarting = false;
+                await this.fetchUpdateStatus();
+                this.updateError = e.message;
+                this.updateStatus = Object.assign({}, this.updateStatus, { running: false, error: this.updateStatus.error || e.message });
+                showToast(e.message, "error");
+                this.updating = false;
+            }
         }
     }
 }

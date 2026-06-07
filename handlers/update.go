@@ -36,6 +36,29 @@ const (
 )
 
 var updateMu sync.Mutex
+var updateStatusMu sync.Mutex
+
+const updateTerminalStatusTTL = 5 * time.Minute
+
+type panelUpdateStatus struct {
+	Running         bool      `json:"running"`
+	Completed       bool      `json:"completed"`
+	Stage           string    `json:"stage"`
+	Message         string    `json:"message"`
+	Percent         int       `json:"percent"`
+	DownloadPercent int       `json:"download_percent"`
+	DownloadedBytes int64     `json:"downloaded_bytes"`
+	TotalBytes      int64     `json:"total_bytes"`
+	HasTotal        bool      `json:"has_total"`
+	Error           string    `json:"error"`
+	UpdatedAt       time.Time `json:"-"`
+}
+
+var currentUpdateStatus = panelUpdateStatus{
+	Stage:     "idle",
+	Message:   "等待更新",
+	UpdatedAt: time.Now(),
+}
 
 func getGithubProxy() string {
 	var v string
@@ -80,6 +103,10 @@ func (h *UpdateHandler) Check(c *gin.Context) {
 	}))
 }
 
+func (h *UpdateHandler) Status(c *gin.Context) {
+	c.JSON(http.StatusOK, models.SuccessResponse(snapshotUpdateStatus()))
+}
+
 func (h *UpdateHandler) Update(c *gin.Context) {
 	if runtime.GOOS != "linux" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("仅支持 Linux 服务器更新"))
@@ -91,19 +118,26 @@ func (h *UpdateHandler) Update(c *gin.Context) {
 	}
 	defer updateMu.Unlock()
 
+	resetUpdateStatus()
 	proxy := getGithubProxy()
+	setUpdateStep("fetch_release", "正在获取版本信息...", 5)
+	fail := func(code int, message string) {
+		setUpdateFailed(message)
+		c.JSON(code, models.ErrorResponse(message))
+	}
 
 	latest, err := executor.FetchLatestPanelRelease(proxy)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("获取版本信息失败"))
+		fail(http.StatusInternalServerError, "获取版本信息失败")
 		return
 	}
 
 	if executor.CompareVersions(latest.TagName, h.CurrentVersion) <= 0 {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("已经是最新版本"))
+		fail(http.StatusBadRequest, "已经是最新版本")
 		return
 	}
 
+	setUpdateStep("resolve_assets", "正在准备更新文件...", 10)
 	var downloadURL string
 	var sha256URL string
 	var sigURL string
@@ -119,103 +153,118 @@ func (h *UpdateHandler) Update(c *gin.Context) {
 		}
 	}
 	if downloadURL == "" {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("未找到适用于当前系统的二进制文件"))
+		fail(http.StatusInternalServerError, "未找到适用于当前系统的二进制文件")
 		return
 	}
 	if sha256URL == "" {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("未找到 SHA256 校验文件，无法验证更新完整性"))
+		fail(http.StatusInternalServerError, "未找到 SHA256 校验文件，无法验证更新完整性")
 		return
 	}
 	if sigURL == "" {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("未找到 Ed25519 签名文件，无法验证更新来源"))
+		fail(http.StatusInternalServerError, "未找到 Ed25519 签名文件，无法验证更新来源")
 		return
 	}
 
 	// Download new binary
+	setUpdateStep("prepare_download", "正在创建临时目录...", 12)
 	tmpDir, err := os.MkdirTemp("", "wp-panel-update-*")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建临时目录失败"))
+		fail(http.StatusInternalServerError, "创建临时目录失败")
 		return
 	}
 	defer os.RemoveAll(tmpDir)
 
 	newBinary := filepath.Join(tmpDir, binaryName)
-	if err := downloadFile(proxyURL(proxy, downloadURL), newBinary); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("下载失败"))
+	setUpdateStep("download_binary", "正在下载更新包...", 15)
+	if err := downloadFileWithProgress(proxyURL(proxy, downloadURL), newBinary, 10*time.Minute, setBinaryDownloadProgress); err != nil {
+		fail(http.StatusInternalServerError, "下载失败")
 		return
 	}
 	if err := os.Chmod(newBinary, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("设置新版本权限失败"))
+		fail(http.StatusInternalServerError, "设置新版本权限失败")
 		return
 	}
 
 	// Verify SHA256
+	setUpdateStep("download_sha256", "正在下载校验文件...", 62)
 	shaFile := filepath.Join(tmpDir, binaryName+".sha256")
 	if err := downloadFile(proxyURL(proxy, sha256URL), shaFile); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("SHA256 校验文件下载失败"))
+		fail(http.StatusInternalServerError, "SHA256 校验文件下载失败")
 		return
 	}
+	setUpdateStep("verify_sha256", "正在校验更新包完整性...", 68)
 	if err := verifySHA256(newBinary, shaFile); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("校验失败"))
+		fail(http.StatusInternalServerError, "校验失败")
 		return
 	}
 
 	// Verify Ed25519 signature of checksum file
+	setUpdateStep("download_signature", "正在下载签名文件...", 72)
 	sigFile := filepath.Join(tmpDir, binaryName+".sha256.sig")
 	if err := downloadFile(proxyURL(proxy, sigURL), sigFile); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("签名文件下载失败"))
+		fail(http.StatusInternalServerError, "签名文件下载失败")
 		return
 	}
+	setUpdateStep("verify_signature", "正在校验更新来源...", 78)
 	if err := verifyEd25519(shaFile, sigFile); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("签名校验失败"))
+		fail(http.StatusInternalServerError, "签名校验失败")
 		return
 	}
 
+	setUpdateStep("preflight", "正在预检新版本...", 82)
 	if err := preflightBinary(newBinary); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("新版本预检失败"))
+		fail(http.StatusInternalServerError, "新版本预检失败")
 		return
 	}
 
+	setUpdateStep("backup", "正在备份当前版本...", 88)
 	backupPath := versionedBackupPath(h.CurrentVersion)
 	if err := copyFile(installPath, backupPath, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("备份旧版本失败"))
+		fail(http.StatusInternalServerError, "备份旧版本失败")
 		return
 	}
 
+	setUpdateStep("replace_binary", "正在替换面板文件...", 92)
 	stagedBinary := installPath + ".new"
 	os.Remove(stagedBinary)
 	if err := copyFile(newBinary, stagedBinary, 0755); err != nil {
 		os.Remove(stagedBinary)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("暂存新版本失败"))
+		fail(http.StatusInternalServerError, "暂存新版本失败")
 		return
 	}
 	if err := os.Rename(stagedBinary, installPath); err != nil {
 		os.Remove(stagedBinary)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换失败，旧版本仍保留"))
+		fail(http.StatusInternalServerError, "替换失败，旧版本仍保留")
 		return
 	}
 	if err := os.Chmod(installPath, 0755); err != nil {
 		if rbErr := copyFile(backupPath, installPath, 0755); rbErr != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换后权限设置失败，且自动回滚失败"))
+			fail(http.StatusInternalServerError, "替换后权限设置失败，且自动回滚失败")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换后权限设置失败，已回滚"))
+		fail(http.StatusInternalServerError, "替换后权限设置失败，已回滚")
 		return
 	}
 
 	// Restart service
+	setUpdateStep("restart", "正在重启面板...", 98)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		exec.Command("systemctl", "restart", "wp-panel").Run()
 	}()
 
+	setUpdateCompleted("更新完成，面板正在重启...")
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
 		"message": fmt.Sprintf("正在更新到 %s，面板即将重启...", latest.TagName),
 	}))
 }
 
 func downloadFile(url, dest string) error {
-	client := &http.Client{Timeout: 60 * time.Second}
+	return downloadFileWithProgress(url, dest, 60*time.Second, nil)
+}
+
+func downloadFileWithProgress(url, dest string, timeout time.Duration, progress func(downloaded, total int64)) error {
+	client := &http.Client{Timeout: timeout}
 	resp, err := client.Get(url)
 	if err != nil {
 		return err
@@ -231,16 +280,144 @@ func downloadFile(url, dest string) error {
 		return err
 	}
 
-	if _, err := io.Copy(out, resp.Body); err != nil {
-		out.Close()
-		os.Remove(dest)
-		return err
+	if progress != nil {
+		progress(0, resp.ContentLength)
+	}
+	var downloaded int64
+	buf := make([]byte, 32*1024)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, err := out.Write(buf[:n]); err != nil {
+				out.Close()
+				os.Remove(dest)
+				return err
+			}
+			downloaded += int64(n)
+			if progress != nil {
+				progress(downloaded, resp.ContentLength)
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			out.Close()
+			os.Remove(dest)
+			return readErr
+		}
 	}
 	if err := out.Close(); err != nil {
 		os.Remove(dest)
 		return err
 	}
 	return nil
+}
+
+func snapshotUpdateStatus() panelUpdateStatus {
+	updateStatusMu.Lock()
+	defer updateStatusMu.Unlock()
+	if updateStatusExpiredLocked(time.Now()) {
+		resetUpdateStatusLocked()
+	}
+	return currentUpdateStatus
+}
+
+func resetUpdateStatus() {
+	updateStatusMu.Lock()
+	resetUpdateStatusLocked()
+	updateStatusMu.Unlock()
+}
+
+func resetUpdateStatusLocked() {
+	currentUpdateStatus = panelUpdateStatus{
+		Stage:     "idle",
+		Message:   "等待更新",
+		UpdatedAt: time.Now(),
+	}
+}
+
+func updateStatusExpiredLocked(now time.Time) bool {
+	if currentUpdateStatus.Running {
+		return false
+	}
+	if !currentUpdateStatus.Completed && currentUpdateStatus.Error == "" {
+		return false
+	}
+	return now.Sub(currentUpdateStatus.UpdatedAt) > updateTerminalStatusTTL
+}
+
+func setUpdateStep(stage, message string, percent int) {
+	updateStatusMu.Lock()
+	currentUpdateStatus.Running = true
+	currentUpdateStatus.Completed = false
+	currentUpdateStatus.Stage = stage
+	currentUpdateStatus.Message = message
+	currentUpdateStatus.Percent = clampPercent(percent)
+	currentUpdateStatus.DownloadPercent = 0
+	currentUpdateStatus.DownloadedBytes = 0
+	currentUpdateStatus.TotalBytes = 0
+	currentUpdateStatus.HasTotal = false
+	currentUpdateStatus.Error = ""
+	currentUpdateStatus.UpdatedAt = time.Now()
+	updateStatusMu.Unlock()
+}
+
+func setBinaryDownloadProgress(downloaded, total int64) {
+	hasTotal := total > 0
+	downloadPercent := 0
+	overallPercent := 15
+	if hasTotal {
+		downloadPercent = clampPercent(int(downloaded * 100 / total))
+		overallPercent = 15 + downloadPercent*45/100
+	}
+
+	updateStatusMu.Lock()
+	currentUpdateStatus.Running = true
+	currentUpdateStatus.Completed = false
+	currentUpdateStatus.Stage = "download_binary"
+	currentUpdateStatus.Message = "正在下载更新包..."
+	currentUpdateStatus.Percent = clampPercent(overallPercent)
+	currentUpdateStatus.DownloadPercent = downloadPercent
+	currentUpdateStatus.DownloadedBytes = downloaded
+	currentUpdateStatus.TotalBytes = total
+	currentUpdateStatus.HasTotal = hasTotal
+	currentUpdateStatus.Error = ""
+	currentUpdateStatus.UpdatedAt = time.Now()
+	updateStatusMu.Unlock()
+}
+
+func setUpdateFailed(message string) {
+	updateStatusMu.Lock()
+	currentUpdateStatus.Running = false
+	currentUpdateStatus.Completed = false
+	currentUpdateStatus.Message = message
+	currentUpdateStatus.Error = message
+	currentUpdateStatus.UpdatedAt = time.Now()
+	updateStatusMu.Unlock()
+}
+
+func setUpdateCompleted(message string) {
+	updateStatusMu.Lock()
+	currentUpdateStatus.Running = false
+	currentUpdateStatus.Completed = true
+	currentUpdateStatus.Stage = "completed"
+	currentUpdateStatus.Message = message
+	currentUpdateStatus.Percent = 100
+	currentUpdateStatus.DownloadPercent = 100
+	currentUpdateStatus.Error = ""
+	currentUpdateStatus.UpdatedAt = time.Now()
+	updateStatusMu.Unlock()
+}
+
+func clampPercent(percent int) int {
+	if percent < 0 {
+		return 0
+	}
+	if percent > 100 {
+		return 100
+	}
+	return percent
 }
 
 func verifySHA256(filePath, shaFile string) error {
