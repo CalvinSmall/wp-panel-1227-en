@@ -148,6 +148,119 @@ func TestFileOperationNameRejectsTraversal(t *testing.T) {
 	}
 }
 
+func TestFileEntryPaginationDefaultsToFifty(t *testing.T) {
+	files := make([]fileEntry, 60)
+	for i := range files {
+		files[i] = fileEntry{Name: string(rune('a' + i%26))}
+	}
+
+	page, perPage := normalizeFilePage(0, 0)
+	if page != 1 || perPage != defaultFilePageSize {
+		t.Fatalf("normalizeFilePage defaults = (%d, %d), want (1, %d)", page, perPage, defaultFilePageSize)
+	}
+
+	pageFiles, gotPage, totalPages := paginateFileEntries(files, page, perPage)
+	if gotPage != 1 {
+		t.Fatalf("page = %d, want 1", gotPage)
+	}
+	if totalPages != 2 {
+		t.Fatalf("totalPages = %d, want 2", totalPages)
+	}
+	if len(pageFiles) != defaultFilePageSize {
+		t.Fatalf("page size = %d, want %d", len(pageFiles), defaultFilePageSize)
+	}
+}
+
+func TestFileEntryPaginationClampsLastPage(t *testing.T) {
+	files := make([]fileEntry, 55)
+	for i := range files {
+		files[i] = fileEntry{Name: string(rune('a' + i%26))}
+	}
+
+	pageFiles, page, totalPages := paginateFileEntries(files, 99, 50)
+	if page != 2 {
+		t.Fatalf("page = %d, want 2", page)
+	}
+	if totalPages != 2 {
+		t.Fatalf("totalPages = %d, want 2", totalPages)
+	}
+	if len(pageFiles) != 5 {
+		t.Fatalf("last page size = %d, want 5", len(pageFiles))
+	}
+}
+
+func TestNormalizeFilePageClampsMaxPageSize(t *testing.T) {
+	page, perPage := normalizeFilePage(-1, 300)
+	if page != 1 || perPage != maxFilePageSize {
+		t.Fatalf("normalizeFilePage = (%d, %d), want (1, %d)", page, perPage, maxFilePageSize)
+	}
+}
+
+func TestFileEntryPaginationEmptyList(t *testing.T) {
+	pageFiles, page, totalPages := paginateFileEntries(nil, 1, 50)
+	if page != 1 || totalPages != 1 || len(pageFiles) != 0 {
+		t.Fatalf("empty pagination = len %d page %d totalPages %d, want 0/1/1", len(pageFiles), page, totalPages)
+	}
+}
+
+func TestFileEntryPaginationWithSmallPageSize(t *testing.T) {
+	files := []fileEntry{{Name: "a"}, {Name: "b"}}
+	pageFiles, page, totalPages := paginateFileEntries(files, 2, 1)
+	if page != 2 || totalPages != 2 || len(pageFiles) != 1 || pageFiles[0].Name != "b" {
+		t.Fatalf("pagination = %#v page %d totalPages %d, want second single item", pageFiles, page, totalPages)
+	}
+}
+
+func TestSortFileEntriesKeepsDirectoriesFirst(t *testing.T) {
+	files := []fileEntry{
+		{Name: "z.txt", Size: 1},
+		{Name: "assets", IsDir: true},
+		{Name: "a.txt", Size: 2},
+		{Name: "uploads", IsDir: true},
+	}
+
+	sortFileEntries(files, "name", "desc")
+	got := []string{files[0].Name, files[1].Name, files[2].Name, files[3].Name}
+	want := []string{"uploads", "assets", "z.txt", "a.txt"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("sorted names = %v, want %v", got, want)
+	}
+}
+
+func TestSortFileEntriesBySizeAndInvalidOptions(t *testing.T) {
+	files := []fileEntry{
+		{Name: "b.log", Size: 20},
+		{Name: "a.txt", Size: 10},
+	}
+
+	sortFileEntries(files, "size", "asc")
+	if got := []string{files[0].Name, files[1].Name}; !reflect.DeepEqual(got, []string{"a.txt", "b.log"}) {
+		t.Fatalf("size asc = %v", got)
+	}
+
+	sortFileEntries(files, "unknown", "invalid")
+	if got := []string{files[0].Name, files[1].Name}; !reflect.DeepEqual(got, []string{"a.txt", "b.log"}) {
+		t.Fatalf("fallback name asc = %v", got)
+	}
+}
+
+func TestSortFileEntriesByTypeAndTime(t *testing.T) {
+	files := []fileEntry{
+		{Name: "b.zip", ModTime: "2026-01-02 00:00:00"},
+		{Name: "a.txt", ModTime: "2026-01-01 00:00:00"},
+	}
+
+	sortFileEntries(files, "type", "asc")
+	if got := []string{files[0].Name, files[1].Name}; !reflect.DeepEqual(got, []string{"a.txt", "b.zip"}) {
+		t.Fatalf("type asc = %v", got)
+	}
+
+	sortFileEntries(files, "time", "desc")
+	if got := []string{files[0].Name, files[1].Name}; !reflect.DeepEqual(got, []string{"b.zip", "a.txt"}) {
+		t.Fatalf("time desc = %v", got)
+	}
+}
+
 func TestCopyFileOrDirRejectsDirectoryIntoItself(t *testing.T) {
 	base := t.TempDir()
 	src := filepath.Join(base, "wp-content")

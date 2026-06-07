@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -62,6 +63,11 @@ type fileEntry struct {
 	Mode    string `json:"mode"`
 	ModTime string `json:"mod_time"`
 }
+
+const (
+	defaultFilePageSize = 50
+	maxFilePageSize     = 200
+)
 
 func fileBasePath(siteID int) (string, error) {
 	if siteID == 0 {
@@ -124,6 +130,92 @@ func isSamePath(basePath, targetPath string) bool {
 		target = strings.ToLower(target)
 	}
 	return base == target
+}
+
+func normalizeFilePage(page, perPage int) (int, int) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage <= 0 {
+		perPage = defaultFilePageSize
+	}
+	if perPage > maxFilePageSize {
+		perPage = maxFilePageSize
+	}
+	return page, perPage
+}
+
+func sortFileEntries(files []fileEntry, sortBy, sortDir string) {
+	if sortDir != "desc" {
+		sortDir = "asc"
+	}
+	switch sortBy {
+	case "type", "size", "time":
+	default:
+		sortBy = "name"
+	}
+	dir := 1
+	if sortDir == "desc" {
+		dir = -1
+	}
+	sort.SliceStable(files, func(i, j int) bool {
+		a := files[i]
+		b := files[j]
+		if a.IsDir != b.IsDir {
+			return a.IsDir
+		}
+		cmp := 0
+		switch sortBy {
+		case "type":
+			cmp = strings.Compare(fileEntryType(a), fileEntryType(b))
+		case "size":
+			if a.Size < b.Size {
+				cmp = -1
+			} else if a.Size > b.Size {
+				cmp = 1
+			}
+		case "time":
+			cmp = strings.Compare(a.ModTime, b.ModTime)
+		default:
+			cmp = strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+		}
+		if cmp == 0 {
+			cmp = strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+		}
+		return dir*cmp < 0
+	})
+}
+
+func fileEntryType(f fileEntry) string {
+	if f.IsDir {
+		return ""
+	}
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(f.Name)), ".")
+	if ext == "" {
+		return f.Name
+	}
+	return ext
+}
+
+func paginateFileEntries(files []fileEntry, page, perPage int) ([]fileEntry, int, int) {
+	page, perPage = normalizeFilePage(page, perPage)
+	total := len(files)
+	totalPages := (total + perPage - 1) / perPage
+	if totalPages == 0 {
+		totalPages = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	start := (page - 1) * perPage
+	end := start + perPage
+	if end > total {
+		end = total
+	}
+	if start >= total {
+		return []fileEntry{}, page, totalPages
+	}
+	return files[start:end], page, totalPages
 }
 
 func cleanFileOperationName(name string) (string, error) {
@@ -228,6 +320,12 @@ func missingUploadChunks(dir string, totalChunks int) []int {
 func (h *FileHandler) List(c *gin.Context) {
 	siteIDStr := c.Query("site_id")
 	relPath := c.DefaultQuery("path", "/")
+	hasPagingParams := c.Query("page") != "" || c.Query("per_page") != "" || c.Query("sort_by") != "" || c.Query("sort_dir") != ""
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", strconv.Itoa(defaultFilePageSize)))
+	page, perPage = normalizeFilePage(page, perPage)
+	sortBy := c.DefaultQuery("sort_by", "name")
+	sortDir := c.DefaultQuery("sort_dir", "asc")
 
 	siteID, err := strconv.Atoi(siteIDStr)
 	if err != nil {
@@ -272,10 +370,29 @@ func (h *FileHandler) List(c *gin.Context) {
 	if files == nil {
 		files = []fileEntry{}
 	}
+	total := len(files)
+	sortFileEntries(files, sortBy, sortDir)
+	pageFiles := files
+	totalPages := 1
+	if hasPagingParams {
+		pageFiles, page, totalPages = paginateFileEntries(files, page, perPage)
+	} else {
+		perPage = total
+		if perPage == 0 {
+			perPage = defaultFilePageSize
+		}
+	}
+	if totalPages < 1 {
+		totalPages = 1
+	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
-		"path":  relPath,
-		"files": files,
+		"path":        relPath,
+		"files":       pageFiles,
+		"total":       total,
+		"page":        page,
+		"per_page":    perPage,
+		"total_pages": totalPages,
 	}))
 }
 

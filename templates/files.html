@@ -4,7 +4,7 @@
     <h2 class="text-xl font-bold text-white mb-6">文件管理</h2>
 
     <div x-show="selected.length > 0" class="flex flex-wrap items-center gap-2 mb-3 p-3 bg-blue-900/30 rounded border border-blue-800">
-        <span class="text-sm text-gray-300" x-text="'已选 ' + selected.length + ' 项'"></span>
+        <span class="text-sm text-gray-300" x-text="'当前页已选 ' + selected.length + ' 项'"></span>
         <button @click="batchCompress()" class="btn-secondary text-sm py-1">批量压缩</button>
         <button @click="cutItems()" class="btn-secondary text-sm py-1">剪切</button>
         <button @click="copyItems()" class="btn-secondary text-sm py-1">复制</button>
@@ -22,7 +22,7 @@
 
     <div class="card mb-4">
         <div class="flex items-center space-x-4 mb-4">
-            <select x-model="selectedSite" @change="loadFiles()" class="input-field w-64" x-ref="siteSelect">
+            <select x-model="selectedSite" @change="switchRoot()" class="input-field w-64" x-ref="siteSelect">
                 <option value="">选择网站...</option>
                 <template x-for="s in sites" :key="s.id">
                     <option :value="s.id" x-text="s.domain"></option>
@@ -82,7 +82,7 @@
                     <tr x-show="currentPath !== '/'" class="border-b border-gray-700/50 cursor-pointer hover:bg-gray-800/50" @click="goUp()">
                         <td class="table-cell text-gray-400" colspan="7">📂 ..</td>
                     </tr>
-                    <template x-for="f in sortedFiles" :key="f.name">
+                    <template x-for="f in files" :key="f.name">
                         <tr class="border-b border-gray-700/50" :class="isSelected(f.name) ? 'bg-blue-900/20' : ''">
                             <td class="table-cell">
                                 <input type="checkbox" :checked="isSelected(f.name)" @click.stop @change="toggleSelect(f.name, $event.target.checked)">
@@ -115,6 +115,16 @@
                 </tbody>
             </table>
         </div>
+        <div x-show="selectedSite && totalPages > 1" class="flex items-center justify-between mt-4 pt-3 border-t border-gray-700/50">
+            <span class="text-sm text-gray-400" x-text="'共 ' + total + ' 项，每页 ' + perPage + ' 项'"></span>
+            <div class="flex items-center space-x-1">
+                <button @click="goPage(page - 1)" :disabled="page <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+                <template x-for="p in pageNumbers" :key="p">
+                    <button @click="goPage(p)" :class="p === page ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'" class="px-3 py-1 text-sm rounded" x-text="p"></button>
+                </template>
+                <button @click="goPage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -128,25 +138,15 @@ function fileManager() {
         selected: [],
         sortBy: 'name',
         sortDir: 'asc',
-        get sortedFiles() {
-            const dir = this.sortDir === 'asc' ? 1 : -1;
-            const by = this.sortBy;
-            return [...this.files].sort((a, b) => {
-                if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-                if (by === 'name') return dir * a.name.localeCompare(b.name);
-                if (by === 'type') {
-                    const ta = a.is_dir ? '0' : (a.name.split('.').pop() || '');
-                    const tb = b.is_dir ? '0' : (b.name.split('.').pop() || '');
-                    return dir * ta.localeCompare(tb);
-                }
-                if (by === 'size') return dir * (a.size - b.size);
-                if (by === 'time') return dir * (a.mod_time.localeCompare(b.mod_time));
-                return 0;
-            });
-        },
+        page: 1,
+        perPage: 50,
+        total: 0,
+        totalPages: 1,
         setSort(field) {
             if (this.sortBy === field) { this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc'; }
             else { this.sortBy = field; this.sortDir = 'asc'; }
+            this.page = 1;
+            this.loadFiles();
         },
         sortMark(field) {
             if (this.sortBy !== field) return '';
@@ -175,6 +175,12 @@ function fileManager() {
                 this.loadFiles();
             }
         },
+        switchRoot() {
+            this.currentPath = '/';
+            this.page = 1;
+            this.selected = [];
+            this.loadFiles();
+        },
         breadcrumbs() {
             const parts = [{ label: '根目录', path: '/' }];
             if (this.currentPath === '/') return parts;
@@ -189,15 +195,48 @@ function fileManager() {
         goToBreadcrumb(idx) {
             const bc = this.breadcrumbs();
             this.currentPath = bc[idx].path;
+            this.page = 1;
             this.loadFiles();
         },
         async loadFiles() {
-            if (!this.selectedSite) return;
+            if (!this.selectedSite) {
+                this.files = [];
+                this.total = 0;
+                this.totalPages = 1;
+                return;
+            }
             this.selected = [];
             try {
-                const r = await api('/files/list?site_id=' + this.selectedSite + '&path=' + encodeURIComponent(this.currentPath));
-                if (r.success) this.files = r.data.files || [];
+                let url = '/files/list?site_id=' + this.selectedSite
+                    + '&path=' + encodeURIComponent(this.currentPath)
+                    + '&page=' + this.page
+                    + '&per_page=' + this.perPage
+                    + '&sort_by=' + encodeURIComponent(this.sortBy)
+                    + '&sort_dir=' + encodeURIComponent(this.sortDir);
+                const r = await api(url);
+                if (r.success) {
+                    this.files = r.data.files || [];
+                    this.total = r.data.total || this.files.length;
+                    this.page = r.data.page || 1;
+                    this.perPage = r.data.per_page || 50;
+                    this.totalPages = r.data.total_pages || 1;
+                }
             } catch(e) { showToast(e.message, 'error'); }
+        },
+        goPage(p) {
+            if (p < 1 || p > this.totalPages) return;
+            this.page = p;
+            this.loadFiles();
+        },
+        get pageNumbers() {
+            const pages = [];
+            const total = this.totalPages;
+            const current = this.page;
+            let start = Math.max(1, current - 2);
+            let end = Math.min(total, start + 4);
+            if (end - start < 4) start = Math.max(1, end - 4);
+            for (let i = start; i <= end; i++) pages.push(i);
+            return pages;
         },
         isSelected(name) { return this.selected.includes(name); },
         toggleSelect(name, checked) {
@@ -209,6 +248,7 @@ function fileManager() {
         },
         enterDir(name) {
             this.currentPath = this.currentPath === '/' ? '/' + name : this.currentPath + '/' + name;
+            this.page = 1;
             this.loadFiles();
         },
         goUp() {
@@ -217,6 +257,7 @@ function fileManager() {
             parts.pop();
             this.currentPath = '/' + parts.join('/');
             if (this.currentPath === '') this.currentPath = '/';
+            this.page = 1;
             this.loadFiles();
         },
         fileSelected(e) { this.uploadTarget = e.target.files[0]; },

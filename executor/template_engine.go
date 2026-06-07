@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -44,6 +47,8 @@ type PHPFPMPoolData struct {
 type TemplateEngine struct {
 	BackupDir string
 }
+
+const nginxConfigBackupKeepCount = 7
 
 func EnsureLogMap() {
 	confDir := "/etc/nginx/conf.d"
@@ -152,6 +157,7 @@ func (e *TemplateEngine) ApplyNginxConfig(configContent string, targetPath strin
 		if err := os.Rename(targetPath, backupPath); err != nil {
 			return fmt.Errorf("备份旧配置失败: %w", err)
 		}
+		cleanupNginxConfigBackups(nginxBackupDir, targetPath, nginxConfigBackupKeepCount)
 	}
 
 	if err := os.WriteFile(targetPath, []byte(configContent), 0644); err != nil {
@@ -244,6 +250,52 @@ func getConfBaseName(path string) string {
 		}
 	}
 	return path
+}
+
+func cleanupNginxConfigBackups(backupDir, targetPath string, keepCount int) int {
+	if keepCount <= 0 {
+		keepCount = nginxConfigBackupKeepCount
+	}
+
+	entries, err := os.ReadDir(backupDir)
+	if err != nil {
+		return 0
+	}
+
+	prefix := getConfBaseName(targetPath) + ".bak."
+	type backupFile struct {
+		name string
+		ts   int64
+	}
+	backups := make([]backupFile, 0)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), prefix) {
+			continue
+		}
+		ts, err := strconv.ParseInt(strings.TrimPrefix(entry.Name(), prefix), 10, 64)
+		if err != nil {
+			continue
+		}
+		backups = append(backups, backupFile{name: entry.Name(), ts: ts})
+	}
+	if len(backups) <= keepCount {
+		return 0
+	}
+
+	sort.Slice(backups, func(i, j int) bool {
+		if backups[i].ts == backups[j].ts {
+			return backups[i].name > backups[j].name
+		}
+		return backups[i].ts > backups[j].ts
+	})
+
+	removed := 0
+	for _, backup := range backups[keepCount:] {
+		if os.Remove(filepath.Join(backupDir, backup.name)) == nil {
+			removed++
+		}
+	}
+	return removed
 }
 
 func getNginxTemplate(useSSL bool, siteType string) string {
