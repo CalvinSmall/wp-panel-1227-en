@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/naibabiji/wp-panel/database"
+	"github.com/naibabiji/wp-panel/executor"
 	"github.com/naibabiji/wp-panel/models"
 
 	"github.com/gin-gonic/gin"
@@ -48,6 +49,21 @@ func SaveRemoteBackup(c *gin.Context) {
 	if req.Port == 0 {
 		req.Port = 22
 	}
+	if req.Username == "" {
+		req.Username = "root"
+	}
+	if req.AuthType == "" {
+		req.AuthType = "password"
+	}
+	if req.RemotePath == "" {
+		req.RemotePath = "/home/" + req.Username + "/backup"
+	}
+	if req.Enabled || req.Host != "" {
+		if err := executor.ValidateRemoteBackupSettings(req.Host, req.Port, req.Username, req.AuthType, req.RemotePath); err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
+			return
+		}
+	}
 
 	if req.AuthType == "key" {
 		keyPath := "/www/server/panel/remote_backup_key"
@@ -87,11 +103,24 @@ func TestRemoteBackup(c *gin.Context) {
 	var port int
 	db.QueryRow(`SELECT host, port, username, auth_type, password, ssh_key, remote_path FROM remote_backup_settings WHERE id = 1`).Scan(
 		&host, &port, &username, &authType, &password, &sshKey, &remotePath)
+	if port == 0 {
+		port = 22
+	}
+	if username == "" {
+		username = "root"
+	}
+	if authType == "" {
+		authType = "password"
+	}
 	if remotePath == "" {
 		remotePath = "/home/" + username + "/backup"
 	}
 	if host == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("请先填写远程服务器地址"))
+		return
+	}
+	if err := executor.ValidateRemoteBackupSettings(host, port, username, authType, remotePath); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
 	}
 

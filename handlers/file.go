@@ -102,6 +102,38 @@ func isPathWithin(basePath, targetPath string) bool {
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
+func isSamePath(basePath, targetPath string) bool {
+	base, err := filepath.EvalSymlinks(filepath.Clean(basePath))
+	if err != nil {
+		if runtime.GOOS != "windows" {
+			return false
+		}
+		base, err = filepath.Abs(filepath.Clean(basePath))
+		if err != nil {
+			return false
+		}
+	}
+	target, err := resolvePathForAccess(targetPath)
+	if err != nil {
+		return false
+	}
+	base = filepath.Clean(base)
+	target = filepath.Clean(target)
+	if runtime.GOOS == "windows" {
+		base = strings.ToLower(base)
+		target = strings.ToLower(target)
+	}
+	return base == target
+}
+
+func cleanFileOperationName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "." || name == ".." || filepath.IsAbs(name) || strings.ContainsAny(name, "/\\") {
+		return "", fmt.Errorf("文件名非法")
+	}
+	return name, nil
+}
+
 func resolvePathForAccess(path string) (string, error) {
 	cleanPath := filepath.Clean(path)
 	if resolved, err := filepath.EvalSymlinks(cleanPath); err == nil {
@@ -520,6 +552,10 @@ func (h *FileHandler) Download(c *gin.Context) {
 	fullPath = filepath.Clean(fullPath)
 	if !isPathWithin(basePath, fullPath) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
+		return
+	}
+	if isSamePath(basePath, fullPath) {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("不能删除根目录"))
 		return
 	}
 
@@ -1035,6 +1071,22 @@ func extractTarArchive(archivePath, format, basePath, destDir string) error {
 	return nil
 }
 
+func zipTargetForFile(basePath, destDir string, f *zip.File) (string, bool, error) {
+	if f.Name == "" {
+		return "", true, nil
+	}
+	info := f.FileInfo()
+	if !info.IsDir() && info.Mode().Type() != 0 {
+		return "", false, fmt.Errorf("压缩包包含不支持的条目: %s", f.Name)
+	}
+	target := filepath.Join(destDir, filepath.FromSlash(f.Name))
+	target = filepath.Clean(target)
+	if !isPathWithin(basePath, target) {
+		return "", false, fmt.Errorf("压缩包包含非法路径: %s", f.Name)
+	}
+	return target, false, nil
+}
+
 func (h *FileHandler) Decompress(c *gin.Context) {
 	siteIDStr := c.Query("site_id")
 	relPath := c.Query("path")
@@ -1098,11 +1150,13 @@ func (h *FileHandler) Decompress(c *gin.Context) {
 		return
 	}
 	for _, f := range r.File {
-		target := filepath.Join(destDir, filepath.FromSlash(f.Name))
-		target = filepath.Clean(target)
-		if !isPathWithin(basePath, target) {
-			c.JSON(http.StatusForbidden, models.ErrorResponse("压缩包包含非法路径: "+f.Name))
+		target, skip, err := zipTargetForFile(basePath, destDir, f)
+		if err != nil {
+			c.JSON(http.StatusForbidden, models.ErrorResponse(err.Error()))
 			return
+		}
+		if skip {
+			continue
 		}
 		if !f.FileInfo().IsDir() && !overwrite {
 			if _, err := os.Stat(target); err == nil {
@@ -1116,11 +1170,13 @@ func (h *FileHandler) Decompress(c *gin.Context) {
 	}
 
 	for _, f := range r.File {
-		target := filepath.Join(destDir, filepath.FromSlash(f.Name))
-		target = filepath.Clean(target)
-		if !isPathWithin(basePath, target) {
-			c.JSON(http.StatusForbidden, models.ErrorResponse("压缩包包含非法路径: "+f.Name))
+		target, skip, err := zipTargetForFile(basePath, destDir, f)
+		if err != nil {
+			c.JSON(http.StatusForbidden, models.ErrorResponse(err.Error()))
 			return
+		}
+		if skip {
+			continue
 		}
 
 		if f.FileInfo().IsDir() {
@@ -1193,12 +1249,22 @@ func (h *FileHandler) Move(c *gin.Context) {
 	}
 
 	for _, name := range req.Names {
-		src := filepath.Join(srcDir, filepath.Clean(name))
-		dest := filepath.Join(destDir, filepath.Clean(name))
-		if !isPathWithin(basePath, src) || !isPathWithin(basePath, dest) {
-			continue
+		cleanName, err := cleanFileOperationName(name)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
+			return
 		}
-		os.Rename(src, dest)
+		src := filepath.Join(srcDir, cleanName)
+		dest := filepath.Join(destDir, cleanName)
+		if !isPathWithin(basePath, src) || !isPathWithin(basePath, dest) {
+			c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
+			return
+		}
+		if err := os.Rename(src, dest); err != nil {
+			log.Printf("移动失败 src=%s dest=%s: %v", src, dest, err)
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("移动失败"))
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": fmt.Sprintf("已移动 %d 个项目", len(req.Names))}))
@@ -1233,12 +1299,22 @@ func (h *FileHandler) Copy(c *gin.Context) {
 	}
 
 	for _, name := range req.Names {
-		src := filepath.Join(srcDir, filepath.Clean(name))
-		dest := filepath.Join(destDir, filepath.Clean(name))
-		if !isPathWithin(basePath, src) || !isPathWithin(basePath, dest) {
-			continue
+		cleanName, err := cleanFileOperationName(name)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
+			return
 		}
-		copyFileOrDir(basePath, src, dest)
+		src := filepath.Join(srcDir, cleanName)
+		dest := filepath.Join(destDir, cleanName)
+		if !isPathWithin(basePath, src) || !isPathWithin(basePath, dest) {
+			c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
+			return
+		}
+		if err := copyFileOrDir(basePath, src, dest); err != nil {
+			log.Printf("复制失败 src=%s dest=%s: %v", src, dest, err)
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("复制失败"))
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": fmt.Sprintf("已复制 %d 个项目", len(req.Names))}))
@@ -1253,13 +1329,20 @@ func copyFileOrDir(basePath, src, dest string) error {
 		return err
 	}
 	if info.IsDir() {
-		os.MkdirAll(dest, info.Mode())
+		if isSamePath(src, dest) || isPathWithin(src, dest) {
+			return fmt.Errorf("cannot copy directory into itself")
+		}
+		if err := os.MkdirAll(dest, info.Mode()); err != nil {
+			return err
+		}
 		entries, err := os.ReadDir(src)
 		if err != nil {
 			return err
 		}
 		for _, e := range entries {
-			copyFileOrDir(basePath, filepath.Join(src, e.Name()), filepath.Join(dest, e.Name()))
+			if err := copyFileOrDir(basePath, filepath.Join(src, e.Name()), filepath.Join(dest, e.Name())); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

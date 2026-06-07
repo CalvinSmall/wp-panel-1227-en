@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"os"
 	"path/filepath"
@@ -133,6 +134,47 @@ func TestTarArchiveRejectsPathTraversal(t *testing.T) {
 
 	if _, err := checkTarArchive(archivePath, "tar.gz", base, base, false); err == nil {
 		t.Fatal("expected path traversal archive to be rejected")
+	}
+}
+
+func TestFileOperationNameRejectsTraversal(t *testing.T) {
+	for _, name := range []string{"", ".", "..", "../x", "sub/file", `sub\file`} {
+		if _, err := cleanFileOperationName(name); err == nil {
+			t.Fatalf("cleanFileOperationName(%q) error = nil, want error", name)
+		}
+	}
+	if got, err := cleanFileOperationName("readme.txt"); err != nil || got != "readme.txt" {
+		t.Fatalf("cleanFileOperationName safe = %q, %v", got, err)
+	}
+}
+
+func TestCopyFileOrDirRejectsDirectoryIntoItself(t *testing.T) {
+	base := t.TempDir()
+	src := filepath.Join(base, "wp-content")
+	dest := filepath.Join(src, "copy")
+	if err := os.MkdirAll(src, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := copyFileOrDir(base, src, dest); err == nil {
+		t.Fatal("copyFileOrDir into itself error = nil, want error")
+	}
+}
+
+func TestZipTargetRejectsSpecialEntries(t *testing.T) {
+	base := t.TempDir()
+	header := &zip.FileHeader{Name: "link"}
+	header.SetMode(os.ModeSymlink | 0777)
+	f := &zip.File{FileHeader: *header}
+	if _, _, err := zipTargetForFile(base, base, f); err == nil {
+		t.Fatal("zipTargetForFile symlink error = nil, want error")
+	}
+}
+
+func TestZipTargetRejectsPathTraversal(t *testing.T) {
+	base := t.TempDir()
+	f := &zip.File{FileHeader: zip.FileHeader{Name: "../escape.txt"}}
+	if _, _, err := zipTargetForFile(base, base, f); err == nil {
+		t.Fatal("zipTargetForFile traversal error = nil, want error")
 	}
 }
 
