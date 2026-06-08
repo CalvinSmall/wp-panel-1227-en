@@ -5,7 +5,7 @@
 
     <div x-show="selected.length > 0" class="flex flex-wrap items-center gap-2 mb-3 p-3 bg-blue-900/30 rounded border border-blue-800">
         <span class="text-sm text-gray-300" x-text="'当前页已选 ' + selected.length + ' 项'"></span>
-        <button @click="batchCompress()" class="btn-secondary text-sm py-1">批量压缩</button>
+        <button @click="batchCompress()" :disabled="archiveBusy" class="btn-secondary text-sm py-1">批量压缩</button>
         <button @click="cutItems()" class="btn-secondary text-sm py-1">剪切</button>
         <button @click="copyItems()" class="btn-secondary text-sm py-1">复制</button>
         <button @click="batchDelete()" class="btn-danger text-sm py-1">批量删除</button>
@@ -19,6 +19,11 @@
         <button @click="clipboard = null" class="text-sm text-gray-400 hover:text-white py-1">清空</button>
     </div>
     </template>
+
+    <div x-show="archiveBusy" class="flex items-center gap-3 mb-3 p-3 bg-amber-900/30 rounded border border-amber-700 text-amber-100" aria-live="polite">
+        <span class="inline-block w-4 h-4 rounded-full border-2 border-amber-200 border-t-transparent animate-spin"></span>
+        <span class="text-sm" x-text="archiveBusyText"></span>
+    </div>
 
     <div class="card mb-4">
         <div class="flex items-center space-x-4 mb-4">
@@ -99,8 +104,8 @@
                                 <div class="flex flex-wrap gap-1">
                                     <button x-show="!f.is_dir" @click="downloadFile(f.name)" class="btn-primary text-xs py-1 px-2">下载</button>
                                     <button @click="startRename(f.name)" class="btn-secondary text-xs py-1 px-2">重命名</button>
-                                    <button @click="compressItems([f.name])" class="btn-secondary text-xs py-1 px-2" :title="f.is_dir ? '压缩目录' : '压缩文件'">压缩</button>
-                                    <button x-show="isArchive(f.name)" @click="decompressFile(f.name)" class="btn-secondary text-xs py-1 px-2">解压</button>
+                                    <button @click="compressItems([f.name])" :disabled="archiveBusy" class="btn-secondary text-xs py-1 px-2" :title="f.is_dir ? '压缩目录' : '压缩文件'">压缩</button>
+                                    <button x-show="isArchive(f.name)" @click="decompressFile(f.name)" :disabled="archiveBusy" class="btn-secondary text-xs py-1 px-2">解压</button>
                                     <button @click="deleteItems([f.name])" class="btn-danger text-xs py-1 px-2">删除</button>
                                 </div>
                             </td>
@@ -156,6 +161,8 @@ function fileManager() {
         uploading: false,
         uploadProgress: 0,
         fixingPerms: false,
+        archiveBusy: false,
+        archiveBusyText: '',
         showMkdir: false,
         mkdirName: '',
         showRename: false,
@@ -453,10 +460,13 @@ function fileManager() {
         },
         async compressItems(names) {
             if (names.length === 1) {
+                this.archiveBusy = true;
+                this.archiveBusyText = '压缩中，文件较大时可能需要一段时间，请等待完成通知';
                 try {
                     const r = await api('/files/zip?site_id=' + this.selectedSite + '&path=' + encodeURIComponent(this.pathFor(names[0])), { method: 'POST' });
                     if (r.success) { this.loadFiles(); showToast(r.data?.message || '压缩完成', 'success'); }
                 } catch(e) { showToast(e.message, 'error'); }
+                finally { this.archiveBusy = false; this.archiveBusyText = ''; }
             } else {
                 this.batchCompress();
             }
@@ -466,6 +476,8 @@ function fileManager() {
             const defaultName = 'archive_' + new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '') + '.zip';
             const archiveName = prompt('请输入压缩文件名：', defaultName);
             if (!archiveName) return;
+            this.archiveBusy = true;
+            this.archiveBusyText = '压缩中，文件较大时可能需要一段时间，请等待完成通知';
             try {
                 const r = await api('/files/batch-zip', {
                     method: 'POST',
@@ -478,24 +490,37 @@ function fileManager() {
                 });
                 if (r.success) { this.loadFiles(); showToast(r.data?.message || '压缩完成', 'success'); }
             } catch(e) { showToast(e.message, 'error'); }
+            finally { this.archiveBusy = false; this.archiveBusyText = ''; }
         },
         async decompressFile(name) {
             if (!await confirmModal('确认解压 ' + name + ' 到当前目录？')) return;
             const path = this.pathFor(name);
+            this.archiveBusy = true;
+            this.archiveBusyText = '解压中，文件较大时可能需要一段时间，请等待完成通知';
             try {
                 const r = await api('/files/unzip?site_id=' + this.selectedSite + '&path=' + encodeURIComponent(path), { method: 'POST' });
                 if (r.success) { this.loadFiles(); showToast(r.data?.message || '解压完成', 'success'); }
             } catch(e) {
                 if (e.conflicts) {
+                    this.archiveBusy = false;
+                    this.archiveBusyText = '';
                     const msg = '以下文件将被覆盖，确认继续？\n\n' + e.conflicts.join('\n');
                     if (await confirmModal(msg)) {
+                        this.archiveBusy = true;
+                        this.archiveBusyText = '解压中，文件较大时可能需要一段时间，请等待完成通知';
                         try {
                             await api('/files/unzip?site_id=' + this.selectedSite + '&path=' + encodeURIComponent(path) + '&overwrite=1', { method: 'POST' });
                             this.loadFiles(); showToast('解压完成', 'success');
                         } catch(e2) { showToast(e2.message, 'error'); }
+                        finally { this.archiveBusy = false; this.archiveBusyText = ''; }
                     }
                 } else {
                     showToast(e.message, 'error');
+                }
+            } finally {
+                if (this.archiveBusy) {
+                    this.archiveBusy = false;
+                    this.archiveBusyText = '';
                 }
             }
         }
