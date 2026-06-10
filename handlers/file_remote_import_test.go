@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net"
+	"net/http"
 	"net/url"
 	"testing"
 )
@@ -44,18 +45,23 @@ func TestIsBlockedRemoteImportIP(t *testing.T) {
 	}
 }
 
-func TestNormalizeRemoteImportFingerprint(t *testing.T) {
-	raw := "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
-	got, err := normalizeRemoteImportFingerprint(raw)
-	if err != nil {
-		t.Fatalf("normalizeRemoteImportFingerprint: %v", err)
+func TestRemoteImportHTTPClientInsecureTLSOption(t *testing.T) {
+	secureTransport := remoteImportHTTPClient(false).Transport
+	secure, ok := secureTransport.(*http.Transport)
+	if !ok {
+		t.Fatalf("secure transport type = %T, want *http.Transport", secureTransport)
 	}
-	want := "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
-	if got != want {
-		t.Fatalf("fingerprint = %q, want %q", got, want)
+	if secure.TLSClientConfig.InsecureSkipVerify {
+		t.Fatal("default remote import client should verify TLS certificates")
 	}
-	if _, err := normalizeRemoteImportFingerprint("abc"); err == nil {
-		t.Fatal("short fingerprint error = nil, want error")
+
+	insecureTransport := remoteImportHTTPClient(true).Transport
+	insecure, ok := insecureTransport.(*http.Transport)
+	if !ok {
+		t.Fatalf("insecure transport type = %T, want *http.Transport", insecureTransport)
+	}
+	if !insecure.TLSClientConfig.InsecureSkipVerify {
+		t.Fatal("insecure remote import client should allow untrusted TLS certificates")
 	}
 }
 

@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -22,6 +20,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/naibabiji/wp-panel/executor"
 	"github.com/naibabiji/wp-panel/models"
 )
 
@@ -51,11 +50,11 @@ var remoteImportTasks = struct {
 
 func (h *FileHandler) RemoteImport(c *gin.Context) {
 	var req struct {
-		URL             string `json:"url"`
-		Filename        string `json:"filename"`
-		SiteID          *int   `json:"site_id"`
-		Path            string `json:"path"`
-		CertFingerprint string `json:"cert_fingerprint"`
+		URL              string `json:"url"`
+		Filename         string `json:"filename"`
+		SiteID           *int   `json:"site_id"`
+		Path             string `json:"path"`
+		AllowInsecureTLS bool   `json:"allow_insecure_tls"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数无效"))
@@ -69,11 +68,6 @@ func (h *FileHandler) RemoteImport(c *gin.Context) {
 		req.Path = "/"
 	}
 	u, err := validateRemoteImportURL(req.URL)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
-		return
-	}
-	fingerprint, err := normalizeRemoteImportFingerprint(req.CertFingerprint)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
@@ -105,9 +99,19 @@ func (h *FileHandler) RemoteImport(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("目标路径已存在且是目录"))
 		return
 	}
+	var siteRoot, systemUser string
+	if *req.SiteID != 0 {
+		site := getWebsiteByID(*req.SiteID)
+		if site == nil {
+			c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+			return
+		}
+		siteRoot = site.WebRoot
+		systemUser = site.SystemUser
+	}
 
 	task := createRemoteImportTask(filename)
-	go runRemoteImport(task.ID, u.String(), fingerprint, destPath)
+	go runRemoteImport(task.ID, u.String(), req.AllowInsecureTLS, destPath, siteRoot, systemUser)
 
 	c.JSON(http.StatusOK, models.SuccessResponse(taskSnapshot(task.ID)))
 }
@@ -191,7 +195,7 @@ func updateRemoteImportTask(id string, update func(*remoteImportTask)) {
 	task.UpdatedAt = time.Now().Unix()
 }
 
-func runRemoteImport(taskID, rawURL, fingerprint, destPath string) {
+func runRemoteImport(taskID, rawURL string, allowInsecureTLS bool, destPath, siteRoot, systemUser string) {
 	tmpPath := destPath + ".download_tmp-" + filepath.Base(taskID)
 	copyOK := false
 	defer func() {
@@ -214,7 +218,7 @@ func runRemoteImport(taskID, rawURL, fingerprint, destPath string) {
 	}
 	req.Header.Set("User-Agent", "WP-Panel-Remote-Import/1.0")
 
-	client := remoteImportHTTPClient(fingerprint)
+	client := remoteImportHTTPClient(allowInsecureTLS)
 	resp, err := client.Do(req)
 	if err != nil {
 		failRemoteImportTask(taskID, "远程下载失败: "+err.Error())
@@ -297,9 +301,16 @@ func runRemoteImport(taskID, rawURL, fingerprint, destPath string) {
 		return
 	}
 	copyOK = true
+	message := "远程导入完成"
+	if siteRoot != "" && systemUser != "" {
+		if err := executor.ChownSitePath(destPath, siteRoot, systemUser); err != nil {
+			log.Printf("远程导入权限设置失败 path=%s user=%s: %v", destPath, systemUser, err)
+			message = "远程导入完成，权限设置失败，请点击修复权限"
+		}
+	}
 	updateRemoteImportTask(taskID, func(t *remoteImportTask) {
 		t.Status = "success"
-		t.Message = "远程导入完成"
+		t.Message = message
 		t.Downloaded = downloaded
 		t.Total = downloaded
 		t.Completed = true
@@ -316,20 +327,10 @@ func failRemoteImportTask(taskID, message string) {
 	})
 }
 
-func remoteImportHTTPClient(fingerprint string) *http.Client {
-	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
-	if fingerprint != "" {
-		tlsConfig.InsecureSkipVerify = true
-		tlsConfig.VerifyConnection = func(state tls.ConnectionState) error {
-			if len(state.PeerCertificates) == 0 {
-				return fmt.Errorf("远程服务器未提供证书")
-			}
-			sum := sha256.Sum256(state.PeerCertificates[0].Raw)
-			if hex.EncodeToString(sum[:]) != fingerprint {
-				return fmt.Errorf("远程服务器证书指纹不匹配")
-			}
-			return nil
-		}
+func remoteImportHTTPClient(allowInsecureTLS bool) *http.Client {
+	tlsConfig := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: allowInsecureTLS,
 	}
 	transport := &http.Transport{
 		TLSClientConfig: tlsConfig,
@@ -457,20 +458,4 @@ func pathBaseFromURL(u *url.URL) string {
 		return path.Base(decoded)
 	}
 	return path.Base(escapedPath)
-}
-
-func normalizeRemoteImportFingerprint(raw string) (string, error) {
-	raw = strings.ToLower(strings.TrimSpace(raw))
-	raw = strings.ReplaceAll(raw, ":", "")
-	raw = strings.ReplaceAll(raw, " ", "")
-	if raw == "" {
-		return "", nil
-	}
-	if len(raw) != 64 {
-		return "", fmt.Errorf("证书指纹必须是SHA256格式")
-	}
-	if _, err := hex.DecodeString(raw); err != nil {
-		return "", fmt.Errorf("证书指纹必须是SHA256格式")
-	}
-	return raw, nil
 }

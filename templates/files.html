@@ -33,9 +33,9 @@
                     <label class="label">HTTPS URL</label>
                     <input type="url" x-model="remoteImportUrl" class="input-field text-sm" placeholder="https://example.com/backup.zip">
                 </div>
-                <div>
-                    <label class="label">证书 SHA256 指纹</label>
-                    <input type="text" x-model="remoteImportFingerprint" class="input-field text-sm font-mono" placeholder="自签名证书可选">
+                <div class="flex items-start gap-2">
+                    <input type="checkbox" x-model="remoteImportAllowInsecureTLS" class="mt-1">
+                    <label class="text-sm text-gray-300">允许自签名或不受信任的 HTTPS 证书</label>
                 </div>
                 <div x-show="remoteImportStatus" class="p-3 rounded bg-gray-700/50">
                     <div class="flex justify-between text-sm text-gray-300 mb-2">
@@ -202,7 +202,7 @@ function fileManager() {
         clipboard: null,
         showRemoteImport: false,
         remoteImportUrl: '',
-        remoteImportFingerprint: '',
+        remoteImportAllowInsecureTLS: false,
         remoteImporting: false,
         remoteImportStatus: null,
         remoteImportTimer: null,
@@ -317,7 +317,7 @@ function fileManager() {
                 return;
             }
             this.remoteImportUrl = '';
-            this.remoteImportFingerprint = '';
+            this.remoteImportAllowInsecureTLS = false;
             this.remoteImportStatus = null;
             this.showRemoteImport = true;
         },
@@ -349,7 +349,7 @@ function fileManager() {
                     method: 'POST',
                     body: {
                         url: this.remoteImportUrl.trim(),
-                        cert_fingerprint: this.remoteImportFingerprint.trim(),
+                        allow_insecure_tls: this.remoteImportAllowInsecureTLS,
                         site_id: siteID,
                         path: this.currentPath
                     }
