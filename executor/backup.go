@@ -76,6 +76,12 @@ func executeRestoreBackup(task *Task) TaskResult {
 
 	site := payload.Site
 	dbPass := readMariaDBPassword()
+	if dbPass == "" {
+		return TaskResult{Success: false, Message: "无法读取 MariaDB root 密码"}
+	}
+	if err := ClearDatabaseTables(site.DBName, dbPass); err != nil {
+		return TaskResult{Success: false, Message: "清空数据库失败: " + err.Error()}
+	}
 
 	var filePath string
 	if payload.FilePath != "" {
@@ -180,6 +186,42 @@ func restoreFromZip(filePath, dbName, dbPass string) TaskResult {
 		return TaskResult{Success: false, Message: fmt.Sprintf("恢复失败: %s", string(out))}
 	}
 	return TaskResult{Success: true, Message: "数据库恢复成功"}
+}
+
+// ClearDatabaseTables 清空指定数据库中的所有表（保留数据库本身）
+func ClearDatabaseTables(dbName, dbPass string) error {
+	if !isValidMySQLIdentifier(dbName) {
+		return fmt.Errorf("invalid database name")
+	}
+	if dbPass == "" {
+		return fmt.Errorf("无法读取数据库密码")
+	}
+
+	cmd := exec.Command("mysql", "-u", "root", "-B", "-N", "-e",
+		fmt.Sprintf("SELECT CONCAT('DROP TABLE IF EXISTS `', REPLACE(TABLE_NAME, '`', '``'), '`;') FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_TYPE = 'BASE TABLE'", dbName))
+	cmd.Env = append(os.Environ(), "MYSQL_PWD="+dbPass)
+	dropSQL, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("获取表列表失败: %s", string(dropSQL))
+	}
+
+	mysqlCmd := exec.Command("mysql", "-u", "root", dbName)
+	mysqlCmd.Env = append(os.Environ(), "MYSQL_PWD="+dbPass)
+	stdin, err := mysqlCmd.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("准备数据库操作失败")
+	}
+	var stderr bytes.Buffer
+	mysqlCmd.Stderr = &stderr
+	if err := mysqlCmd.Start(); err != nil {
+		return fmt.Errorf("启动数据库操作失败")
+	}
+	fmt.Fprintf(stdin, "SET FOREIGN_KEY_CHECKS = 0;\n%s\nSET FOREIGN_KEY_CHECKS = 1;\n", string(dropSQL))
+	stdin.Close()
+	if err := mysqlCmd.Wait(); err != nil {
+		return fmt.Errorf("清空数据库失败: %s", stderr.String())
+	}
+	return nil
 }
 
 func ExecuteDeleteBackup(siteID int, filename string) error {

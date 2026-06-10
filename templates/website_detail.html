@@ -612,7 +612,12 @@ function websiteDetail() {
                 const r = await api('/websites/' + this.site.id + '/detect-table-prefix');
                 if (r.success && r.data.prefix) {
                     this.editTablePrefix = r.data.prefix;
-                    showToast('检测到表前缀: ' + r.data.prefix + '，请点击「同步数据库信息」保存', 'success');
+                    const candidates = r.data.candidates || [];
+                    if (candidates.length > 1) {
+                        showToast('检测到多个可能前缀：' + candidates.join('、') + '。已预选「' + r.data.prefix + '」，如不准确请手动修改', 'warning');
+                    } else {
+                        showToast('检测到表前缀: ' + r.data.prefix + '，请点击「同步数据库信息」保存', 'success');
+                    }
                 } else {
                     showToast(r.data?.message || '未检测到表前缀', 'error');
                 }

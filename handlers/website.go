@@ -527,13 +527,28 @@ func (h *WebsiteHandler) DetectDBTablePrefix(c *gin.Context) {
 	}
 
 	cfg := config.AppConfig
-	prefix, err := executor.DetectDBTablePrefix(site.DBName, cfg)
+	prefix, candidates, err := executor.DetectDBTablePrefix(site.DBName, cfg)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("检测失败: "+err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"prefix": prefix}))
+	// 如果 wp-config.php 中的前缀存在于候选列表中，优先推荐
+	if site.WebRoot != "" {
+		if configPrefix, err := executor.ReadWPTablePrefix(site.WebRoot); err == nil {
+			for _, c := range candidates {
+				if c == configPrefix {
+					prefix = configPrefix
+					break
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
+		"prefix":     prefix,
+		"candidates": candidates,
+	}))
 }
 
 func (h *WebsiteHandler) GetWPSiteURLs(c *gin.Context) {

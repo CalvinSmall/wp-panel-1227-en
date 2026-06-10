@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/naibabiji/wp-panel/config"
@@ -157,9 +158,10 @@ func executeChangeDBPassword(task *Task) TaskResult {
 }
 
 // DetectDBTablePrefix 查询数据库中实际的 WordPress 表前缀
-func DetectDBTablePrefix(dbName string, cfg *config.Config) (string, error) {
+// 返回推荐前缀、所有候选前缀列表、错误
+func DetectDBTablePrefix(dbName string, cfg *config.Config) (string, []string, error) {
 	if !isValidMySQLIdentifier(dbName) {
-		return "", fmt.Errorf("invalid database name")
+		return "", nil, fmt.Errorf("invalid database name")
 	}
 	cmd := exec.Command("mysql", "-u", cfg.MariaDB.RootUser, "-N", "-e",
 		fmt.Sprintf("SHOW TABLES FROM `%s` LIKE '%%options'", dbName))
@@ -168,21 +170,33 @@ func DetectDBTablePrefix(dbName string, cfg *config.Config) (string, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("查询失败: %s", strings.TrimSpace(stderr.String()))
+		return "", nil, fmt.Errorf("查询失败: %s", strings.TrimSpace(stderr.String()))
 	}
 
 	output := strings.TrimSpace(stdout.String())
 	if output == "" {
-		return "", fmt.Errorf("未找到 options 表，数据库可能为空或不是 WordPress 数据库")
+		return "", nil, fmt.Errorf("未找到 options 表，数据库可能为空或不是 WordPress 数据库")
 	}
 
+	prefixSet := make(map[string]struct{})
 	for _, line := range strings.Split(output, "\n") {
 		tableName := strings.TrimSpace(line)
 		if prefix, ok := tablePrefixFromOptionsTable(tableName); ok {
-			return prefix, nil
+			prefixSet[prefix] = struct{}{}
 		}
 	}
-	return "", fmt.Errorf("无法解析表前缀: %s", strings.Split(output, "\n")[0])
+
+	if len(prefixSet) == 0 {
+		return "", nil, fmt.Errorf("无法解析表前缀")
+	}
+
+	var candidates []string
+	for p := range prefixSet {
+		candidates = append(candidates, p)
+	}
+	sort.Strings(candidates)
+
+	return candidates[0], candidates, nil
 }
 
 func tablePrefixFromOptionsTable(tableName string) (string, bool) {

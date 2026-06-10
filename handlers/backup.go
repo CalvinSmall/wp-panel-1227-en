@@ -1,13 +1,10 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -239,46 +236,21 @@ func (h *BackupHandler) ClearDatabase(c *gin.Context) {
 		return
 	}
 
-	dbPass := readMariaDBPassword()
-	if dbPass == "" {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("无法读取数据库密码"))
-		return
-	}
-
 	if site.DBName == "" || len(site.DBName) > 64 || !mysqlIdentifierRe.MatchString(site.DBName) {
 		log.Printf("拒绝清空异常数据库名 site=%d db=%q", id, site.DBName)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("数据库名异常，已拒绝执行"))
 		return
 	}
 
-	cmd := exec.Command("mysql", "-u", "root", "-B", "-N", "-e",
-		fmt.Sprintf("SELECT CONCAT('DROP TABLE IF EXISTS `', REPLACE(TABLE_NAME, '`', '``'), '`;') FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_TYPE = 'BASE TABLE'", site.DBName))
-	cmd.Env = append(os.Environ(), "MYSQL_PWD="+dbPass)
-	dropSQL, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("获取表列表失败 site=%s: %s", site.DBName, string(dropSQL))
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("获取表列表失败"))
+	dbPass := readMariaDBPassword()
+	if dbPass == "" {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("无法读取数据库密码"))
 		return
 	}
 
-	mysqlCmd := exec.Command("mysql", "-u", "root", site.DBName)
-	mysqlCmd.Env = append(os.Environ(), "MYSQL_PWD="+dbPass)
-	stdin, err := mysqlCmd.StdinPipe()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("准备数据库操作失败"))
-		return
-	}
-	var stderr bytes.Buffer
-	mysqlCmd.Stderr = &stderr
-	if err := mysqlCmd.Start(); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("启动数据库操作失败"))
-		return
-	}
-	fmt.Fprintf(stdin, "SET FOREIGN_KEY_CHECKS = 0;\n%s\nSET FOREIGN_KEY_CHECKS = 1;\n", string(dropSQL))
-	stdin.Close()
-	if err := mysqlCmd.Wait(); err != nil {
-		log.Printf("清空数据库失败 site=%s: %s", site.DBName, stderr.String())
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("清空数据库失败"))
+	if err := executor.ClearDatabaseTables(site.DBName, dbPass); err != nil {
+		log.Printf("清空数据库失败 site=%s: %v", site.DBName, err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(err.Error()))
 		return
 	}
 
