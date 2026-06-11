@@ -42,6 +42,9 @@ server {
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         fastcgi_read_timeout 300;
+        fastcgi_buffer_size 128k;
+        fastcgi_buffers 8 128k;
+        fastcgi_busy_buffers_size 256k;
 	    {{if .FCacheEnabled}}
 	    set $wp_skip_cache 0;
 	    if ($request_method = POST) { set $wp_skip_cache 1; }
@@ -151,6 +154,9 @@ server {
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         fastcgi_param HTTPS on;
         fastcgi_read_timeout 300;
+        fastcgi_buffer_size 128k;
+        fastcgi_buffers 8 128k;
+        fastcgi_busy_buffers_size 256k;
 	    {{if .FCacheEnabled}}
 	    set $wp_skip_cache 0;
 	    if ($request_method = POST) { set $wp_skip_cache 1; }

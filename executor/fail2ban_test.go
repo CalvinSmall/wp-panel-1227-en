@@ -80,6 +80,31 @@ func TestNginxTemplateErrorOnlyAccessLog(t *testing.T) {
 	}
 }
 
+func TestNginxTemplateIncludesFastCGIHeaderBuffers(t *testing.T) {
+	engine := NewTemplateEngine(t.TempDir())
+	config, err := engine.RenderNginxConfig(&NginxSiteData{
+		Domain:        "example.com",
+		ServerNames:   "example.com",
+		WebRoot:       "/www/wwwroot/example.com",
+		PHPProxy:      "unix:/run/php/example.sock",
+		TemplateVer:   "v1.0",
+		AccessLogMode: "full",
+	})
+	if err != nil {
+		t.Fatalf("render nginx config: %v", err)
+	}
+
+	for _, directive := range []string{
+		"fastcgi_buffer_size 128k;",
+		"fastcgi_buffers 8 128k;",
+		"fastcgi_busy_buffers_size 256k;",
+	} {
+		if !strings.Contains(config, directive) {
+			t.Fatalf("expected %q in config:\n%s", directive, config)
+		}
+	}
+}
+
 func openTestDB(t *testing.T) {
 	t.Helper()
 
