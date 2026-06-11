@@ -3,7 +3,7 @@
  * Plugin Name: WP Panel Optimizer
  * Plugin URI:  https://github.com/naibabiji/wp-panel
  * Description: 与 WP Panel 面板配合，管理 FastCGI 缓存、调试模式、文章修订、内存限制等优化项。发布/更新文章自动清除缓存。
- * Version:     1.1.1
+ * Version:     1.1.2
  * Author:      WP Panel
  * Author URI:  https://blog.naibabiji.com
  * License:     GPL-2.0+
@@ -27,7 +27,7 @@ function wpp_optimizer_uninstall() {
 
 class WP_Panel_Optimizer {
 
-    const VERSION = '1.1.1';
+    const VERSION = '1.1.2';
 
     const OPTION_FCACHE_ENABLED = 'wpp_optimizer_fcache_enabled';
     const OPTION_FCACHE_TTL     = 'wpp_optimizer_fcache_ttl';
@@ -40,9 +40,49 @@ class WP_Panel_Optimizer {
     const OPTION_POST_REVISIONS = 'wpp_optimizer_post_revisions';
     const OPTION_MEMORY_LIMIT   = 'wpp_optimizer_memory_limit';
 
+    private static function is_path_allowed_by_open_basedir($path) {
+        $openBasedir = ini_get('open_basedir');
+        if (!$openBasedir) {
+            return true;
+        }
+
+        $path = str_replace('\\', '/', $path);
+        foreach (explode(PATH_SEPARATOR, $openBasedir) as $allowed) {
+            $allowed = trim($allowed);
+            if ($allowed === '') {
+                continue;
+            }
+            if ($allowed === '.' && defined('ABSPATH')) {
+                $allowed = ABSPATH;
+            }
+            $allowed = str_replace('\\', '/', $allowed);
+            if ($allowed === '/') {
+                return true;
+            }
+            $allowed = rtrim($allowed, '/');
+            if ($allowed === '') {
+                continue;
+            }
+            if ($path === $allowed || strpos($path, $allowed . '/') === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static function load_config() {
+        static $loaded = false;
+        static $cached = null;
+
+        if ($loaded) {
+            return $cached;
+        }
+        $loaded = true;
+
         $domain = wp_parse_url(home_url(), PHP_URL_HOST);
         if (!$domain) return null;
+        $domain = strtolower(trim($domain));
 
         $base = '/var/wp-panel/site-secrets/';
         $candidates = array($domain);
@@ -54,8 +94,16 @@ class WP_Panel_Optimizer {
 
         foreach ($candidates as $d) {
             $file = $base . $d . '/wp-panel-config.json';
+            if (!self::is_path_allowed_by_open_basedir($file)) {
+                continue;
+            }
             if (file_exists($file)) {
-                return json_decode(file_get_contents($file), true);
+                $json = file_get_contents($file);
+                if ($json === false) {
+                    continue;
+                }
+                $cached = json_decode($json, true);
+                return $cached;
             }
         }
         return null;
