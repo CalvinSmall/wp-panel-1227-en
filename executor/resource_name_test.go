@@ -55,6 +55,17 @@ func TestPHPPoolNamePreservesLegacyDomainPool(t *testing.T) {
 	}
 }
 
+func TestNginxEnabledPathUsesStoredConfigFilename(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Paths.NginxSitesEnabled = "/etc/nginx/sites-enabled"
+
+	got := nginxEnabledPath(cfg, "/etc/nginx/sites-available/vps17_top_0ea8c86a.conf", "vps17.top")
+	want := filepath.Join("/etc/nginx/sites-enabled", "vps17_top_0ea8c86a.conf")
+	if got != want {
+		t.Fatalf("nginxEnabledPath() = %q, want %q", got, want)
+	}
+}
+
 func TestIsValidDomainRejectsLongLabel(t *testing.T) {
 	domain := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com"
 	if IsValidDomain(domain) {

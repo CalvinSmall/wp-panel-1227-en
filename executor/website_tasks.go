@@ -470,7 +470,7 @@ func executePauseSite(task *Task) TaskResult {
 	site := payload.Site
 	cfg := config.AppConfig
 
-	enabledPath := filepath.Join(cfg.Paths.NginxSitesEnabled, site.Domain+".conf")
+	enabledPath := nginxEnabledPath(cfg, site.NginxConfPath, site.Domain)
 	os.Remove(enabledPath)
 
 	if out, err := exec.Command("nginx", "-s", "reload").CombinedOutput(); err != nil {
@@ -493,7 +493,7 @@ func executeEnableSite(task *Task) TaskResult {
 	site := payload.Site
 	cfg := config.AppConfig
 
-	enabledPath := filepath.Join(cfg.Paths.NginxSitesEnabled, site.Domain+".conf")
+	enabledPath := nginxEnabledPath(cfg, site.NginxConfPath, site.Domain)
 	os.Remove(enabledPath)
 	if err := os.Symlink(site.NginxConfPath, enabledPath); err != nil {
 		log.Printf("创建软链接失败: %v", err)
