@@ -567,21 +567,49 @@ function fileManager() {
             if (!this.selectedSite) { showToast('请先选择目标网站或目录', 'error'); return; }
             const cb = this.clipboard;
             const apiPath = cb.action === 'cut' ? '/files/move' : '/files/copy';
-            try {
-                const r = await api(apiPath, {
+            const pasteRequest = async (conflictPolicy = '') => {
+                return await api(apiPath, {
                     method: 'POST',
                     body: {
                         site_id: parseInt(cb.site_id),
                         dest_site_id: parseInt(this.selectedSite),
                         src_path: cb.src_path,
                         dest_path: this.currentPath,
-                        names: cb.names
+                        names: cb.names,
+                        conflict_policy: conflictPolicy
                     }
                 });
+            };
+            try {
+                const r = await pasteRequest();
                 showToast(r.data?.message || '操作完成', 'success');
                 this.clipboard = null;
                 this.loadFiles();
-            } catch(e) { showToast(e.message, 'error'); }
+            } catch(e) {
+                if (e.conflicts) {
+                    const msg = '以下项目已存在：\n\n' + e.conflicts.join('\n')
+                        + '\n\n选择“确认”将合并目录并覆盖同名文件；选择“取消”后可继续选择跳过。';
+                    if (await confirmModal(msg)) {
+                        try {
+                            const r = await pasteRequest('overwrite');
+                            showToast(r.data?.message || '操作完成', 'success');
+                            this.clipboard = null;
+                            this.loadFiles();
+                        } catch(e2) { showToast(e2.message, 'error'); }
+                        return;
+                    }
+                    if (await confirmModal('是否跳过已存在项目，并继续粘贴其他项目？')) {
+                        try {
+                            const r = await pasteRequest('skip');
+                            showToast(r.data?.message || '操作完成', 'success');
+                            this.clipboard = null;
+                            this.loadFiles();
+                        } catch(e2) { showToast(e2.message, 'error'); }
+                    }
+                    return;
+                }
+                showToast(e.message, 'error');
+            }
         },
         async compressItems(names) {
             if (names.length === 1) {

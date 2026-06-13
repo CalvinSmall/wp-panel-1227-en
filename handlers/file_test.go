@@ -230,6 +230,17 @@ func TestFileOperationNameRejectsTraversal(t *testing.T) {
 	}
 }
 
+func TestNormalizeFileConflictPolicy(t *testing.T) {
+	for _, policy := range []string{"", fileConflictPolicyError, fileConflictPolicyOverwrite, fileConflictPolicySkip} {
+		if _, err := normalizeFileConflictPolicy(policy); err != nil {
+			t.Fatalf("normalizeFileConflictPolicy(%q) returned error: %v", policy, err)
+		}
+	}
+	if _, err := normalizeFileConflictPolicy("replace"); err == nil {
+		t.Fatal("normalizeFileConflictPolicy invalid policy error = nil, want error")
+	}
+}
+
 func TestFileEntryPaginationDefaultsToFifty(t *testing.T) {
 	files := make([]fileEntry, 60)
 	for i := range files {
@@ -373,6 +384,98 @@ func TestCopyFileOrDirAllowsSeparateBases(t *testing.T) {
 	}
 	if string(data) != "ok" {
 		t.Fatalf("copied content = %q, want ok", string(data))
+	}
+}
+
+func TestCopyFileOrDirOverwriteMergesDirectoryAndKeepsExtraTargetFiles(t *testing.T) {
+	srcBase := t.TempDir()
+	destBase := t.TempDir()
+	src := filepath.Join(srcBase, "wp-content")
+	dest := filepath.Join(destBase, "wp-content")
+
+	if err := os.MkdirAll(filepath.Join(src, "themes", "twentytwenty"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "index.php"), []byte("new core"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "themes", "twentytwenty", "style.css"), []byte("theme"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dest, "uploads", "2026"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dest, "index.php"), []byte("old core"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dest, "uploads", "2026", "photo.jpg"), []byte("user upload"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := copyFileOrDirWithOverwrite(srcBase, destBase, src, dest, true); err != nil {
+		t.Fatal(err)
+	}
+
+	index, err := os.ReadFile(filepath.Join(dest, "index.php"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(index) != "new core" {
+		t.Fatalf("overwritten index = %q, want new core", string(index))
+	}
+	upload, err := os.ReadFile(filepath.Join(dest, "uploads", "2026", "photo.jpg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(upload) != "user upload" {
+		t.Fatalf("target upload = %q, want user upload", string(upload))
+	}
+	if _, err := os.Stat(filepath.Join(dest, "themes", "twentytwenty", "style.css")); err != nil {
+		t.Fatalf("new nested file missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(src, "index.php")); err != nil {
+		t.Fatalf("copy should keep source file: %v", err)
+	}
+}
+
+func TestCopyFileOrDirWithoutOverwriteRejectsExistingFile(t *testing.T) {
+	srcBase := t.TempDir()
+	destBase := t.TempDir()
+	src := filepath.Join(srcBase, "readme.txt")
+	dest := filepath.Join(destBase, "readme.txt")
+	if err := os.WriteFile(src, []byte("new"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dest, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := copyFileOrDirWithOverwrite(srcBase, destBase, src, dest, false); err == nil {
+		t.Fatal("copyFileOrDirWithOverwrite without overwrite error = nil, want error")
+	}
+	data, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "old" {
+		t.Fatalf("destination changed to %q, want old", string(data))
+	}
+}
+
+func TestCopyFileOrDirOverwriteRejectsDirectoryOntoFile(t *testing.T) {
+	srcBase := t.TempDir()
+	destBase := t.TempDir()
+	src := filepath.Join(srcBase, "wp-content")
+	dest := filepath.Join(destBase, "wp-content")
+	if err := os.MkdirAll(src, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dest, []byte("file"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := copyFileOrDirWithOverwrite(srcBase, destBase, src, dest, true); err == nil {
+		t.Fatal("copyFileOrDirWithOverwrite directory onto file error = nil, want error")
 	}
 }
 
