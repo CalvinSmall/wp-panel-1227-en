@@ -189,7 +189,7 @@ download_file() {
     return 1
 }
 
-php_package_available() {
+apt_package_available() {
     local pkg="$1"
     local candidate=""
 
@@ -199,6 +199,142 @@ php_package_available() {
     fi
 
     LC_ALL=C apt-cache show "$pkg" >/dev/null 2>&1
+}
+
+php_package_available() {
+    local pkg="$1"
+
+    apt_package_available "$pkg"
+}
+
+set_debian_source_meta() {
+    case "$1" in
+        nju)
+            DEBIAN_SOURCE_LABEL="南京大学 Debian 镜像"
+            DEBIAN_REPO_URL="http://mirror.nju.edu.cn/debian"
+            DEBIAN_SECURITY_URL="http://mirror.nju.edu.cn/debian-security"
+            ;;
+        ustc)
+            DEBIAN_SOURCE_LABEL="中科大 Debian 镜像"
+            DEBIAN_REPO_URL="http://mirrors.ustc.edu.cn/debian"
+            DEBIAN_SECURITY_URL="http://mirrors.ustc.edu.cn/debian-security"
+            ;;
+        tuna)
+            DEBIAN_SOURCE_LABEL="清华大学 Debian 镜像"
+            DEBIAN_REPO_URL="http://mirrors.tuna.tsinghua.edu.cn/debian"
+            DEBIAN_SECURITY_URL="http://mirrors.tuna.tsinghua.edu.cn/debian-security"
+            ;;
+        official)
+            DEBIAN_SOURCE_LABEL="Debian 官方源"
+            DEBIAN_REPO_URL="http://deb.debian.org/debian"
+            DEBIAN_SECURITY_URL="http://security.debian.org/debian-security"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+backup_default_debian_sources() {
+    local source_file=""
+
+    mkdir -p /etc/apt/sources.list.d
+
+    if [[ -f /etc/apt/sources.list.d/debian.sources ]]; then
+        if [[ ! -f /etc/apt/sources.list.d/debian.sources.wp-panel.bak ]]; then
+            cp /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/debian.sources.wp-panel.bak
+        fi
+        mv /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/debian.sources.wp-panel.disabled
+    fi
+
+    for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+        [[ -f "$source_file" ]] || continue
+        if [[ ! -f "${source_file}.wp-panel.bak" ]]; then
+            cp "$source_file" "${source_file}.wp-panel.bak"
+        fi
+        sed -i -E '/^[[:space:]]*deb(-src)?[[:space:]].*(\/debian-security|\/debian([[:space:]\/]|$)|deb\.debian\.org|security\.debian\.org)/ s/^/# disabled by WP Panel: /' "$source_file"
+    done
+}
+
+write_debian_sources() {
+    local codename="$1"
+
+    cat > /etc/apt/sources.list.d/wp-panel-debian.sources << DEBIANSOURCESEOF
+Types: deb
+URIs: ${DEBIAN_REPO_URL}
+Suites: ${codename} ${codename}-updates
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: ${DEBIAN_SECURITY_URL}
+Suites: ${codename}-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+DEBIANSOURCESEOF
+}
+
+debian_packages_available() {
+    local packages=(ca-certificates wget curl gnupg lsb-release nginx mariadb-server redis-server)
+    local pkg=""
+
+    for pkg in "${packages[@]}"; do
+        if ! apt_package_available "$pkg"; then
+            log_warn "APT 源缺少关键包候选版本: ${pkg}"
+            return 1
+        fi
+    done
+    return 0
+}
+
+configure_debian_source() {
+    local source_id="$1"
+    local codename="$2"
+    local apt_log="/tmp/wp-panel-debian-apt-update.log"
+
+    set_debian_source_meta "$source_id" || return 1
+    log_info "尝试 Debian 源: ${DEBIAN_SOURCE_LABEL}"
+    write_debian_sources "$codename"
+
+    if apt-get update > "$apt_log" 2>&1 && debian_packages_available; then
+        rm -f "$apt_log"
+        log_info "Debian 源可用: ${DEBIAN_SOURCE_LABEL}"
+        return 0
+    fi
+
+    log_warn "${DEBIAN_SOURCE_LABEL} 不可用或同步不完整，准备尝试下一个 Debian 源"
+    if [[ -f "$apt_log" ]]; then
+        tail -n 8 "$apt_log" 2>/dev/null || true
+    fi
+    rm -f "$apt_log"
+    return 1
+}
+
+select_debian_source() {
+    local codename="$1"
+    local candidates=()
+    local source_id=""
+
+    if $PREFER_CN; then
+        candidates=(nju ustc tuna official)
+        backup_default_debian_sources
+    else
+        log_info "使用系统默认 Debian APT 源"
+        apt-get update
+        debian_packages_available || log_error "系统默认 APT 源缺少关键包，请检查 /etc/apt/sources.list 或 /etc/apt/sources.list.d/"
+        return 0
+    fi
+
+    for source_id in "${candidates[@]}"; do
+        if configure_debian_source "$source_id" "$codename"; then
+            if [[ "$source_id" == "official" ]]; then
+                log_warn "国内镜像同步可能延迟，已回退官方源"
+            fi
+            return 0
+        fi
+    done
+
+    log_error "所有 Debian APT 源均不可用。请检查网络、DNS、系统时间，或手动配置可用镜像源后重试。"
 }
 
 configure_php_source() {
@@ -533,12 +669,13 @@ if [[ -z "$DEBIAN_CODENAME" ]]; then
 fi
 log_info "Debian 版本: ${DEBIAN_CODENAME}"
 
-apt-get update
+# 国内模式会优先选择 Debian 镜像，并同时覆盖 debian-security / debian-updates。
+select_debian_source "$DEBIAN_CODENAME"
 
 # 安装基础依赖
 apt-get install -y curl wget unzip ca-certificates gnupg lsb-release
 
-# 只对 PHP 8.3 源做多重兜底；Debian/Nginx/MariaDB/Redis 继续走系统默认源。
+# PHP 8.3 源单独做多重兜底，国内模式优先中科大 / 上交镜像。
 select_php_source "$DEBIAN_CODENAME"
 
 # ============================================================
