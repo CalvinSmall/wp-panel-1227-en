@@ -24,14 +24,14 @@
 
 ## 二、`install-cn.sh`：只是一个"入口招待员"
 
-先讲简单的。国内用户看到的 `install-cn.sh` 只有 **54 行**，核心逻辑就三句话：
+先讲简单的。国内用户看到的 `install-cn.sh` 仍然很短，核心逻辑就三句话：
 
 ```bash
 export WP_PANEL_PREFER_CN_MIRROR=1    # 标记：优先使用国内镜像
 bash install.sh --prefer-cn            # 调用主脚本，附加国内优先参数
 ```
 
-如果同目录有 `install.sh`，它就执行本地文件；如果没有，它先从 `gh.wp-panel.org`（国内反代）拉取主脚本，失败后再尝试直连 GitHub。
+如果同目录有 `install.sh`，它就执行本地文件；如果没有，它会按固定白名单来源依次尝试 `gh.wp-panel.org`、`jsDelivr`、GitHub 直连来拉取主脚本，并在内容看起来异常时继续尝试下一个来源。
 
 **安全要点**：
 - 它不执行任何系统操作，只是一个"**跳板脚本**"。

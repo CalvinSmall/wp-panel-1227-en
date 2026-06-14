@@ -5,7 +5,7 @@ set -o pipefail
 # ============================================================
 # WP Panel 国内入口脚本
 # 主安装逻辑统一维护在 install.sh。
-# 这里仅启用国内优先策略，并在管道安装时通过 gh.wp-panel.org 拉取主脚本。
+# 这里仅启用国内优先策略，并在管道安装时通过多个固定来源拉取主脚本。
 # ============================================================
 
 RED='\033[0;31m'
@@ -13,8 +13,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-INSTALL_URL="https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh"
-PROXY_INSTALL_URL="https://gh.wp-panel.org/https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh"
+GITHUB_INSTALL_URL="https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh"
+INSTALL_SCRIPT_SOURCES=(
+    "gh.wp-panel.org 反代|https://gh.wp-panel.org/${GITHUB_INSTALL_URL}"
+    "jsDelivr 反代|https://cdn.jsdelivr.net/gh/naibabiji/wp-panel@main/install.sh"
+    "GitHub 直连|${GITHUB_INSTALL_URL}"
+)
 
 log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
@@ -39,16 +43,31 @@ download_install_script() {
     return 1
 }
 
-log_info "通过 gh.wp-panel.org 获取主安装脚本..."
-INSTALL_SCRIPT="$(download_install_script "$PROXY_INSTALL_URL" || true)"
+validate_install_script() {
+    local content="$1"
+    [[ "$content" == *"WP Panel 安装脚本"* ]] && [[ "$content" == *"部署面板二进制"* ]]
+}
+
+INSTALL_SCRIPT=""
+for source in "${INSTALL_SCRIPT_SOURCES[@]}"; do
+    label="${source%%|*}"
+    url="${source#*|}"
+
+    log_info "通过 ${label} 获取主安装脚本..."
+    CANDIDATE_SCRIPT="$(download_install_script "$url" || true)"
+    if [[ -n "$CANDIDATE_SCRIPT" ]] && validate_install_script "$CANDIDATE_SCRIPT"; then
+        INSTALL_SCRIPT="$CANDIDATE_SCRIPT"
+        log_info "主安装脚本获取成功: ${label}"
+        break
+    fi
+    log_warn "${label} 获取失败或内容异常，尝试下一个来源..."
+done
 
 if [[ -z "$INSTALL_SCRIPT" ]]; then
-    log_warn "gh.wp-panel.org 获取失败，尝试直连 GitHub..."
-    INSTALL_SCRIPT="$(download_install_script "$INSTALL_URL" || true)"
-fi
-
-if [[ -z "$INSTALL_SCRIPT" ]]; then
-    log_error "无法获取 install.sh。请确认当前服务器能访问 gh.wp-panel.org，或手动下载 install.sh 后执行：bash install.sh --prefer-cn"
+    log_error "无法获取 install.sh。建议方案：
+  1. 检查服务器能否访问 gh.wp-panel.org、cdn.jsdelivr.net 或 GitHub
+  2. 手动下载 install.sh 后执行：bash install.sh --prefer-cn
+  3. 如 GitHub Releases 也不可访问，请同时下载 release 附件 wp-panel，并与 install.sh 放在同一目录后重新运行"
 fi
 
 exec bash -s -- --prefer-cn "$@" <<< "$INSTALL_SCRIPT"
