@@ -1083,9 +1083,13 @@ echo ""
 echo -e "公网 IP:     ${BOLD}${PUBLIC_IP}${NC}"
 echo -e "内网 IP:     ${BOLD}${LOCAL_IP}${NC}"
 echo ""
-echo -e "面板地址:    ${BOLD}https://${LOCAL_IP}:8443/${PANEL_SUFFIX}/${NC}"
 if [[ "$PUBLIC_IP" != "<未知>" ]]; then
-    echo -e "            ${BOLD}https://${PUBLIC_IP}:8443/${PANEL_SUFFIX}/${NC}"
+    echo -e "面板地址:    ${BOLD}https://${PUBLIC_IP}:8443/${PANEL_SUFFIX}/${NC}"
+    if [[ "$LOCAL_IP" != "<未知>" && "$LOCAL_IP" != "$PUBLIC_IP" ]]; then
+        echo -e "内网地址:    ${BOLD}https://${LOCAL_IP}:8443/${PANEL_SUFFIX}/${NC}"
+    fi
+else
+    echo -e "面板地址:    ${BOLD}https://${LOCAL_IP}:8443/${PANEL_SUFFIX}/${NC}"
 fi
 echo -e "面板状态:    ${STATUS}"
 if $PORT_OK; then
