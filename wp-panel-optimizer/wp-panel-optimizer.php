@@ -3,7 +3,7 @@
  * Plugin Name: WP Panel Optimizer
  * Plugin URI:  https://github.com/naibabiji/wp-panel
  * Description: 与 WP Panel 面板配合，管理 FastCGI 缓存、预加载、调试模式、文章修订、内存限制等优化项。发布/更新文章自动清除缓存。
- * Version:     1.1.3
+ * Version:     1.1.4
  * Author:      WP Panel
  * Author URI:  https://blog.naibabiji.com
  * License:     GPL-2.0+
@@ -32,7 +32,7 @@ function wpp_optimizer_uninstall() {
 
 class WP_Panel_Optimizer {
 
-    const VERSION = '1.1.3';
+    const VERSION = '1.1.4';
 
     const OPTION_FCACHE_ENABLED = 'wpp_optimizer_fcache_enabled';
     const OPTION_FCACHE_TTL     = 'wpp_optimizer_fcache_ttl';
@@ -49,6 +49,8 @@ class WP_Panel_Optimizer {
     const OPTION_PRELOAD_QUEUE   = 'wpp_optimizer_preload_queue';
     const OPTION_PRELOAD_STATUS  = 'wpp_optimizer_preload_status';
     const PRELOAD_HOOK           = 'wpp_optimizer_preload_batch';
+    const PRELOAD_BATCH_SIZE     = 5;
+    const PRELOAD_TICK_THROTTLE  = 50;
 
     private static function is_path_allowed_by_open_basedir($path) {
         $openBasedir = ini_get('open_basedir');
@@ -142,6 +144,7 @@ class WP_Panel_Optimizer {
         add_action('admin_notices', [__CLASS__, 'clear_notice']);
         add_action('wp_ajax_wpp_optimizer_check_update', [__CLASS__, 'ajax_check_update']);
         add_action(self::PRELOAD_HOOK, [__CLASS__, 'process_preload_batch']);
+        self::maybe_process_preload_tick();
 
         // 禁止检测更新：完全屏蔽更新提示和通知
         if (get_option(self::OPTION_NO_UPDATES, '0') === '1') {
@@ -301,6 +304,7 @@ class WP_Panel_Optimizer {
                         <td>
                             <label><input id="wpp-preload-enabled" name="preload_enabled" type="checkbox" value="1" <?php checked($preloadEnabled); ?>> 清除缓存后自动预加载</label>
                             <p class="description">插件会以未登录访客身份访问本站公开页面，让 Nginx 自然生成 FastCGI 缓存文件。默认低速批处理，避免压垮小服务器。</p>
+                            <p class="description"><strong>说明：</strong>预加载只提前处理首页和最近更新的公开内容（最多为下方设置的 URL 数量），不是全站爬虫。未进入预加载队列的页面仍会在真实访客首次访问后由 Nginx 正常生成缓存。</p>
                         </td>
                     </tr>
                     <tr>
@@ -377,6 +381,9 @@ class WP_Panel_Optimizer {
                 失败：<?php echo intval($preloadStatus['failed']); ?>
                 <?php if (!empty($preloadStatus['started_at'])): ?>
                     ，开始：<?php echo esc_html($preloadStatus['started_at']); ?>
+                <?php endif; ?>
+                <?php if (!empty($preloadStatus['last_run_at'])): ?>
+                    ，上次执行：<?php echo esc_html($preloadStatus['last_run_at']); ?>
                 <?php endif; ?>
                 <?php if (!empty($preloadStatus['finished_at'])): ?>
                     ，结束：<?php echo esc_html($preloadStatus['finished_at']); ?>
@@ -521,6 +528,9 @@ class WP_Panel_Optimizer {
         }
 
         $count = self::queue_preload(self::build_full_preload_urls(), 'manual');
+        if ($count > 0) {
+            self::process_preload_batch();
+        }
         self::redirect_preload_notice($count > 0 ? 'queued' : 'failed', $count);
     }
 
@@ -617,6 +627,7 @@ class WP_Panel_Optimizer {
             'failed'       => 0,
             'reason'       => '',
             'started_at'   => '',
+            'last_run_at'  => '',
             'finished_at'  => '',
             'last_message' => '',
         ], $status);
@@ -660,9 +671,22 @@ class WP_Panel_Optimizer {
         update_option(self::OPTION_PRELOAD_STATUS, $status, false);
 
         if (!wp_next_scheduled(self::PRELOAD_HOOK)) {
-            wp_schedule_single_event(time() + 10, self::PRELOAD_HOOK);
+            wp_schedule_single_event(time() + 60, self::PRELOAD_HOOK);
         }
         return count($queue);
+    }
+
+    public static function maybe_process_preload_tick() {
+        $queue = get_option(self::OPTION_PRELOAD_QUEUE, []);
+        $status = self::get_preload_status();
+        if (empty($status['running']) || empty($queue) || !is_array($queue)) {
+            return;
+        }
+        if (get_transient('wpp_optimizer_preload_tick')) {
+            return;
+        }
+        set_transient('wpp_optimizer_preload_tick', 1, self::PRELOAD_TICK_THROTTLE);
+        self::process_preload_batch();
     }
 
     public static function process_preload_batch() {
@@ -687,7 +711,8 @@ class WP_Panel_Optimizer {
             return;
         }
 
-        $batch = array_splice($queue, 0, 5);
+        $status['last_run_at'] = current_time('Y-m-d H:i:s');
+        $batch = array_splice($queue, 0, self::PRELOAD_BATCH_SIZE);
         foreach ($batch as $url) {
             if (!self::is_preload_url_allowed($url)) {
                 $status['failed']++;
@@ -721,7 +746,9 @@ class WP_Panel_Optimizer {
             $status['last_message'] = '预加载进行中';
             update_option(self::OPTION_PRELOAD_QUEUE, array_values($queue), false);
             update_option(self::OPTION_PRELOAD_STATUS, $status, false);
-            wp_schedule_single_event(time() + 20, self::PRELOAD_HOOK);
+            if (!wp_next_scheduled(self::PRELOAD_HOOK)) {
+                wp_schedule_single_event(time() + 60, self::PRELOAD_HOOK);
+            }
         } else {
             delete_option(self::OPTION_PRELOAD_QUEUE);
             $status['running'] = false;
