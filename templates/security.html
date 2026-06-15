@@ -170,8 +170,8 @@
         </div>
         <div class="rounded border border-blue-900/60 bg-blue-950/30 p-3 mb-4 text-sm text-blue-100">
             <p class="font-medium text-blue-200">结论：网站启用 CDN Real IP 后，日志分析、异常访问识别和自动封禁会按真实访客 IP 工作。</p>
-            <p class="text-xs text-blue-200/80 mt-1">不填写可信 CDN 回源 IP 段也能进入兼容模式；填写后会切换为更严格的可信 CDN 模式，并同时加入 Web 防护白名单，降低误伤 CDN 节点的风险。</p>
-            <p class="text-xs text-blue-200/80 mt-1">不会填写 CDN 回源 IP 段时，网站详情里可直接选择“通用 CDN（兼容模式）”。知道阿里云 ESA、腾讯 EdgeOne、又拍云等回源 IP 段时，再新增对应配置组并填写 IP 段。</p>
+            <p class="text-xs text-blue-200/80 mt-1">不会填写 CDN 回源 IP 段时，选择“通用 CDN（兼容模式）”即可。正常 CDN 场景下不会误封 CDN 节点。</p>
+            <p class="text-xs text-blue-200/80 mt-1">能拿到 CDN 回源 IP 段时，再新增配置组并填写，可降低 Header 被伪造的风险。Cloudflare 由系统自动处理。</p>
         </div>
         <div class="space-y-2 mb-4">
             <template x-for="g in cdnGroups" :key="g.id">
@@ -189,6 +189,7 @@
                                 <span x-text="cdnGroupModeLabel(g)"></span>
                             </div>
                             <p x-show="g.provider === 'compatible'" class="text-xs text-gray-500 mt-1">不会填写 CDN 回源 IP 段时选择此模式，适合大多数普通 CDN 场景。</p>
+                            <p x-show="g.provider === 'cloudflare'" class="text-xs text-gray-500 mt-1">Cloudflare 真实 IP 已由系统全局自动处理，网站详情页无需选择此组。</p>
                         </div>
                         <div x-show="!g.builtin" class="flex items-center space-x-2">
                             <button @click="editCDNGroup(g)" class="btn-secondary text-xs py-1 px-2">编辑</button>
@@ -273,7 +274,7 @@ function securitySettings() {
         },
         cdnGroupModeLabel(group) {
             if ((group.ip_ranges || '').trim()) return '严格模式：已填写可信回源 IP 段';
-            if (group.provider === 'cloudflare') return '严格模式：自动拉取 Cloudflare IP';
+            if (group.provider === 'cloudflare') return '系统自动处理：自动拉取 Cloudflare IP';
             if (group.provider === 'compatible') return '兼容模式：不会填写回源 IP 段时使用';
             return '兼容模式：未填写可信回源 IP 段';
         },

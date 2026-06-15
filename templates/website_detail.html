@@ -28,12 +28,16 @@
                 <div><dt class="text-sm text-gray-400">类型</dt><dd class="text-white" x-text="site.site_type === 'php' ? '通用 PHP 网站' : 'WordPress'"></dd></div>
                 <div class="pt-2 border-t border-gray-700/50">
                     <dt class="text-sm text-gray-400 mb-2">CDN 真实 IP</dt>
+                    <div class="rounded border border-blue-900/60 bg-blue-950/30 p-2 mb-2 text-xs text-blue-200">
+                        <p>Cloudflare 真实 IP 已由系统自动处理，无需在这里选择。</p>
+                        <p class="mt-1 text-blue-200/80">这里仅用于阿里云 ESA、腾讯 EdgeOne、又拍云或其他非 Cloudflare CDN。</p>
+                    </div>
                     <label class="flex items-center space-x-2 text-sm text-gray-300 mb-2">
                         <input type="checkbox" x-model="cdnRealIPEnabled">
-                        <span>启用 CDN 真实 IP</span>
+                        <span>启用其他 CDN 真实 IP</span>
                     </label>
                     <div x-show="cdnRealIPEnabled" class="space-y-2">
-                        <template x-for="g in cdnGroups" :key="g.id">
+                        <template x-for="g in selectableCDNGroups()" :key="g.id">
                             <label class="flex items-start space-x-2 text-sm text-gray-300">
                                 <input type="checkbox" class="mt-1" :value="g.id" x-model="cdnRealIPGroupIDs" :disabled="!g.enabled">
                                 <span>
@@ -42,9 +46,10 @@
                                 </span>
                             </label>
                         </template>
+                        <p x-show="selectableCDNGroups().length === 0" class="text-xs text-gray-500">暂无可选择的非 Cloudflare CDN 配置组，请先到安全设置中新增。</p>
                         <p class="text-xs text-gray-500" x-text="cdnRealIPModeText()"></p>
                     </div>
-                    <button @click="saveCDNRealIP()" :disabled="cdnRealIPSaving" class="btn-primary text-sm mt-2" x-text="cdnRealIPSaving ? '保存中...' : '保存 CDN 真实 IP'"></button>
+                    <button @click="saveCDNRealIP()" :disabled="cdnRealIPSaving" class="btn-primary text-sm mt-2" x-text="cdnRealIPSaving ? '保存中...' : '保存其他 CDN 设置'"></button>
                 </div>
                 <div><dt class="text-sm text-gray-400">系统用户</dt><dd class="text-white font-mono" x-text="site.system_user"></dd></div>
                 <div><dt class="text-sm text-gray-400">网站根目录</dt><dd class="text-white font-mono text-sm" x-text="site.web_root"></dd></div>
@@ -576,16 +581,32 @@ function websiteDetail() {
         async fetchCDNGroups() {
             try {
                 const r = await api('/security/cdn-realip-groups');
-                if (r.success) this.cdnGroups = r.data || [];
+                if (r.success) {
+                    this.cdnGroups = r.data || [];
+                    this.normalizeCDNRealIPSelection();
+                }
             } catch(e) {}
+        },
+        selectableCDNGroups() {
+            return this.cdnGroups.filter(g => g.provider !== 'cloudflare');
+        },
+        normalizeCDNRealIPSelection() {
+            const currentIDs = this.cdnRealIPGroupIDs.map(id => parseInt(id));
+            const selected = this.cdnGroups.filter(g => currentIDs.includes(g.id));
+            const selectedNonCloudflareIDs = selected.filter(g => g.provider !== 'cloudflare').map(g => g.id);
+            if (this.cdnRealIPEnabled && selected.length > 0 && selectedNonCloudflareIDs.length === 0) {
+                this.cdnRealIPEnabled = false;
+            }
+            this.cdnRealIPGroupIDs = selectedNonCloudflareIDs;
         },
         cdnRealIPModeText() {
             if (!this.cdnRealIPEnabled) return '';
-            const selected = this.cdnGroups.filter(g => this.cdnRealIPGroupIDs.includes(g.id));
-            if (selected.length === 0) return '请选择至少一个 CDN 配置组。';
+            const currentIDs = this.cdnRealIPGroupIDs.map(id => parseInt(id));
+            const selected = this.selectableCDNGroups().filter(g => currentIDs.includes(g.id));
+            if (selected.length === 0) return '请选择至少一个非 Cloudflare CDN 配置组。Cloudflare 已由系统自动处理。';
             const headers = [...new Set(selected.map(g => (g.header_name || '').toLowerCase()))];
             if (headers.length > 1) return '所选配置组 Header 不一致，保存时会被拒绝。';
-            if (selected.some(g => g.provider !== 'cloudflare' && !(g.ip_ranges || '').trim())) {
+            if (selected.some(g => !(g.ip_ranges || '').trim())) {
                 return '兼容模式：未填写可信回源 IP 段，将信任所有来源的真实 IP Header。';
             }
             return '可信 CDN 模式：仅信任所选配置组的回源 IP 段。';
@@ -593,9 +614,14 @@ function websiteDetail() {
         async saveCDNRealIP() {
             this.cdnRealIPSaving = true;
             try {
+                const groupIDs = this.cdnRealIPGroupIDs.map(id => parseInt(id)).filter(id => this.selectableCDNGroups().some(g => g.id === id));
+                if (this.cdnRealIPEnabled && groupIDs.length === 0) {
+                    showToast('请选择至少一个非 Cloudflare CDN 配置组；Cloudflare 已由系统自动处理，无需保存。', 'error');
+                    return;
+                }
                 const r = await api('/websites/' + this.site.id + '/cdn-realip', {
                     method: 'PUT',
-                    body: { enabled: this.cdnRealIPEnabled, group_ids: this.cdnRealIPGroupIDs.map(id => parseInt(id)) }
+                    body: { enabled: this.cdnRealIPEnabled, group_ids: groupIDs }
                 });
                 showToast(r.data?.message || 'CDN 真实 IP 已保存', 'success');
                 await this.fetchDetail();

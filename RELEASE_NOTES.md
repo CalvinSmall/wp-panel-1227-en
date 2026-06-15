@@ -4,9 +4,9 @@
 
 ### 新功能
 
-- 新增网站级 CDN Real IP 功能：每个网站可单独开启 CDN 真实 IP，并绑定对应 CDN 配置组。
-- 新增 CDN 真实 IP 配置组管理：支持 Cloudflare 内置组、通用 CDN 兼容模式，以及阿里云 ESA、腾讯 EdgeOne、又拍云等自定义 CDN 配置组。
-- Cloudflare 配置组自动使用官方 IP 段，无需手动维护回源 IP。
+- 新增网站级 CDN Real IP 功能：非 Cloudflare CDN 可按网站单独开启真实 IP，并绑定对应 CDN 配置组。
+- 新增 CDN 真实 IP 配置组管理：支持 Cloudflare 自动处理、通用 CDN 兼容模式，以及阿里云 ESA、腾讯 EdgeOne、又拍云等自定义 CDN 配置组。
+- Cloudflare 真实 IP 由系统全局自动处理并使用官方 IP 段，无需在网站详情页手动绑定配置组。
 - 通用 CDN（兼容模式）可在不会填写 CDN 回源 IP 段时直接使用，默认信任 `X-Forwarded-For`。
 - 自定义 CDN 配置组支持填写真实 IP Header 和可信 CDN 回源 IP/CIDR；填写回源 IP 后自动进入更严格的可信 CDN 模式。
 - CDN 可信回源 IP 段会同时用于网站真实 IP 判断和 Web 防护白名单，避免误封 CDN 节点。
@@ -27,11 +27,12 @@
 - 批量重建网站 Nginx 配置时会汇总部分失败并反馈给调用方。
 - 后台异步刷新单站点 Nginx 配置时记录失败日志，便于排查配置未生效问题。
 - CDN 配置组创建表单默认 Header 调整为 `X-Forwarded-For`，更符合国内 CDN 常见用法。
+- 网站详情页将 Cloudflare 标记为系统自动处理，只保留其他 CDN 配置组的手动选择入口，避免与阿里云 ESA、腾讯 EdgeOne、又拍云等站点级配置产生理解冲突。
 - 强化 CDN 配置组失败路径测试，覆盖 Fail2ban 失败、Nginx 重建失败、删除回滚、绑定恢复等场景。
 
 ### 使用说明
 
-- Cloudflare 网站：在网站详情启用 CDN Real IP，并选择内置 Cloudflare 配置组。
+- Cloudflare 网站：无需在网站详情启用 CDN Real IP，系统会自动部署 Cloudflare 真实 IP 配置。
 - 不会填写 CDN 回源 IP 段的普通 CDN 网站：选择“通用 CDN（兼容模式）”。
 - 阿里云 ESA、腾讯 EdgeOne、又拍云等国内 CDN：建议新增自定义配置组，Header 通常填写 `X-Forwarded-For`，并在“可信 CDN 回源 IP/CIDR”中填写厂商回源 IP 段。
 - 启用 CDN Real IP 后，网站日志、异常访问分析、自动封禁等功能会尽量按真实访客 IP 工作；兼容模式允许少量 Header 伪造风险，严格模式更可靠。
