@@ -189,7 +189,7 @@ func reloadOrStartFail2ban() error {
 			return err
 		}
 		if _, startErr := executeCommand("systemctl", "start", "fail2ban"); startErr != nil {
-			return err
+			return startErr
 		}
 	}
 	return nil

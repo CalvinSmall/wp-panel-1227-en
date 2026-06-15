@@ -256,6 +256,49 @@ func GetCDNRealIPGroup(id int) (models.CDNRealIPGroup, error) {
 		FROM cdn_realip_groups WHERE id = ?`, id).Scan)
 }
 
+func WebsiteIDsForCDNRealIPGroup(groupID int) ([]int, error) {
+	rows, err := database.GetDB().Query(`SELECT website_id FROM website_cdn_realip_groups WHERE group_id = ? ORDER BY website_id`, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var websiteIDs []int
+	for rows.Next() {
+		var websiteID int
+		if err := rows.Scan(&websiteID); err != nil {
+			return nil, err
+		}
+		websiteIDs = append(websiteIDs, websiteID)
+	}
+	return websiteIDs, rows.Err()
+}
+
+func RestoreCDNRealIPGroupWithBindings(group models.CDNRealIPGroup, websiteIDs []int) error {
+	tx, err := database.GetDB().Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`INSERT OR REPLACE INTO cdn_realip_groups
+		(id, name, provider, header_name, ip_ranges, builtin, enabled, description, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		group.ID, group.Name, group.Provider, group.HeaderName, group.IPRanges,
+		boolToDBInt(group.Builtin), boolToDBInt(group.Enabled), group.Description, group.CreatedAt, group.UpdatedAt); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM website_cdn_realip_groups WHERE group_id = ?`, group.ID); err != nil {
+		return err
+	}
+	for _, websiteID := range websiteIDs {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO website_cdn_realip_groups (website_id, group_id) VALUES (?, ?)`, websiteID, group.ID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func GetEnabledCDNRealIPGroupsByIDs(groupIDs []int) ([]models.CDNRealIPGroup, error) {
 	seenIDs := map[int]bool{}
 	var groups []models.CDNRealIPGroup

@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -56,6 +57,86 @@ func TestRecordFail2banBanKeepsRepeatedHistory(t *testing.T) {
 		if jail != "wppanel-404" {
 			t.Fatalf("expected jail wppanel-404, got %q", jail)
 		}
+	}
+}
+
+func TestRestoreCDNRealIPGroupWithBindings(t *testing.T) {
+	openTestDB(t)
+	db := database.GetDB()
+
+	for _, site := range []struct {
+		id     int
+		domain string
+	}{
+		{101, "one.example.com"},
+		{102, "two.example.com"},
+	} {
+		if _, err := db.Exec(`INSERT INTO websites
+			(id, name, domain, system_user, web_root, log_dir, db_name, db_user, php_pool_path, nginx_conf_path)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			site.id, site.domain, site.domain, "wpuser", "/www/wwwroot/"+site.domain, "/www/wwwlogs/"+site.domain,
+			"db_"+site.domain, "dbu_"+site.domain, "/etc/php/"+site.domain+".conf", "/etc/nginx/sites-available/"+site.domain+".conf"); err != nil {
+			t.Fatalf("insert website %s: %v", site.domain, err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO cdn_realip_groups
+		(id, name, provider, header_name, ip_ranges, builtin, enabled, description)
+		VALUES (99, 'EdgeOne', 'custom', 'X-Forwarded-For', '203.0.113.0/24', 0, 1, 'test group')`); err != nil {
+		t.Fatalf("insert cdn group: %v", err)
+	}
+	for _, siteID := range []int{101, 102} {
+		if _, err := db.Exec(`INSERT INTO website_cdn_realip_groups (website_id, group_id) VALUES (?, 99)`, siteID); err != nil {
+			t.Fatalf("insert binding: %v", err)
+		}
+	}
+
+	group, err := GetCDNRealIPGroup(99)
+	if err != nil {
+		t.Fatalf("get cdn group: %v", err)
+	}
+	bindings, err := WebsiteIDsForCDNRealIPGroup(99)
+	if err != nil {
+		t.Fatalf("get bindings: %v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM cdn_realip_groups WHERE id = 99`); err != nil {
+		t.Fatalf("delete cdn group: %v", err)
+	}
+
+	if err := RestoreCDNRealIPGroupWithBindings(group, bindings); err != nil {
+		t.Fatalf("restore cdn group: %v", err)
+	}
+	restoredBindings, err := WebsiteIDsForCDNRealIPGroup(99)
+	if err != nil {
+		t.Fatalf("get restored bindings: %v", err)
+	}
+	if len(restoredBindings) != 2 || restoredBindings[0] != 101 || restoredBindings[1] != 102 {
+		t.Fatalf("unexpected restored bindings: %v", restoredBindings)
+	}
+}
+
+func TestReloadOrStartFail2banReturnsStartError(t *testing.T) {
+	reloadErr := errors.New("reload failed")
+	startErr := errors.New("start failed")
+
+	oldShellExec := shellExec
+	t.Cleanup(func() { shellExec = oldShellExec })
+	shellExec = func(binary string, args ...string) (string, error) {
+		command := binary + " " + strings.Join(args, " ")
+		switch command {
+		case "fail2ban-client reload":
+			return "", reloadErr
+		case "systemctl is-active --quiet fail2ban":
+			return "", errors.New("inactive")
+		case "systemctl start fail2ban":
+			return "", startErr
+		default:
+			t.Fatalf("unexpected command: %s", command)
+			return "", nil
+		}
+	}
+
+	if err := reloadOrStartFail2ban(); !errors.Is(err, startErr) {
+		t.Fatalf("expected start error, got %v", err)
 	}
 }
 

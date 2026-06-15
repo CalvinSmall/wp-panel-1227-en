@@ -121,7 +121,9 @@ func ClearSiteCache(siteID int) {
 	db := database.GetDB()
 	key := NewCacheKey()
 	db.Exec("UPDATE websites SET fastcgi_cache_key = ? WHERE id = ?", key, siteID)
-	RegenerateSiteNginx(siteID)
+	if err := RegenerateSiteNginx(siteID); err != nil {
+		log.Printf("刷新站点 Nginx 配置失败 site=%d: %v", siteID, err)
+	}
 }
 
 func ClearWPSiteRuntimeCaches(siteID int, domain, webRoot string) {

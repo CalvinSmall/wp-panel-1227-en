@@ -1077,7 +1077,11 @@ func (h *WebsiteHandler) UpdateCache(c *gin.Context) {
 	}
 	database.GetDB().Exec("UPDATE websites SET fastcgi_cache_enabled = ?, fastcgi_cache_ttl = ? WHERE id = ?", enabled, req.TTL, id)
 
-	executor.GoSafe(func() { executor.RegenerateSiteNginx(id) })
+	executor.GoSafe(func() {
+		if err := executor.RegenerateSiteNginx(id); err != nil {
+			log.Printf("刷新站点 Nginx 配置失败 site=%d: %v", id, err)
+		}
+	})
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "缓存设置已更新"}))
 }
@@ -1169,7 +1173,11 @@ func (h *WebsiteHandler) SaveWPOptimizations(c *gin.Context) {
 
 	// FastCGI / XML-RPC 配置变化时重载 Nginx
 	if oldFCacheEnabled != fcEnabled || oldFCacheTTL != req.FCacheTTL || oldXMLRPCEnabled != xmlrpcEnabled {
-		executor.GoSafe(func() { executor.RegenerateSiteNginx(id) })
+		executor.GoSafe(func() {
+			if err := executor.RegenerateSiteNginx(id); err != nil {
+				log.Printf("刷新站点 Nginx 配置失败 site=%d: %v", id, err)
+			}
+		})
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "已保存"}))
@@ -1348,7 +1356,11 @@ func (h *CacheHelperHandler) UpdateCacheSettings(c *gin.Context) {
 	var siteID int
 	db.QueryRow("SELECT id FROM websites WHERE (domain = ? OR (char(10) || aliases || char(10)) LIKE ('%' || char(10) || ? || char(10) || '%') ESCAPE '\\')", req.Domain, escapeLike(req.Domain)).Scan(&siteID)
 	if siteID > 0 {
-		executor.GoSafe(func() { executor.RegenerateSiteNginx(siteID) })
+		executor.GoSafe(func() {
+			if err := executor.RegenerateSiteNginx(siteID); err != nil {
+				log.Printf("刷新站点 Nginx 配置失败 site=%d: %v", siteID, err)
+			}
+		})
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "TTL 已更新", "ttl": req.TTL}))
@@ -1500,7 +1512,11 @@ func (h *CacheHelperHandler) UpdateOptimizerSettings(c *gin.Context) {
 		var siteID int
 		db.QueryRow("SELECT id FROM websites WHERE domain = ? OR (char(10) || aliases || char(10)) LIKE ('%' || char(10) || ? || char(10) || '%') ESCAPE '\\'", req.Domain, escapeLike(req.Domain)).Scan(&siteID)
 		if siteID > 0 {
-			executor.GoSafe(func() { executor.RegenerateSiteNginx(siteID) })
+			executor.GoSafe(func() {
+				if err := executor.RegenerateSiteNginx(siteID); err != nil {
+					log.Printf("刷新站点 Nginx 配置失败 site=%d: %v", siteID, err)
+				}
+			})
 		}
 	}
 
