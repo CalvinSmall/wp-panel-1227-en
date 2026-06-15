@@ -134,7 +134,11 @@ func executeSetCDNRealIP(task *Task) TaskResult {
 
 	cfg := config.AppConfig
 	engine := NewTemplateEngine(cfg.Panel.BackupDir)
-	nginxConfig, err := engine.RenderNginxConfig(nginxDataFromSite(&siteCopy))
+	nginxData, err := nginxDataFromSiteChecked(&siteCopy)
+	if err != nil {
+		return TaskResult{Success: false, Message: err.Error()}
+	}
+	nginxConfig, err := engine.RenderNginxConfig(nginxData)
 	if err != nil {
 		log.Printf("渲染 Nginx 配置失败: %v", err)
 		return taskFailure("渲染 Nginx 配置失败", err)
@@ -142,6 +146,14 @@ func executeSetCDNRealIP(task *Task) TaskResult {
 
 	oldEnabled := site.CDNRealIPEnabled
 	oldGroupIDs := cdnRealIPGroupIDs(site.CDNRealIPGroups)
+	oldNginxData, oldDataErr := nginxDataFromSiteChecked(site)
+	var oldNginxConfig string
+	var oldRenderErr error
+	if oldDataErr == nil {
+		oldNginxConfig, oldRenderErr = engine.RenderNginxConfig(oldNginxData)
+	} else {
+		oldRenderErr = oldDataErr
+	}
 	if err := SaveWebsiteCDNRealIPSettings(site.ID, payload.Enabled, payload.GroupIDs); err != nil {
 		return taskFailure("保存 CDN 真实 IP 设置失败", err)
 	}
@@ -150,6 +162,14 @@ func executeSetCDNRealIP(task *Task) TaskResult {
 		log.Printf("应用 Nginx 配置失败: %v", err)
 		_ = SaveWebsiteCDNRealIPSettings(site.ID, oldEnabled, oldGroupIDs)
 		return taskFailure("应用 Nginx 配置失败", err)
+	}
+	if err := ApplyFail2banSettings(); err != nil {
+		_ = SaveWebsiteCDNRealIPSettings(site.ID, oldEnabled, oldGroupIDs)
+		if oldRenderErr == nil {
+			_ = engine.ApplyNginxConfig(oldNginxConfig, site.NginxConfPath,
+				nginxEnabledPath(cfg, site.NginxConfPath, site.Domain))
+		}
+		return taskFailure("CDN 真实 IP 已回滚，Fail2ban 白名单应用失败", err)
 	}
 
 	return TaskResult{Success: true, Message: "CDN 真实 IP 设置已保存并生效"}

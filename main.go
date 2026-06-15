@@ -161,6 +161,8 @@ func main() {
 	}
 	if err := executor.EnsureCloudflareRealIPConfig(); err != nil {
 		log.Printf("Cloudflare Real IP 配置跳过: %v", err)
+	} else if err := executor.ApplyFail2banSettings(); err != nil {
+		log.Printf("Cloudflare Real IP 白名单应用跳过: %v", err)
 	}
 	executor.EnsureFastCGICacheConfig()
 	// 升级后重建全部 Nginx 和 PHP-FPM 配置，确保新模板规则对旧站生效

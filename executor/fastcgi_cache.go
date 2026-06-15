@@ -257,7 +257,11 @@ func RegenerateSiteNginx(siteID int) {
 	if cdnRealIPEnabled == 1 {
 		groups, _ := GetWebsiteCDNRealIPGroups(siteID)
 		runtime, err := ResolveCDNRealIPRuntime(&models.Website{ID: siteID, CDNRealIPEnabled: true, CDNRealIPGroups: groups})
-		if err == nil && runtime.Enabled {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "跳过Nginx配置重建(site %d): CDN Real IP 配置无效: %v\n", siteID, err)
+			return
+		}
+		if runtime.Enabled {
 			data.CDNRealIPEnabled = true
 			data.CDNRealIPHeader = runtime.HeaderName
 			data.CDNRealIPRanges = runtime.IPRanges

@@ -9,6 +9,11 @@ import (
 )
 
 func nginxDataFromSite(site *models.Website) *NginxSiteData {
+	data, _ := nginxDataFromSiteChecked(site)
+	return data
+}
+
+func nginxDataFromSiteChecked(site *models.Website) (*NginxSiteData, error) {
 	cfg := config.AppConfig
 	aliases := splitAliases(site.Aliases)
 	accessLogMode := site.AccessLogMode
@@ -43,7 +48,9 @@ func nginxDataFromSite(site *models.Website) *NginxSiteData {
 		FCacheKey:     site.FCacheKey,
 		XMLRPCEnabled: site.XMLRPCEnabled,
 	}
-	if runtime, err := ResolveCDNRealIPRuntime(site); err == nil && runtime.Enabled {
+	if runtime, err := ResolveCDNRealIPRuntime(site); err != nil {
+		return nil, err
+	} else if runtime.Enabled {
 		data.CDNRealIPEnabled = true
 		data.CDNRealIPHeader = runtime.HeaderName
 		data.CDNRealIPRanges = runtime.IPRanges
@@ -57,7 +64,7 @@ func nginxDataFromSite(site *models.Website) *NginxSiteData {
 			data.SSLKeyPath = filepath.Join(cfg.Paths.Certificates, site.Domain, "privkey.pem")
 		}
 	}
-	return data
+	return data, nil
 }
 
 func splitAliases(raw string) []string {

@@ -92,3 +92,49 @@ func TestUpgradeRunnerAdvancesExistingVersion(t *testing.T) {
 		t.Fatalf("version = %q, want %q", version, LatestVersion())
 	}
 }
+
+func TestUpgradeAddsCDNRealIPColumnToOldSchema(t *testing.T) {
+	openTempDB(t)
+
+	if _, err := DB.Exec(`CREATE TABLE websites (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		domain TEXT NOT NULL UNIQUE
+	)`); err != nil {
+		t.Fatalf("create old websites table: %v", err)
+	}
+	if _, err := DB.Exec(`CREATE TABLE schema_version (
+		version TEXT PRIMARY KEY,
+		applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
+		t.Fatalf("create schema_version: %v", err)
+	}
+	if _, err := DB.Exec(`CREATE TABLE security_settings (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		skey TEXT NOT NULL UNIQUE,
+		svalue TEXT NOT NULL DEFAULT '',
+		description TEXT DEFAULT '',
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
+		t.Fatalf("create security_settings: %v", err)
+	}
+	if _, err := DB.Exec("INSERT INTO schema_version (version) VALUES ('1.0.11')"); err != nil {
+		t.Fatalf("seed schema_version: %v", err)
+	}
+
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("RunUpgrades() error = %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("second RunUpgrades() error = %v", err)
+	}
+
+	var exists int
+	if err := DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = 'cdn_realip_enabled'").Scan(&exists); err != nil {
+		t.Fatalf("query cdn_realip_enabled: %v", err)
+	}
+	if exists != 1 {
+		t.Fatalf("cdn_realip_enabled exists = %d, want 1", exists)
+	}
+}
