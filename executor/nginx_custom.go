@@ -139,30 +139,28 @@ func executeSetCDNRealIP(task *Task) TaskResult {
 		log.Printf("渲染 Nginx 配置失败: %v", err)
 		return taskFailure("渲染 Nginx 配置失败", err)
 	}
+
+	oldEnabled := site.CDNRealIPEnabled
+	oldGroupIDs := cdnRealIPGroupIDs(site.CDNRealIPGroups)
+	if err := SaveWebsiteCDNRealIPSettings(site.ID, payload.Enabled, payload.GroupIDs); err != nil {
+		return taskFailure("保存 CDN 真实 IP 设置失败", err)
+	}
 	if err := engine.ApplyNginxConfig(nginxConfig, site.NginxConfPath,
 		nginxEnabledPath(cfg, site.NginxConfPath, site.Domain)); err != nil {
 		log.Printf("应用 Nginx 配置失败: %v", err)
+		_ = SaveWebsiteCDNRealIPSettings(site.ID, oldEnabled, oldGroupIDs)
 		return taskFailure("应用 Nginx 配置失败", err)
 	}
 
-	db := database.GetDB()
-	tx, err := db.Begin()
-	if err != nil {
-		return taskFailure("保存 CDN 真实 IP 设置失败", err)
-	}
-	if _, err := tx.Exec(`UPDATE websites SET cdn_realip_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, boolToDBInt(payload.Enabled), site.ID); err != nil {
-		_ = tx.Rollback()
-		return taskFailure("保存 CDN 真实 IP 设置失败", err)
-	}
-	if err := UpdateWebsiteCDNRealIPGroups(tx, site.ID, payload.GroupIDs); err != nil {
-		_ = tx.Rollback()
-		return taskFailure("保存 CDN 真实 IP 配置组失败", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return taskFailure("保存 CDN 真实 IP 设置失败", err)
-	}
-
 	return TaskResult{Success: true, Message: "CDN 真实 IP 设置已保存并生效"}
+}
+
+func cdnRealIPGroupIDs(groups []models.CDNRealIPGroup) []int {
+	ids := make([]int, 0, len(groups))
+	for _, group := range groups {
+		ids = append(ids, group.ID)
+	}
+	return ids
 }
 
 func boolToDBInt(v bool) int {

@@ -151,12 +151,16 @@ func (h *SecurityHandler) CreateCDNRealIPGroup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
 	}
-	if _, err := database.GetDB().Exec(`INSERT INTO cdn_realip_groups (name, provider, header_name, ip_ranges, builtin, enabled, description)
-		VALUES (?, 'custom', ?, ?, 0, ?, ?)`, name, header, ranges, boolToInt(enabled), desc); err != nil {
+	res, err := database.GetDB().Exec(`INSERT INTO cdn_realip_groups (name, provider, header_name, ip_ranges, builtin, enabled, description)
+		VALUES (?, 'custom', ?, ?, 0, ?, ?)`, name, header, ranges, boolToInt(enabled), desc)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建 CDN 配置组失败"))
 		return
 	}
 	if err := executor.ApplyFail2banSettings(); err != nil {
+		if id, idErr := res.LastInsertId(); idErr == nil {
+			_, _ = database.GetDB().Exec(`DELETE FROM cdn_realip_groups WHERE id = ? AND builtin = 0`, id)
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已保存，但 Fail2ban 白名单应用失败: "+err.Error()))
 		return
 	}
@@ -202,10 +206,13 @@ func (h *SecurityHandler) UpdateCDNRealIPGroup(c *gin.Context) {
 		return
 	}
 	if err := executor.ApplyFail2banSettings(); err != nil {
+		_, _ = database.GetDB().Exec(`UPDATE cdn_realip_groups
+			SET name = ?, header_name = ?, ip_ranges = ?, enabled = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?`, group.Name, group.HeaderName, group.IPRanges, boolToInt(group.Enabled), group.Description, id)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已保存，但 Fail2ban 白名单应用失败: "+err.Error()))
 		return
 	}
-	executor.GoSafe(func() { executor.RegenerateAllSitesNginx() })
+	executor.RegenerateAllSitesNginx()
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "CDN 配置组已保存"}))
 }
 
@@ -229,10 +236,12 @@ func (h *SecurityHandler) DeleteCDNRealIPGroup(c *gin.Context) {
 		return
 	}
 	if err := executor.ApplyFail2banSettings(); err != nil {
+		_, _ = database.GetDB().Exec(`INSERT OR IGNORE INTO cdn_realip_groups (id, name, provider, header_name, ip_ranges, builtin, enabled, description, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, group.ID, group.Name, group.Provider, group.HeaderName, group.IPRanges, boolToInt(group.Builtin), boolToInt(group.Enabled), group.Description, group.CreatedAt, group.UpdatedAt)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已删除，但 Fail2ban 白名单应用失败: "+err.Error()))
 		return
 	}
-	executor.GoSafe(func() { executor.RegenerateAllSitesNginx() })
+	executor.RegenerateAllSitesNginx()
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "CDN 配置组已删除"}))
 }
 

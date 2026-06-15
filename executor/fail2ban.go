@@ -18,7 +18,7 @@ import (
 var syncMu sync.Mutex
 var recordPersistBan = AddPersistBan
 
-func deployFail2ban(whitelistIPs string, maxRetry, findTime, banTime int) error {
+func deployFail2ban(webWhitelistIPs, sshWhitelistIPs string, maxRetry, findTime, banTime int) error {
 	jailDir := "/etc/fail2ban/jail.d"
 	filterDir := "/etc/fail2ban/filter.d"
 	actionDir := "/etc/fail2ban/action.d"
@@ -29,25 +29,13 @@ func deployFail2ban(whitelistIPs string, maxRetry, findTime, banTime int) error 
 	ensureLogFiles()
 	_ = EnsureNginxBannedIPsConfig()
 
-	ignoreIPs := "127.0.0.1/8"
-	if whitelistIPs != "" {
-		for _, ip := range strings.Split(whitelistIPs, "\n") {
-			ip = strings.TrimSpace(ip)
-			if ip == "" {
-				continue
-			}
-			if strings.ContainsAny(ip, " \t\r") {
-				return fmt.Errorf("白名单 IP 格式不正确: %s", ip)
-			}
-			if strings.Contains(ip, "/") {
-				if _, _, err := net.ParseCIDR(ip); err != nil {
-					return fmt.Errorf("白名单 IP 格式不正确: %s", ip)
-				}
-			} else if net.ParseIP(ip) == nil {
-				return fmt.Errorf("白名单 IP 格式不正确: %s", ip)
-			}
-			ignoreIPs += " " + ip
-		}
+	webIgnoreIPs, err := buildFail2banIgnoreIPs(webWhitelistIPs)
+	if err != nil {
+		return err
+	}
+	sshIgnoreIPs, err := buildFail2banIgnoreIPs(sshWhitelistIPs)
+	if err != nil {
+		return err
 	}
 
 	if maxRetry <= 0 {
@@ -93,7 +81,7 @@ maxretry = %d
 findtime = %d
 bantime = %d
 ignoreip = %s
-`, maxRetry, findTime, banTime, ignoreIPs, banTime, ignoreIPs, maxRetry, findTime, banTime, ignoreIPs)
+`, maxRetry, findTime, banTime, webIgnoreIPs, banTime, webIgnoreIPs, maxRetry, findTime, banTime, sshIgnoreIPs)
 
 	if err := os.WriteFile(jailDir+"/wppanel.conf", []byte(jailConfig), 0644); err != nil {
 		return fmt.Errorf("写入 jail 配置失败: %w", err)
@@ -142,6 +130,31 @@ ignoreregex =
 		}
 	}
 	return nil
+}
+
+func buildFail2banIgnoreIPs(whitelistIPs string) (string, error) {
+	ignoreIPs := "127.0.0.1/8"
+	if whitelistIPs == "" {
+		return ignoreIPs, nil
+	}
+	for _, ip := range strings.Split(whitelistIPs, "\n") {
+		ip = strings.TrimSpace(ip)
+		if ip == "" {
+			continue
+		}
+		if strings.ContainsAny(ip, " \t\r") {
+			return "", fmt.Errorf("白名单 IP 格式不正确: %s", ip)
+		}
+		if strings.Contains(ip, "/") {
+			if _, _, err := net.ParseCIDR(ip); err != nil {
+				return "", fmt.Errorf("白名单 IP 格式不正确: %s", ip)
+			}
+		} else if net.ParseIP(ip) == nil {
+			return "", fmt.Errorf("白名单 IP 格式不正确: %s", ip)
+		}
+		ignoreIPs += " " + ip
+	}
+	return ignoreIPs, nil
 }
 
 func ensureLogFiles() {
@@ -205,9 +218,7 @@ func executeRefreshWhitelist(task *Task) TaskResult {
 	if cfIPs, err := fetchCloudflareIPs(); err == nil {
 		allIPs = append(allIPs, cfIPs...)
 		details = append(details, fmt.Sprintf("Cloudflare: %d 条", len(cfIPs)))
-		db := database.GetDB()
-		db.Exec(`UPDATE security_settings SET svalue = ?, updated_at = CURRENT_TIMESTAMP WHERE skey = 'cloudflare_realip_ips'`,
-			strings.Join(cfIPs, "\n"))
+		cacheCloudflareRealIPRanges(cfIPs)
 		if err := DeployCloudflareRealIPConfig(cfIPs); err != nil {
 			details = append(details, "Cloudflare Real IP: 配置失败")
 		} else {
@@ -256,25 +267,26 @@ func ApplyFail2banSettings() error {
 	db.QueryRow(`SELECT svalue FROM security_settings WHERE skey = 'fail2ban_findtime'`).Scan(&findTime)
 	db.QueryRow(`SELECT svalue FROM security_settings WHERE skey = 'fail2ban_bantime'`).Scan(&banTime)
 
-	mergedIPs := strings.TrimSpace(officialIPs)
+	baseIPs := strings.TrimSpace(officialIPs)
 	if customIPs != "" {
-		if mergedIPs != "" {
-			mergedIPs += "\n"
+		if baseIPs != "" {
+			baseIPs += "\n"
 		}
-		mergedIPs += customIPs
+		baseIPs += customIPs
 	}
+	webIPs := baseIPs
 	if cdnRealIPIPs != "" {
-		if mergedIPs != "" {
-			mergedIPs += "\n"
+		if webIPs != "" {
+			webIPs += "\n"
 		}
-		mergedIPs += cdnRealIPIPs
+		webIPs += cdnRealIPIPs
 	}
 
 	mr := parseIntOr(maxRetry, 5)
 	ft := parseIntOr(findTime, 60)
 	bt := parseIntOr(banTime, 600)
 
-	if err := deployFail2ban(mergedIPs, mr, ft, bt); err != nil {
+	if err := deployFail2ban(webIPs, baseIPs, mr, ft, bt); err != nil {
 		return err
 	}
 

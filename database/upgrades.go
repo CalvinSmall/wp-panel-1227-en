@@ -130,7 +130,6 @@ var upgrades = []Upgrade{
 		Version:     "1.0.12",
 		Description: "新增网站级 CDN 真实 IP 配置组",
 		SQL: []string{
-			`ALTER TABLE websites ADD COLUMN cdn_realip_enabled INTEGER NOT NULL DEFAULT 0`,
 			`CREATE TABLE IF NOT EXISTS cdn_realip_groups (
 				id          INTEGER PRIMARY KEY AUTOINCREMENT,
 				name        TEXT    NOT NULL UNIQUE,
@@ -158,7 +157,20 @@ var upgrades = []Upgrade{
 				('Cloudflare', 'cloudflare', 'CF-Connecting-IP', '', 1, 1, 'Cloudflare 官方 IP 段由面板自动拉取'),
 				('通用 CDN（兼容模式）', 'compatible', 'X-Forwarded-For', '', 1, 1, '不校验来源 IP，直接信任 X-Forwarded-For')`,
 		},
+		Func: ensureCDNRealIPEnabledColumn,
 	},
+}
+
+func ensureCDNRealIPEnabledColumn() error {
+	var exists int
+	if err := DB.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = 'cdn_realip_enabled'`).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 1 {
+		return nil
+	}
+	_, err := DB.Exec(`ALTER TABLE websites ADD COLUMN cdn_realip_enabled INTEGER NOT NULL DEFAULT 0`)
+	return err
 }
 
 // LatestVersion 返回 upgrades 列表中的最新版本号。

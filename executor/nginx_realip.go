@@ -13,15 +13,20 @@ import (
 const nginxRealIPPath = "/etc/nginx/conf.d/wppanel-realip.conf"
 
 func EnsureCloudflareRealIPConfig() error {
+	exists := false
 	if _, err := os.Stat(nginxRealIPPath); err == nil {
-		return nil
+		exists = true
+		if strings.TrimSpace(cachedCloudflareRealIPRanges()) != "" {
+			return nil
+		}
 	}
 	cfIPs, err := fetchCloudflareIPs()
 	if err != nil {
 		return err
 	}
-	if database.GetDB() != nil {
-		database.GetDB().Exec(`UPDATE security_settings SET svalue = ?, updated_at = CURRENT_TIMESTAMP WHERE skey = 'cloudflare_realip_ips'`, strings.Join(cfIPs, "\n"))
+	cacheCloudflareRealIPRanges(cfIPs)
+	if exists {
+		return nil
 	}
 	return DeployCloudflareRealIPConfig(cfIPs)
 }
@@ -61,6 +66,13 @@ func DeployCloudflareRealIPConfig(cfIPs []string) error {
 		return fmt.Errorf("nginx reload failed: %s", out)
 	}
 	return nil
+}
+
+func cacheCloudflareRealIPRanges(cfIPs []string) {
+	if database.GetDB() == nil {
+		return
+	}
+	database.GetDB().Exec(`UPDATE security_settings SET svalue = ?, updated_at = CURRENT_TIMESTAMP WHERE skey = 'cloudflare_realip_ips'`, strings.Join(cfIPs, "\n"))
 }
 
 func renderCloudflareRealIPConfig(cfIPs []string) string {

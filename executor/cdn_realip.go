@@ -162,6 +162,9 @@ func ResolveCDNRealIPRuntime(site *models.Website) (*CDNRealIPRuntime, error) {
 		groupRanges := strings.TrimSpace(group.IPRanges)
 		if group.Provider == CDNProviderCloudflare && groupRanges == "" {
 			groupRanges = cachedCloudflareRealIPRanges()
+			if strings.TrimSpace(groupRanges) == "" {
+				return nil, fmt.Errorf("Cloudflare 官方 IP 段尚未缓存，请先刷新官方白名单")
+			}
 		}
 		normalized, err := NormalizeCDNRealIPRanges(groupRanges)
 		if err != nil {
@@ -192,14 +195,20 @@ func ResolveCDNRealIPRuntime(site *models.Website) (*CDNRealIPRuntime, error) {
 }
 
 func CombinedCDNRealIPRangesForFail2ban() string {
-	groups, err := ListCDNRealIPGroups()
+	rows, err := database.GetDB().Query(`SELECT DISTINCT g.id, g.name, g.provider, g.header_name, g.ip_ranges, g.builtin, g.enabled, g.description, g.created_at, g.updated_at
+		FROM cdn_realip_groups g
+		INNER JOIN website_cdn_realip_groups wg ON wg.group_id = g.id
+		INNER JOIN websites w ON w.id = wg.website_id
+		WHERE g.enabled = 1 AND w.cdn_realip_enabled = 1`)
 	if err != nil {
 		return ""
 	}
+	defer rows.Close()
 	seen := map[string]bool{}
 	var merged []string
-	for _, group := range groups {
-		if !group.Enabled {
+	for rows.Next() {
+		group, err := scanCDNRealIPGroup(rows.Scan)
+		if err != nil {
 			continue
 		}
 		raw := group.IPRanges
@@ -277,4 +286,20 @@ func UpdateWebsiteCDNRealIPGroups(tx *sql.Tx, websiteID int, groupIDs []int) err
 		}
 	}
 	return nil
+}
+
+func SaveWebsiteCDNRealIPSettings(websiteID int, enabled bool, groupIDs []int) error {
+	tx, err := database.GetDB().Begin()
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE websites SET cdn_realip_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, boolToDBInt(enabled), websiteID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := UpdateWebsiteCDNRealIPGroups(tx, websiteID, groupIDs); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
