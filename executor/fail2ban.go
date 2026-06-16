@@ -18,6 +18,9 @@ import (
 
 var syncMu sync.Mutex
 var recordPersistBan = AddPersistBan
+var manualAddNginxBan = AddNginxBan
+var manualRemoveNginxBan = RemoveNginxBan
+var syncReplaceNginxBannedIPs = ReplaceNginxBannedIPs
 
 type fail2banConfigBackup struct {
 	path    string
@@ -485,7 +488,21 @@ func SyncFail2banBans() {
 			continue
 		}
 		if bannedSet[ip] {
-			if jail == "wppanel" || jail == "wppanel-404" {
+			if isWebBanSource(jail) {
+				webBannedSet[ip] = true
+			}
+			continue
+		}
+		if isManual == 1 {
+			if expiresAt != nil && !expiresAt.After(now) {
+				RemovePersistBan(ip)
+				expiredIDs = append(expiredIDs, id)
+				continue
+			}
+			if level >= 3 {
+				AddPersistBan(ip)
+			}
+			if isWebBanSource(jail) {
 				webBannedSet[ip] = true
 			}
 			continue
@@ -493,20 +510,20 @@ func SyncFail2banBans() {
 		if level >= 3 {
 			if expiresAt == nil || expiresAt.After(now) {
 				if nftablesSet != nil && nftablesSet[ip] {
-					if jail == "wppanel" || jail == "wppanel-404" {
+					if isWebBanSource(jail) {
 						webBannedSet[ip] = true
 					}
 					continue
 				}
 				if nftablesSet != nil && !nftablesSet[ip] {
 					AddPersistBan(ip)
-					if jail == "wppanel" || jail == "wppanel-404" {
+					if isWebBanSource(jail) {
 						webBannedSet[ip] = true
 					}
 					continue
 				}
 				AddPersistBan(ip)
-				if jail == "wppanel" || jail == "wppanel-404" {
+				if isWebBanSource(jail) {
 					webBannedSet[ip] = true
 				}
 				continue
@@ -520,7 +537,7 @@ func SyncFail2banBans() {
 		db.Exec("UPDATE firewall_bans SET unbanned_at = datetime('now') WHERE id = ?", id)
 	}
 	if webJailStatusRead || len(webBannedSet) > 0 {
-		_ = ReplaceNginxBannedIPs(webBannedSet)
+		_ = syncReplaceNginxBannedIPs(webBannedSet)
 	}
 }
 
@@ -593,6 +610,10 @@ func normalizeFail2banJail(jail string) string {
 	default:
 		return ""
 	}
+}
+
+func isWebBanSource(jail string) bool {
+	return jail == "wppanel" || jail == "wppanel-404" || jail == "manual"
 }
 
 func detectFail2banJail(ip string) string {
@@ -782,13 +803,12 @@ func executeManualBan(task *Task) TaskResult {
 		return TaskResult{Success: false, Message: "IP 地址格式不正确"}
 	}
 
-	jail := "wppanel"
-	out, err := executeCommand("fail2ban-client", "set", jail, "banip", ip)
-	if err != nil {
-		return TaskResult{Success: false, Message: "封禁失败: " + out}
+	db := database.GetDB()
+	if db == nil {
+		return TaskResult{Success: false, Message: "database not initialized"}
 	}
 
-	db := database.GetDB()
+	jail := "manual"
 	banLevel := 2
 	duration := 600
 	if payload.Duration == 3600 {
@@ -809,17 +829,21 @@ func executeManualBan(task *Task) TaskResult {
 		expires = time.Now().Add(time.Duration(duration) * time.Second)
 	}
 
-	db.Exec(
+	if err := manualAddNginxBan(ip); err != nil {
+		return TaskResult{Success: false, Message: "封禁失败: " + err.Error()}
+	}
+
+	if _, err := db.Exec(
 		`INSERT INTO firewall_bans (ip_address, ban_level, reason, source_jail, is_manual, ban_count, expires_at)
 		 VALUES (?, ?, '管理员手动封禁', ?, 1, 1, ?)`,
 		ip, banLevel, jail, expires,
-	)
+	); err != nil {
+		_ = manualRemoveNginxBan(ip)
+		return TaskResult{Success: false, Message: "封禁记录写入失败"}
+	}
 
 	if banLevel >= 3 {
 		AddPersistBan(ip)
-	}
-	if jail == "wppanel" || jail == "wppanel-404" {
-		_ = AddNginxBan(ip)
 	}
 
 	msg := fmt.Sprintf("IP %s 已封禁", ip)
@@ -916,10 +940,10 @@ func CleanExpiredBans() {
 
 		db.Exec("UPDATE firewall_bans SET unbanned_at = datetime('now') WHERE id = ?", id)
 
-		if jail == "panel_scan" || jail == "panel" {
+		if jail == "panel_scan" || jail == "panel" || jail == "manual" {
 			RemovePersistBan(ip)
 		}
-		if jail == "wppanel" || jail == "wppanel-404" {
+		if isWebBanSource(jail) {
 			_ = RemoveNginxBan(ip)
 		}
 	}

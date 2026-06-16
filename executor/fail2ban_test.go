@@ -60,6 +60,106 @@ func TestRecordFail2banBanKeepsRepeatedHistory(t *testing.T) {
 	}
 }
 
+func TestExecuteManualBanCreatesSingleManualRecord(t *testing.T) {
+	openTestDB(t)
+
+	oldAddNginxBan := manualAddNginxBan
+	oldRemoveNginxBan := manualRemoveNginxBan
+	oldShellExec := shellExec
+	t.Cleanup(func() {
+		manualAddNginxBan = oldAddNginxBan
+		manualRemoveNginxBan = oldRemoveNginxBan
+		shellExec = oldShellExec
+	})
+
+	var nginxBanned []string
+	manualAddNginxBan = func(ip string) error {
+		nginxBanned = append(nginxBanned, ip)
+		return nil
+	}
+	manualRemoveNginxBan = func(string) error { return nil }
+	shellExec = func(binary string, args ...string) (string, error) {
+		if binary == "fail2ban-client" && strings.Join(args, " ") == "set wppanel banip 203.0.113.88" {
+			t.Fatalf("manual ban must not call fail2ban banip")
+		}
+		return "", errors.New("unexpected command")
+	}
+
+	result := executeManualBan(&Task{Payload: &ManualBanPayload{IP: "203.0.113.88", Duration: 86400}})
+	if !result.Success {
+		t.Fatalf("manual ban failed: %s", result.Message)
+	}
+	if len(nginxBanned) != 1 || nginxBanned[0] != "203.0.113.88" {
+		t.Fatalf("expected one nginx ban, got %v", nginxBanned)
+	}
+
+	var count, level, isManual, banCount int
+	var reason, jail string
+	if err := database.GetDB().QueryRow(
+		`SELECT COUNT(*), MAX(ban_level), MAX(is_manual), MAX(ban_count), MAX(reason), MAX(source_jail)
+		 FROM firewall_bans WHERE ip_address = ?`,
+		"203.0.113.88",
+	).Scan(&count, &level, &isManual, &banCount, &reason, &jail); err != nil {
+		t.Fatalf("query manual ban: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one ban record, got %d", count)
+	}
+	if level != 3 || isManual != 1 || banCount != 1 || reason != "管理员手动封禁" || jail != "manual" {
+		t.Fatalf("unexpected manual ban record: level=%d manual=%d count=%d reason=%q jail=%q", level, isManual, banCount, reason, jail)
+	}
+}
+
+func TestSyncFail2banBansKeepsActiveManualBan(t *testing.T) {
+	openTestDB(t)
+
+	oldShellExec := shellExec
+	oldReplace := syncReplaceNginxBannedIPs
+	oldRecordPersistBan := recordPersistBan
+	t.Cleanup(func() {
+		shellExec = oldShellExec
+		syncReplaceNginxBannedIPs = oldReplace
+		recordPersistBan = oldRecordPersistBan
+	})
+
+	shellExec = func(binary string, args ...string) (string, error) {
+		if binary == "fail2ban-client" && len(args) == 2 && args[0] == "status" {
+			return "Status\n|- Currently banned: 0\n`- Banned IP list:", nil
+		}
+		return "", errors.New("unexpected command")
+	}
+	recordPersistBan = func(string) {}
+
+	var synced map[string]bool
+	syncReplaceNginxBannedIPs = func(ips map[string]bool) error {
+		synced = map[string]bool{}
+		for ip, banned := range ips {
+			synced[ip] = banned
+		}
+		return nil
+	}
+
+	if _, err := database.GetDB().Exec(
+		`INSERT INTO firewall_bans (ip_address, ban_level, reason, source_jail, is_manual, ban_count, expires_at)
+		 VALUES ('203.0.113.99', 2, '管理员手动封禁', 'manual', 1, 1, datetime('now', '+600 seconds'))`,
+	); err != nil {
+		t.Fatalf("insert manual ban: %v", err)
+	}
+
+	SyncFail2banBans()
+
+	var unbannedAt *string
+	if err := database.GetDB().QueryRow(`SELECT unbanned_at FROM firewall_bans WHERE ip_address = '203.0.113.99'`).Scan(&unbannedAt); err != nil {
+		t.Fatalf("query manual ban: %v", err)
+	}
+	if unbannedAt != nil {
+		t.Fatalf("active manual ban was marked unbanned: %v", *unbannedAt)
+	}
+	if !synced["203.0.113.99"] {
+		t.Fatalf("active manual ban was not synced to nginx set: %v", synced)
+	}
+}
+
 func TestRestoreCDNRealIPGroupWithBindings(t *testing.T) {
 	openTestDB(t)
 	db := database.GetDB()

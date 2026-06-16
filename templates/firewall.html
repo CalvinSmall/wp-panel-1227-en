@@ -342,6 +342,7 @@ function firewallManager() {
             if (ban.source_jail === 'wppanel-sshd') return 'SSH防护';
             if (ban.source_jail === 'panel') return '面板';
             if (ban.source_jail === 'panel_scan') return '扫描防御';
+            if (ban.source_jail === 'manual') return '手动封禁';
             if (ban.ban_level >= 5) return 'Nftables 持久';
             return ban.source_jail || '--';
         },
@@ -349,6 +350,7 @@ function firewallManager() {
             if (ban.source_jail === 'wppanel') return 'text-blue-400';
             if (ban.source_jail === 'wppanel-404') return 'text-yellow-400';
             if (ban.source_jail === 'wppanel-sshd') return 'text-green-400';
+            if (ban.source_jail === 'manual') return 'text-purple-400';
             if (ban.ban_level >= 4) return 'text-purple-400';
             return 'text-gray-400';
         },

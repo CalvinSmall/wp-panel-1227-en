@@ -128,7 +128,7 @@ func (h *FirewallHandler) Unban(c *gin.Context) {
 		case "wppanel", "wppanel-404", "wppanel-sshd":
 			executor.Execute("fail2ban-client", "set", jail, "unbanip", ip)
 		}
-		if jail == "wppanel" || jail == "wppanel-404" {
+		if jail == "wppanel" || jail == "wppanel-404" || jail == "manual" {
 			executor.RemoveNginxBan(ip)
 		}
 		executor.RemovePersistBan(ip)
@@ -181,7 +181,7 @@ func (h *FirewallHandler) PermanentBan(c *gin.Context) {
 	}
 
 	executor.GoSafe(func() { executor.AddPersistBan(ip) })
-	if jail == "wppanel" || jail == "wppanel-404" {
+	if jail == "wppanel" || jail == "wppanel-404" || jail == "manual" {
 		executor.GoSafe(func() { executor.AddNginxBan(ip) })
 	}
 
