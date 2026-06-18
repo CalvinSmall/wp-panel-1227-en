@@ -343,10 +343,6 @@ func executeCreateSite(task *Task) TaskResult {
 			log.Printf("创建SSL证书目录失败: %v", sslErr)
 			return TaskResult{Success: false, Message: "创建SSL证书目录失败"}
 		}
-		rollbacks = append(rollbacks, rollbackStep{"删除SSL证书目录 " + certDir, func() error {
-			os.RemoveAll(certDir)
-			return nil
-		}})
 		expiry, sslErr := obtainLegoCert(domain, strings.Join(payload.Aliases, "\n"), webRoot, certDir)
 		if sslErr != nil {
 			log.Printf("申请 Let's Encrypt 证书失败: %v", sslErr)
@@ -386,6 +382,10 @@ func executeCreateSite(task *Task) TaskResult {
 			} else {
 				sslEnabled = 1
 				sslExpiry = &expiry
+				rollbacks = append(rollbacks, rollbackStep{"删除SSL证书目录 " + certDir, func() error {
+					os.RemoveAll(certDir)
+					return nil
+				}})
 			}
 		}
 	}
@@ -406,19 +406,20 @@ func executeCreateSite(task *Task) TaskResult {
 	}
 
 	db := database.GetDB()
-	_, err = db.Exec(
+	insertResult, err := db.Exec(
 		`INSERT INTO websites (name, domain, aliases, status, system_user, web_root, log_dir,
-		 db_name, db_user, php_pool_path, nginx_conf_path, site_type, ssl_enabled, ssl_cert_path, ssl_key_path, ssl_expires_at, template_version, access_log_mode, expires_at)
-		 VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'v1.0', 'error_only', ?)`,
+		 db_name, db_user, php_pool_path, nginx_conf_path, site_type, ssl_enabled, ssl_cert_path, ssl_key_path, ssl_expires_at, ssl_last_error, template_version, access_log_mode, expires_at)
+		 VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'v1.0', 'error_only', ?)`,
 		siteName, domain, strings.Join(payload.Aliases, "\n"), systemUser,
 		webRoot, logDir, dbName, dbUser, phpPoolPath, nginxConfPath, payload.SiteType, sslEnabled,
-		certPath, keyPath, sslExpiry, nilIfEmpty(payload.ExpiresAt),
+		certPath, keyPath, sslExpiry, sslWarning, nilIfEmpty(payload.ExpiresAt),
 	)
 	if err != nil {
 		rollback()
 		log.Printf("写入数据库失败: %v", err)
 		return TaskResult{Success: false, Message: "写入数据库失败"}
 	}
+	siteID, _ := insertResult.LastInsertId()
 	if err := WriteSiteLogrotateConfig(domain, logDir, defaultSiteLogRetentionDays); err != nil {
 		log.Printf("site logrotate config skipped after site create: %v", err)
 	}
@@ -438,6 +439,7 @@ func executeCreateSite(task *Task) TaskResult {
 		Message: fmt.Sprintf("网站 %s 创建成功%s", domain, sslMsg),
 		Data: map[string]interface{}{
 			"domain":      domain,
+			"id":          siteID,
 			"db_name":     dbName,
 			"db_user":     dbUser,
 			"db_password": maskedPassword,

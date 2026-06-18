@@ -78,8 +78,11 @@
                                       x-text="site.status === 'active' ? '运行中' : '已暂停'"></span>
                             </td>
                             <td class="table-cell">
-                                <span :class="site.ssl_enabled ? 'badge-success' : 'badge-info'"
-                                      x-text="site.ssl_enabled ? '已启用' : '未启用'"></span>
+                                <div class="space-y-1">
+                                    <span :class="site.ssl_enabled ? 'badge-success' : site.ssl_last_error ? 'badge-warning' : 'badge-info'"
+                                          x-text="site.ssl_enabled ? '已启用' : site.ssl_last_error ? '待处理' : '未启用'"></span>
+                                    <p x-show="!site.ssl_enabled && site.ssl_last_error" class="text-xs text-yellow-400 max-w-48 truncate" :title="site.ssl_last_error" x-text="site.ssl_last_error"></p>
+                                </div>
                             </td>
                             <td class="table-cell">
                                 <span :class="site.monitoring_enabled ? 'badge-success' : 'badge-info'"

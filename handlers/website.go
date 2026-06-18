@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -25,7 +26,7 @@ import (
 // canonical column list shared by all website queries.
 const websiteCols = `id, name, domain, aliases, status, system_user, web_root, log_dir,
 	db_name, db_user, php_pool_path, nginx_conf_path, site_type, ssl_enabled,
-	ssl_cert_path, ssl_key_path, ssl_expires_at, template_version, access_log_mode,
+	ssl_cert_path, ssl_key_path, ssl_expires_at, ssl_last_error, template_version, access_log_mode,
 	fastcgi_cache_enabled, fastcgi_cache_ttl, fastcgi_cache_key,
 	monitoring_enabled, monitoring_interval, disable_wp_updates, disable_file_editing,
 		xmlrpc_enabled, wp_debug_enabled, wp_post_revisions, wp_memory_limit,
@@ -49,7 +50,7 @@ func scanWebsite(scanner func(dest ...interface{}) error) (*models.Website, erro
 		&w.ID, &w.Name, &w.Domain, &aliases, &status, &w.SystemUser,
 		&w.WebRoot, &w.LogDir, &w.DBName, &w.DBUser, &w.PHPPoolPath,
 		&w.NginxConfPath, &w.SiteType, &sslEnabled, &w.SSLCertPath, &w.SSLKeyPath,
-		&w.SSLExpiresAt, &w.TemplateVersion, &w.AccessLogMode,
+		&w.SSLExpiresAt, &w.SSLLastError, &w.TemplateVersion, &w.AccessLogMode,
 		&fCacheEnabled, &w.FCacheTTL, &w.FCacheKey,
 		&monitoringEnabled, &monitoringInterval, &disableWPUpdates, &disableFileEditing,
 		&xmlrpcEnabled, &wpDebugEnabled, &wpPostRevisions, &wpMemoryLimit,
@@ -87,6 +88,13 @@ type sslPreflightDomain struct {
 	Matched     bool     `json:"matched"`
 	HasIPv6     bool     `json:"has_ipv6"`
 	MatchedIPv6 bool     `json:"matched_ipv6"`
+}
+
+type sslPreflightResult struct {
+	OK           bool                 `json:"ok"`
+	Warnings     []string             `json:"warnings"`
+	HardWarnings []string             `json:"hard_warnings"`
+	Domains      []sslPreflightDomain `json:"domains"`
 }
 
 func normalizeWPSiteURL(raw string) (string, error) {
@@ -149,38 +157,34 @@ func uniqueRequestDomains(domain string, aliases []string) []string {
 	return domains
 }
 
-func (h *WebsiteHandler) SSLPreflight(c *gin.Context) {
-	var req models.CreateWebsiteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
-		return
-	}
-
-	domains := uniqueRequestDomains(req.Domain, req.Aliases)
+func runSSLPreflight(ctx context.Context, domain string, aliases []string) (sslPreflightResult, error) {
+	domains := uniqueRequestDomains(domain, aliases)
 	if len(domains) == 0 {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("域名不能为空"))
-		return
+		return sslPreflightResult{}, fmt.Errorf("域名不能为空")
 	}
 	for _, domain := range domains {
 		if !executor.IsValidDomain(domain) {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("域名格式不合法: "+domain))
-			return
+			return sslPreflightResult{}, fmt.Errorf("域名格式不合法: %s", domain)
 		}
 	}
 
 	localIPs := localInterfaceIPs()
-	var result []sslPreflightDomain
-	var warnings []string
+	result := sslPreflightResult{}
 	for _, domain := range domains {
-		ips, err := net.LookupIP(domain)
-		if err != nil || len(ips) == 0 {
-			warnings = append(warnings, domain+" 未解析到 A/AAAA 记录，Let's Encrypt 无法访问验证文件。")
-			result = append(result, sslPreflightDomain{Domain: domain})
+		records, err := net.DefaultResolver.LookupIPAddr(ctx, domain)
+		if err != nil || len(records) == 0 {
+			msg := domain + " 未解析到 A/AAAA 记录，Let's Encrypt 无法访问验证文件。"
+			if ctx.Err() != nil {
+				msg = domain + " DNS 解析超时，请稍后重试或检查 DNS 服务。"
+			}
+			result.HardWarnings = append(result.HardWarnings, msg)
+			result.Domains = append(result.Domains, sslPreflightDomain{Domain: domain})
 			continue
 		}
 
 		item := sslPreflightDomain{Domain: domain}
-		for _, ip := range ips {
+		for _, record := range records {
+			ip := record.IP
 			ipText := ip.String()
 			item.Addresses = append(item.Addresses, ipText)
 			if ip.To4() == nil {
@@ -194,19 +198,33 @@ func (h *WebsiteHandler) SSLPreflight(c *gin.Context) {
 			}
 		}
 		if !item.Matched {
-			warnings = append(warnings, domain+" 没有解析到当前服务器网卡 IP。如果使用 CDN，请确认 CDN 已正确回源到当前服务器，并且未缓存、重写或拦截 /.well-known/acme-challenge/。")
+			result.Warnings = append(result.Warnings, domain+" 没有解析到当前服务器网卡 IP。如果使用 CDN，请确认 CDN 已正确回源到当前服务器，并且未缓存、重写或拦截 /.well-known/acme-challenge/。")
 		}
 		if item.HasIPv6 && !item.MatchedIPv6 {
-			warnings = append(warnings, domain+" 存在 AAAA 记录，但未匹配到当前服务器 IPv6。Let's Encrypt 可能访问 IPv6 并导致验证 404，请删除错误 AAAA 记录或配置正确 IPv6。")
+			result.Warnings = append(result.Warnings, domain+" 存在 AAAA 记录，但未匹配到当前服务器 IPv6。Let's Encrypt 可能访问 IPv6 并导致验证 404，请删除错误 AAAA 记录或配置正确 IPv6。")
 		}
-		result = append(result, item)
+		result.Domains = append(result.Domains, item)
+	}
+	result.OK = len(result.Warnings) == 0 && len(result.HardWarnings) == 0
+	return result, nil
+}
+
+func (h *WebsiteHandler) SSLPreflight(c *gin.Context) {
+	var req models.CreateWebsiteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		return
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
-		"ok":       len(warnings) == 0,
-		"warnings": warnings,
-		"domains":  result,
-	}))
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+	result, err := runSSLPreflight(ctx, req.Domain, req.Aliases)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse(result))
 }
 
 func (h *WebsiteHandler) List(c *gin.Context) {
@@ -337,6 +355,16 @@ func (h *WebsiteHandler) Create(c *gin.Context) {
 	siteType := req.SiteType
 	if siteType != "php" {
 		siteType = "wordpress"
+	}
+	if req.SSLEnabled {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		preflight, preflightErr := runSSLPreflight(ctx, req.Domain, req.Aliases)
+		cancel()
+		if preflightErr != nil {
+			log.Printf("SSL 预检跳过 domain=%s: %v", req.Domain, preflightErr)
+		} else if !preflight.OK {
+			log.Printf("SSL 预检风险 domain=%s hard=%v warnings=%v", req.Domain, preflight.HardWarnings, preflight.Warnings)
+		}
 	}
 
 	payload := &executor.CreateSitePayload{

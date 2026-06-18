@@ -172,7 +172,11 @@
         <div class="card">
             <h3 class="text-lg font-semibold text-white mb-4">SSL 证书管理</h3>
             <div class="mb-3">
-                <span :class="site.ssl_enabled ? 'badge-success' : 'badge-info'" class="text-sm" x-text="site.ssl_enabled ? '已启用' : '未启用'"></span>
+                <span :class="site.ssl_enabled ? 'badge-success' : site.ssl_last_error ? 'badge-warning' : 'badge-info'" class="text-sm" x-text="site.ssl_enabled ? '已启用' : site.ssl_last_error ? '待处理' : '未启用'"></span>
+            </div>
+            <div x-show="!site.ssl_enabled && site.ssl_last_error" class="mb-4 p-3 bg-yellow-900/40 border border-yellow-700 rounded-lg text-yellow-200 text-sm">
+                <p class="font-medium mb-1">上次 SSL 申请失败</p>
+                <p x-text="site.ssl_last_error"></p>
             </div>
             <div x-show="site.ssl_enabled">
                 <dl class="space-y-3 mb-4">

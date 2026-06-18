@@ -170,6 +170,30 @@ var upgrades = []Upgrade{
 			`INSERT OR IGNORE INTO security_settings (skey, svalue, description) VALUES ('bingbot_ips', '', 'Bingbot官方IP段缓存')`,
 		},
 	},
+	{
+		Version:     "1.0.14",
+		Description: "记录站点最近一次 SSL 申请失败原因",
+		Func:        ensureSSLLastErrorColumn,
+	},
+}
+
+func ensureSSLLastErrorColumn() error {
+	var tableExists int
+	if err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'websites'`).Scan(&tableExists); err != nil {
+		return err
+	}
+	if tableExists == 0 {
+		return nil
+	}
+	var exists int
+	if err := DB.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = 'ssl_last_error'`).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 1 {
+		return nil
+	}
+	_, err := DB.Exec(`ALTER TABLE websites ADD COLUMN ssl_last_error TEXT NOT NULL DEFAULT ''`)
+	return err
 }
 
 func ensureCDNRealIPEnabledColumn() error {

@@ -33,6 +33,7 @@ type Website struct {
 	TemplateVersion    string           `json:"template_version"`
 	AccessLogMode      string           `json:"access_log_mode"`
 	SSLExpiresAt       *time.Time       `json:"ssl_expires_at"`
+	SSLLastError       string           `json:"ssl_last_error"`
 	FCacheEnabled      bool             `json:"fastcgi_cache_enabled"`
 	FCacheTTL          int              `json:"fastcgi_cache_ttl"`
 	FCacheKey          string           `json:"fastcgi_cache_key"`

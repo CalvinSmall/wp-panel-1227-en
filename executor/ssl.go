@@ -79,7 +79,10 @@ func executeEnableSSL(task *Task) TaskResult {
 		expiry, applyErr = obtainLegoCert(site.Domain, site.Aliases, site.WebRoot, certDir)
 		if applyErr != nil {
 			log.Printf("申请 Let's Encrypt 证书失败: %v", applyErr)
-			return TaskResult{Success: false, Message: FriendlySSLError(applyErr)}
+			os.RemoveAll(certDir)
+			msg := FriendlySSLError(applyErr)
+			database.GetDB().Exec("UPDATE websites SET ssl_last_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", msg, site.ID)
+			return TaskResult{Success: false, Message: msg}
 		}
 	}
 
@@ -151,7 +154,7 @@ func executeRemoveSSL(task *Task) TaskResult {
 	}
 
 	db := database.GetDB()
-	db.Exec(`UPDATE websites SET ssl_enabled = 0, ssl_cert_path = '', ssl_key_path = '', ssl_expires_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, site.ID)
+	db.Exec(`UPDATE websites SET ssl_enabled = 0, ssl_cert_path = '', ssl_key_path = '', ssl_expires_at = NULL, ssl_last_error = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, site.ID)
 
 	return TaskResult{Success: true, Message: "网站 " + site.Domain + " SSL 证书已删除，已恢复为 HTTP"}
 }
@@ -300,7 +303,7 @@ func applySSLToSite(site *models.Website, certPath, keyPath string, expiry time.
 
 	db := database.GetDB()
 	_, err = db.Exec(
-		`UPDATE websites SET ssl_enabled = 1, ssl_cert_path = ?, ssl_key_path = ?, ssl_expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		`UPDATE websites SET ssl_enabled = 1, ssl_cert_path = ?, ssl_key_path = ?, ssl_expires_at = ?, ssl_last_error = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
 		certPath, keyPath, expiry, site.ID,
 	)
 	return err

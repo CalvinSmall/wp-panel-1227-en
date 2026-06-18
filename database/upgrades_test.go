@@ -38,7 +38,7 @@ func TestFreshInstallRunsMigrationsAndRecordsLatestVersion(t *testing.T) {
 		t.Fatalf("version = %q, want %q", version, LatestVersion())
 	}
 
-	for _, col := range []string{"php_pool_path", "nginx_conf_path", "wp_memory_limit", "cdn_realip_enabled"} {
+	for _, col := range []string{"php_pool_path", "nginx_conf_path", "wp_memory_limit", "cdn_realip_enabled", "ssl_last_error"} {
 		var exists int
 		if err := DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = ?", col).Scan(&exists); err != nil {
 			t.Fatalf("query websites column %s: %v", col, err)
@@ -73,6 +73,42 @@ func TestFreshInstallRunsMigrationsAndRecordsLatestVersion(t *testing.T) {
 		if got != setting.want {
 			t.Fatalf("%s = %q, want %q", setting.key, got, setting.want)
 		}
+	}
+}
+
+func TestUpgradeAddsSSLLastErrorColumnToExistingSchema(t *testing.T) {
+	openTempDB(t)
+
+	if err := RunMigrations(); err != nil {
+		t.Fatalf("RunMigrations() error = %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("initial RunUpgrades() error = %v", err)
+	}
+	if _, err := DB.Exec("DELETE FROM schema_version"); err != nil {
+		t.Fatalf("delete schema_version: %v", err)
+	}
+	if _, err := DB.Exec("INSERT INTO schema_version (version) VALUES ('1.0.13')"); err != nil {
+		t.Fatalf("seed schema_version: %v", err)
+	}
+
+	if _, err := DB.Exec("ALTER TABLE websites DROP COLUMN ssl_last_error"); err != nil {
+		t.Fatalf("drop ssl_last_error: %v", err)
+	}
+
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("RunUpgrades() error = %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("second RunUpgrades() error = %v", err)
+	}
+
+	var exists int
+	if err := DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = 'ssl_last_error'").Scan(&exists); err != nil {
+		t.Fatalf("query ssl_last_error: %v", err)
+	}
+	if exists != 1 {
+		t.Fatalf("ssl_last_error exists = %d, want 1", exists)
 	}
 }
 
