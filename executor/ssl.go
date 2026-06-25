@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"log"
@@ -166,12 +167,61 @@ func executeRemoveSSL(task *Task) TaskResult {
 
 const acmeAccountDir = "/www/server/panel/acme"
 
+type acmeAccountMetadata struct {
+	Registration *registration.Resource `json:"registration,omitempty"`
+}
+
+func newACMEClient(user *acmeUser, caDirURL string) (*lego.Client, error) {
+	legoCfg := lego.NewConfig(user)
+	legoCfg.CADirURL = caDirURL
+
+	client, err := lego.NewClient(legoCfg)
+	if err != nil {
+		return nil, fmt.Errorf("创建lego客户端失败: %w", err)
+	}
+	return client, nil
+}
+
+func loadACMERegistration(path string) (*registration.Resource, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if strings.TrimSpace(string(data)) == "" {
+		return nil, nil
+	}
+
+	var meta acmeAccountMetadata
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return nil, err
+	}
+	if meta.Registration == nil || strings.TrimSpace(meta.Registration.URI) == "" {
+		return nil, nil
+	}
+	return meta.Registration, nil
+}
+
+func saveACMERegistration(path string, reg *registration.Resource) error {
+	if reg == nil || strings.TrimSpace(reg.URI) == "" {
+		return fmt.Errorf("ACME账户注册信息为空")
+	}
+	data, err := json.MarshalIndent(acmeAccountMetadata{Registration: reg}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0600)
+}
+
 func getOrCreateACMEClient(email string, caDirURL string) (*lego.Client, error) {
 	if err := os.MkdirAll(acmeAccountDir, 0700); err != nil {
 		return nil, fmt.Errorf("创建ACME目录失败: %w", err)
 	}
 
 	accountKeyPath := filepath.Join(acmeAccountDir, "account.key")
+	accountMetaPath := filepath.Join(acmeAccountDir, "account.json")
 
 	var privateKey crypto.PrivateKey
 	var err error
@@ -199,22 +249,45 @@ func getOrCreateACMEClient(email string, caDirURL string) (*lego.Client, error) 
 	}
 
 	user := &acmeUser{Email: email, key: privateKey}
-
-	legoCfg := lego.NewConfig(user)
-	legoCfg.CADirURL = caDirURL
-
-	client, err := lego.NewClient(legoCfg)
-	if err != nil {
-		return nil, fmt.Errorf("创建lego客户端失败: %w", err)
+	if reg, loadErr := loadACMERegistration(accountMetaPath); loadErr != nil {
+		return nil, fmt.Errorf("读取ACME账户信息失败: %w", loadErr)
+	} else if reg != nil {
+		user.Registration = reg
 	}
 
-	reg, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
+	client, err := newACMEClient(user, caDirURL)
 	if err != nil {
-		return nil, fmt.Errorf("注册ACME账户失败: %w", err)
+		return nil, err
 	}
-	user.Registration = reg
+
+	if user.Registration == nil {
+		reg, resolveErr := client.Registration.ResolveAccountByKey()
+		if resolveErr != nil {
+			reg, err = client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
+			if err != nil {
+				return nil, fmt.Errorf("注册ACME账户失败: %w", err)
+			}
+		}
+		user.Registration = reg
+		if err := saveACMERegistration(accountMetaPath, reg); err != nil {
+			return nil, fmt.Errorf("保存ACME账户信息失败: %w", err)
+		}
+		client, err = newACMEClient(user, caDirURL)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return client, nil
+}
+
+func isTransientACMEOrderError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "certificate not found") ||
+		strings.Contains(lower, "authorizations for these identifiers not found")
 }
 
 func obtainLegoCert(domain string, aliases string, webRoot string, certDir string) (time.Time, error) {
@@ -244,6 +317,11 @@ func obtainLegoCert(domain string, aliases string, webRoot string, certDir strin
 	}
 
 	certRes, err := client.Certificate.Obtain(req)
+	if err != nil && isTransientACMEOrderError(err) {
+		log.Printf("ACME订单临时错误，准备重试 domain=%s: %v", domain, err)
+		time.Sleep(3 * time.Second)
+		certRes, err = client.Certificate.Obtain(req)
+	}
 	if err != nil {
 		return time.Time{}, fmt.Errorf("获取证书失败: %w", err)
 	}
