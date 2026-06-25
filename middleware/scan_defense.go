@@ -18,6 +18,8 @@ var browserUAs = []string{
 	"MSIE", "Trident", "Edg", "OPR", "Brave", "Vivaldi",
 }
 
+var scanDefenseAddPersistBan = executor.AddPersistBan
+
 var ensureNftablesOnce sync.Once
 
 func ensureNftables() {
@@ -39,6 +41,53 @@ func isBrowserLike(c *gin.Context) bool {
 	return false
 }
 
+func isCommonProbePath(path string) bool {
+	if path == "/" || path == "/favicon.ico" {
+		return true
+	}
+	if path == "/apple-touch-icon.png" || path == "/apple-touch-icon-precomposed.png" {
+		return true
+	}
+	if strings.HasPrefix(path, "/apple-touch-icon") && strings.HasSuffix(path, ".png") {
+		return true
+	}
+	return strings.HasPrefix(path, "/.well-known/")
+}
+
+// Requests carrying a Basic Auth header are likely from uptime monitors or
+// reverse-proxy health checks, not port scanners. Panel access still requires
+// valid credentials and a valid session, so allowing them through does not
+// grant any privileges.
+func hasBasicAuthHeader(c *gin.Context) bool {
+	auth := strings.TrimSpace(c.GetHeader("Authorization"))
+	return strings.HasPrefix(strings.ToLower(auth), "basic ")
+}
+
+func truncateRunes(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max]) + "..."
+}
+
+func scanReason(c *gin.Context) string {
+	path := strings.TrimSpace(c.Request.URL.Path)
+	ua := strings.TrimSpace(strings.Join(strings.Fields(c.GetHeader("User-Agent")), " "))
+	if path == "" {
+		path = "-"
+	}
+	path = truncateRunes(path, 120)
+	if ua == "" {
+		ua = "-"
+	}
+	ua = truncateRunes(ua, 160)
+	return "高危扫描: 非浏览器特征探测面板端口 (path=" + path + ", ua=" + ua + ")"
+}
+
 func banScanIP(db *sql.DB, ip string, reason string, hours int) {
 	var count int
 	db.QueryRow(`SELECT COUNT(*) FROM firewall_bans WHERE ip_address = ? AND unbanned_at IS NULL`, ip).Scan(&count)
@@ -57,7 +106,7 @@ func banScanIP(db *sql.DB, ip string, reason string, hours int) {
 		return
 	}
 
-	executor.AddPersistBan(ip)
+	scanDefenseAddPersistBan(ip)
 
 	log.Printf("[扫描防御] 已封禁 IP %s (理由: %s, 时长: %d小时)", ip, reason, hours)
 }
@@ -73,8 +122,13 @@ func ScanDefense(db *sql.DB, randomSuffix string) gin.HandlerFunc {
 			return
 		}
 
+		if isCommonProbePath(path) || hasBasicAuthHeader(c) {
+			c.Next()
+			return
+		}
+
 		if !isBrowserLike(c) {
-			banScanIP(db, c.ClientIP(), "高危扫描: 非浏览器特征探测面板端口", 720)
+			banScanIP(db, c.ClientIP(), scanReason(c), 720)
 			c.AbortWithStatus(http.StatusForbidden)
 			return
 		}

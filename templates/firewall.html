@@ -61,7 +61,7 @@
                     <p class="text-white font-semibold mb-1">扫描防御</p>
                     <ul class="space-y-1 ml-2">
                         <li>针对面板 <span class="text-blue-400">8443</span> 端口的扫描防护，不作用于网站端口（80/443）</li>
-                        <li>任何非浏览器特征请求（如 curl、脚本、扫描器）访问面板端口且未命中随机入口 → 封禁 <span class="text-red-400">30 天</span></li>
+                        <li>非浏览器特征请求（如 curl、脚本、扫描器）访问面板端口且未命中随机入口 → 封禁 <span class="text-red-400">30 天</span>；常见浏览器系统探测路径和带 BasicAuth 头的请求不会直接触发扫描封禁</li>
                         <li>命中随机入口（<code class="text-gray-300">/{suffix}</code>）的请求正常放行，不受影响</li>
                     </ul>
                     <p class="text-gray-500 mt-1">触发后写入面板封禁列表，来源标注为「扫描防御」，等级为临时 30 天。</p>
