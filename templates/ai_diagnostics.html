@@ -44,6 +44,20 @@
                 </div>
             </div>
 
+            <div class="card">
+                <div class="flex items-start gap-3">
+                    <div class="w-2 h-2 rounded-full mt-2 shrink-0" style="background-color: #facc15;"></div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-white">AI 诊断测试中</h3>
+                        <p class="text-xs text-gray-400 mt-2 leading-relaxed">如果遇到回答不准确、乱说面板入口或判断明显不合理的情况，请把诊断截图或问题描述反馈给我。</p>
+                        <div class="mt-3 space-y-1 text-xs text-gray-500">
+                            <p>微信：<span class="text-gray-300">vv15_zhi</span></p>
+                            <p>邮箱：<a href="mailto:blog@naibabiji.com" class="text-blue-400 hover:text-blue-300">blog@naibabiji.com</a></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <details class="card">
                 <summary class="cursor-pointer list-none">
                     <div class="flex items-center justify-between gap-3">
@@ -102,68 +116,82 @@
                         <p class="text-sm text-gray-400 mt-2" x-show="report?.user_friendly_explanation" x-text="report?.user_friendly_explanation"></p>
                     </div>
 
-                    <div x-show="report?.likely_causes?.length">
-                        <p class="text-sm text-gray-300 mb-3">可能原因</p>
-                        <template x-for="cause in report.likely_causes" :key="cause.title">
-                            <div class="mb-3 p-4 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
-                                <div class="flex items-center justify-between gap-3 mb-2">
-                                    <span class="text-sm text-white" x-text="cause.title"></span>
-                                    <span class="text-xs text-gray-500" x-text="'置信度：' + confidenceText(cause.confidence)"></span>
-                                </div>
-                                <ul class="text-xs text-gray-400 space-y-1 list-disc list-inside">
-                                    <template x-for="ev in (cause.evidence || [])" :key="ev">
-                                        <li x-text="ev"></li>
-                                    </template>
-                                </ul>
-                            </div>
-                        </template>
-                    </div>
-
-                    <div x-show="report?.recommended_actions?.length">
-                        <p class="text-sm text-gray-300 mb-3">建议操作</p>
-                        <template x-for="action in report.recommended_actions" :key="action.label">
-                            <div class="mb-3 p-4 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
-                                <div class="flex items-center justify-between gap-3 mb-2">
-                                    <span class="text-sm text-white" x-text="action.label"></span>
-                                    <span class="text-xs px-2 py-0.5 rounded" :class="riskClass(action.risk)" x-text="riskText(action.risk)"></span>
-                                </div>
-                                <p class="text-xs text-gray-400 mb-3" x-text="action.description"></p>
-                                <ul class="text-xs text-gray-500 space-y-1 list-disc list-inside" x-show="action.manual_steps?.length">
-                                    <template x-for="step in action.manual_steps" :key="step">
-                                        <li x-text="step"></li>
-                                    </template>
-                                </ul>
-                                <p x-show="action.panel_action_hint" class="text-xs text-blue-300 mt-3" x-text="action.panel_action_hint"></p>
-                            </div>
-                        </template>
-                    </div>
-
-                    <p x-show="report?.needs_more_info" class="text-xs text-yellow-400">AI 认为当前信息不足，请根据上方建议补充信息后重新诊断。</p>
-                    <pre x-show="!report && rawText" x-text="rawText" class="text-xs text-gray-300 whitespace-pre-wrap overflow-auto max-h-[560px] p-4 rounded" style="background-color: #0f172a; border: 1px solid #334155;"></pre>
-
-                    <div x-show="currentSessionID" class="pt-2 space-y-3">
+                    <div x-show="report || rawText" class="space-y-4">
                         <div class="flex items-center justify-between gap-3">
-                            <p class="text-sm text-gray-300">继续排查</p>
-                            <button @click="fetchMessages()" class="btn-secondary text-xs" :disabled="!currentSessionID || sendingFollowup">刷新对话</button>
+                            <p class="text-sm text-gray-300">原始诊断详情</p>
+                            <button @click="diagnosisCollapsed = !diagnosisCollapsed" class="btn-secondary text-xs" x-text="diagnosisCollapsed ? '展开详情' : '折叠详情'"></button>
                         </div>
-                        <div class="space-y-3 max-h-[420px] overflow-auto pr-1">
-                            <template x-for="msg in messages" :key="msg.id">
-                                <div class="p-3 rounded border" :class="msg.role === 'user' ? 'border-blue-900 bg-blue-950/30' : 'border-gray-800'" style="background-color: #0f172a;">
-                                    <div class="flex items-center justify-between gap-3 mb-2">
-                                        <span class="text-xs" :class="msg.role === 'user' ? 'text-blue-300' : 'text-green-300'" x-text="msg.role === 'user' ? '我' : 'AI'"></span>
-                                        <span class="text-xs text-gray-600" x-text="formatTime(msg.created_at)"></span>
+
+                        <div x-show="!diagnosisCollapsed" class="space-y-5">
+                            <div x-show="report?.likely_causes?.length">
+                                <p class="text-sm text-gray-300 mb-3">可能原因</p>
+                                <template x-for="cause in report.likely_causes" :key="cause.title">
+                                    <div class="mb-3 p-4 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
+                                        <div class="flex items-center justify-between gap-3 mb-2">
+                                            <span class="text-sm text-white" x-text="cause.title"></span>
+                                            <span class="text-xs text-gray-500" x-text="'置信度：' + confidenceText(cause.confidence)"></span>
+                                        </div>
+                                        <ul class="text-xs text-gray-400 space-y-1 list-disc list-inside">
+                                            <template x-for="ev in (cause.evidence || [])" :key="ev">
+                                                <li x-text="ev"></li>
+                                            </template>
+                                        </ul>
                                     </div>
-                                    <p x-show="msg.content" class="text-sm text-gray-300 whitespace-pre-wrap" x-text="msg.content"></p>
-                                    <p x-show="msg.error_message" class="text-sm text-red-300" x-text="msg.error_message"></p>
-                                </div>
-                            </template>
-                            <div x-show="messages.length === 0" class="text-xs text-gray-500 py-2">诊断完成后，可以在下方说明你做了什么或粘贴新的错误信息。</div>
+                                </template>
+                            </div>
+
+                            <div x-show="report?.recommended_actions?.length">
+                                <p class="text-sm text-gray-300 mb-3">建议操作</p>
+                                <template x-for="action in report.recommended_actions" :key="action.label">
+                                    <div class="mb-3 p-4 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
+                                        <div class="flex items-center justify-between gap-3 mb-2">
+                                            <span class="text-sm text-white" x-text="action.label"></span>
+                                            <span class="text-xs px-2 py-0.5 rounded" :class="riskClass(action.risk)" x-text="riskText(action.risk)"></span>
+                                        </div>
+                                        <p class="text-xs text-gray-400 mb-3" x-text="action.description"></p>
+                                        <ul class="text-xs text-gray-500 space-y-1 list-disc list-inside" x-show="action.manual_steps?.length">
+                                            <template x-for="step in action.manual_steps" :key="step">
+                                                <li x-text="step"></li>
+                                            </template>
+                                        </ul>
+                                        <p x-show="action.panel_action_hint" class="text-xs text-blue-300 mt-3" x-text="action.panel_action_hint"></p>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <p x-show="report?.needs_more_info" class="text-xs text-yellow-400">AI 认为当前信息不足，请根据上方建议补充信息后在下方继续会话。</p>
+                            <pre x-show="!report && rawText" x-text="rawText" class="text-xs text-gray-300 whitespace-pre-wrap overflow-auto max-h-[560px] p-4 rounded" style="background-color: #0f172a; border: 1px solid #334155;"></pre>
                         </div>
-                        <div class="space-y-2">
-                            <textarea x-model="followupText" rows="3" class="input-field w-full text-sm" placeholder="例如：我已经开启调试模式，请重新检查当前状态。"></textarea>
-                            <div class="flex items-center justify-between gap-3">
-                                <span class="text-xs text-gray-600">发送后面板会自动重新采集当前站点状态，并带上本会话上下文。</span>
-                                <button @click="sendFollowup()" class="btn-primary text-sm" :disabled="sendingFollowup || !followupText.trim()" x-text="sendingFollowup ? '分析中...' : '发送给 AI'"></button>
+                    </div>
+
+                    <div x-show="currentSessionID" class="pt-2">
+                        <div class="rounded border border-gray-800 flex flex-col h-[560px] max-h-[72vh]" style="background-color: #0f172a;">
+                            <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-800">
+                                <div>
+                                    <p class="text-sm text-gray-300">继续排查</p>
+                                    <p class="text-xs text-gray-600 mt-1">发送后会重新采集当前站点状态，并带上本会话上下文。</p>
+                                </div>
+                                <button @click="fetchMessages()" class="btn-secondary text-xs shrink-0" :disabled="!currentSessionID || sendingFollowup">刷新对话</button>
+                            </div>
+                            <div x-ref="messageList" class="flex-1 overflow-y-auto p-4 space-y-3">
+                                <template x-for="msg in messages" :key="msg.id">
+                                    <div class="p-3 rounded border" :class="msg.role === 'user' ? 'border-blue-900 bg-blue-950/30' : 'border-gray-800'" style="background-color: #0f172a;">
+                                        <div class="flex items-center justify-between gap-3 mb-2">
+                                            <span class="text-xs" :class="msg.role === 'user' ? 'text-blue-300' : 'text-green-300'" x-text="msg.role === 'user' ? '我' : 'AI'"></span>
+                                            <span class="text-xs text-gray-600" x-text="formatTime(msg.created_at)"></span>
+                                        </div>
+                                        <p x-show="msg.content" class="text-sm text-gray-300 whitespace-pre-wrap" x-text="msg.content"></p>
+                                        <p x-show="msg.error_message" class="text-sm text-red-300" x-text="msg.error_message"></p>
+                                    </div>
+                                </template>
+                                <div x-show="messages.length === 0" class="text-xs text-gray-500 py-2">诊断完成后，可以在下方说明你做了什么或粘贴新的错误信息。</div>
+                            </div>
+                            <div class="border-t border-gray-800 p-4 space-y-2">
+                                <textarea x-model="followupText" rows="3" class="input-field w-full text-sm resize-none" placeholder="例如：我已经开启调试模式，请重新检查当前状态。"></textarea>
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <span class="text-xs text-gray-600">继续会话会保留原诊断和历史问答，不需要重新发起一次诊断。</span>
+                                    <button @click="sendFollowup()" class="btn-primary text-sm shrink-0" :disabled="sendingFollowup || !followupText.trim()" x-text="sendingFollowup ? '分析中...' : '发送给 AI'"></button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -194,6 +222,7 @@ function aiDiagnosticsPage() {
         messages: [],
         followupText: '',
         sendingFollowup: false,
+        diagnosisCollapsed: false,
         error: '',
         diagnosing: false,
         elapsedSeconds: 0,
@@ -228,6 +257,7 @@ function aiDiagnosticsPage() {
             this.currentSessionID = null;
             this.messages = [];
             this.followupText = '';
+            this.diagnosisCollapsed = false;
             this.error = '';
             await this.fetchSessions();
         },
@@ -276,6 +306,7 @@ function aiDiagnosticsPage() {
             this.currentSessionID = null;
             this.messages = [];
             this.followupText = '';
+            this.diagnosisCollapsed = false;
             try {
                 const r = await api('/websites/' + this.selectedSiteID + '/ai/diagnose', {
                     method: 'POST',
@@ -293,6 +324,7 @@ function aiDiagnosticsPage() {
                     this.currentSessionID = d.session_id || null;
                     this.report = d.report || null;
                     this.rawText = d.raw_text || '';
+                    this.diagnosisCollapsed = false;
                     await this.fetchMessages();
                     showToast('AI 诊断完成', 'success');
                 }
@@ -330,6 +362,7 @@ function aiDiagnosticsPage() {
                     this.report = r.data.report || null;
                     this.rawText = r.data.raw_text || '';
                     this.error = r.data.error_message || '';
+                    this.diagnosisCollapsed = false;
                     await this.fetchMessages();
                     if (this.error) showToast(this.error, 'error');
                 }
@@ -345,8 +378,18 @@ function aiDiagnosticsPage() {
             }
             try {
                 const r = await api('/websites/' + this.selectedSiteID + '/ai/sessions/' + this.currentSessionID + '/messages', { silent: true });
-                if (r.success) this.messages = r.data || [];
+                if (r.success) {
+                    this.messages = r.data || [];
+                    if (this.messages.length > 0) this.diagnosisCollapsed = true;
+                    this.scrollMessagesToBottom();
+                }
             } catch(e) {}
+        },
+        scrollMessagesToBottom() {
+            this.$nextTick(() => {
+                const el = this.$refs.messageList;
+                if (el) el.scrollTop = el.scrollHeight;
+            });
         },
         async sendFollowup() {
             if (!this.selectedSiteID || !this.currentSessionID || !this.followupText.trim()) return;
@@ -371,6 +414,8 @@ function aiDiagnosticsPage() {
                     this.followupText = content;
                 } else {
                     this.messages = d.messages || [];
+                    if (this.messages.length > 0) this.diagnosisCollapsed = true;
+                    this.scrollMessagesToBottom();
                     showToast('AI 已回复', 'success');
                 }
             } catch(e) {
