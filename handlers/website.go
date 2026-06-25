@@ -1562,9 +1562,10 @@ func (h *WebsiteHandler) SaveWPOptimizations(c *gin.Context) {
 	db := database.GetDB()
 
 	// 检查 FastCGI / XML-RPC 配置是否变化，决定是否重载 Nginx
+	var domain string
 	var oldFCacheEnabled, oldFCacheTTL, oldXMLRPCEnabled int
-	db.QueryRow("SELECT fastcgi_cache_enabled, fastcgi_cache_ttl, xmlrpc_enabled FROM websites WHERE id = ?", id).
-		Scan(&oldFCacheEnabled, &oldFCacheTTL, &oldXMLRPCEnabled)
+	db.QueryRow("SELECT domain, fastcgi_cache_enabled, fastcgi_cache_ttl, xmlrpc_enabled FROM websites WHERE id = ?", id).
+		Scan(&domain, &oldFCacheEnabled, &oldFCacheTTL, &oldXMLRPCEnabled)
 
 	fcEnabled := 0
 	if req.FCacheEnabled {
@@ -1623,6 +1624,9 @@ func (h *WebsiteHandler) SaveWPOptimizations(c *gin.Context) {
 				log.Printf("刷新站点 Nginx 配置失败 site=%d: %v", id, err)
 			}
 		})
+	}
+	if domain != "" {
+		recordHandlerOperationLog("wp_optimizations", domain, "success", wpOptimizationsLogMessage(req.FCacheEnabled, req.FCacheTTL, req.DisableWPUpdates, req.DisableFileEditing, req.XMLRPCEnabled, req.WPDebugEnabled, req.WPPostRevisions, req.WPMemoryLimit))
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "已保存"}))
@@ -2032,8 +2036,31 @@ func (h *CacheHelperHandler) UpdateOptimizerSettings(c *gin.Context) {
 			})
 		}
 	}
+	recordHandlerOperationLog("wp_optimizations", req.Domain, "success", wpOptimizationsLogMessage(req.Enabled, req.TTL, req.DisableWPUpdates, req.DisableFileEditing, false, req.WPDebugEnabled, req.WPPostRevisions, req.WPMemoryLimit))
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "已保存"}))
+}
+
+func wpOptimizationsLogMessage(fcacheEnabled bool, fcacheTTL int, disableUpdates, disableEditing, xmlrpcEnabled, wpDebugEnabled bool, postRevisions int, memoryLimit string) string {
+	state := func(enabled bool) string {
+		if enabled {
+			return "开启"
+		}
+		return "关闭"
+	}
+	parts := []string{
+		"FastCGI缓存=" + state(fcacheEnabled),
+		fmt.Sprintf("缓存TTL=%d", fcacheTTL),
+		"禁止更新=" + state(disableUpdates),
+		"禁止文件编辑=" + state(disableEditing),
+		"XML-RPC=" + state(xmlrpcEnabled),
+		"WP_DEBUG=" + state(wpDebugEnabled),
+		fmt.Sprintf("文章修订=%d", postRevisions),
+	}
+	if strings.TrimSpace(memoryLimit) != "" {
+		parts = append(parts, "PHP内存限制="+strings.TrimSpace(memoryLimit))
+	}
+	return strings.Join(parts, "；")
 }
 
 func (h *WebsiteHandler) SetLogRetention(c *gin.Context) {

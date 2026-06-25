@@ -98,55 +98,6 @@
 
             <hr class="my-4 border-gray-700">
 
-            <div class="mb-4 p-3 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <p class="text-sm text-gray-300">AI 诊断</p>
-                        <p class="text-xs text-gray-500">用于网站故障和性能只读诊断，默认使用 DeepSeek</p>
-                    </div>
-                    <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
-                        <input type="checkbox" x-model="ai.enabled">
-                        <span x-text="ai.enabled ? '已启用' : '已关闭'"></span>
-                    </label>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <label class="label">服务商</label>
-                        <select x-model="ai.provider" @change="applyAIProviderDefaults()" class="input-field text-sm">
-                            <option value="deepseek">DeepSeek</option>
-                            <option value="openai">OpenAI</option>
-                            <option value="openai_compatible">OpenAI Compatible</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="label">模型</label>
-                        <input type="text" x-model="ai.model" class="input-field text-sm" placeholder="deepseek-v4-pro">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="label">Base URL</label>
-                        <input type="text" x-model="ai.base_url" class="input-field text-sm" placeholder="https://api.deepseek.com">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="label">API Key</label>
-                        <input type="password" x-model="ai.api_key" class="input-field text-sm" :placeholder="ai.api_key_masked || '输入 API Key'">
-                    </div>
-                    <div>
-                        <label class="label">超时（秒）</label>
-                        <input type="number" x-model.number="ai.timeout_seconds" min="15" max="120" class="input-field text-sm">
-                    </div>
-                </div>
-                <div class="mt-3 p-2 rounded text-xs text-yellow-200" style="background-color: #422006; border: 1px solid #854d0e;">
-                    AI 诊断会把站点域名、日志摘要、配置摘要和检查结果发送给所选服务商；不会发送数据库密码、AI Key、SSL 私钥、面板密码或面板数据库内容。
-                </div>
-                <div class="flex items-center space-x-3 mt-3">
-                    <button @click="testAI()" :disabled="aiTesting" class="btn-secondary text-sm" x-text="aiTesting ? '测试中...' : '测试连接'"></button>
-                    <button @click="saveAI()" :disabled="aiSaving" class="btn-primary text-sm" x-text="aiSaving ? '保存中...' : '保存 AI 设置'"></button>
-                </div>
-                <p x-show="aiTestResult" class="text-xs mt-2" :class="aiTestOK ? 'text-green-400' : 'text-red-400'" x-text="aiTestResult"></p>
-            </div>
-
-            <hr class="my-4 border-gray-700">
-
             <div x-data="versionCheck()" x-init="fetchVersion()">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm text-gray-400">面板版本</span>
@@ -249,6 +200,59 @@
                 <p x-show="msg" class="text-sm mt-2" :class="ok ? 'text-green-400' : 'text-red-400'" x-text="msg"></p>
             </div>
         </div>
+    </div>
+
+    <div class="card mb-6">
+        <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+            <div>
+                <h3 class="text-lg font-semibold text-white">AI 诊断设置</h3>
+                <p class="text-xs text-gray-500 mt-1">配置网站故障和性能诊断使用的 AI 服务商；诊断操作在「AI 诊断」页面进行。</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="/{{.RandomSuffix}}/ai-diagnostics" class="btn-secondary text-sm">前往 AI 诊断</a>
+                <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" x-model="ai.enabled">
+                    <span x-text="ai.enabled ? '已启用' : '已关闭'"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="label">服务商</label>
+                <select x-model="ai.provider" @change="applyAIProviderDefaults()" class="input-field text-sm">
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="openai_compatible">OpenAI Compatible</option>
+                </select>
+            </div>
+            <div>
+                <label class="label">模型</label>
+                <input type="text" x-model="ai.model" class="input-field text-sm" placeholder="deepseek-v4-pro">
+            </div>
+            <div>
+                <label class="label">Base URL</label>
+                <input type="text" x-model="ai.base_url" class="input-field text-sm" placeholder="https://api.deepseek.com">
+            </div>
+            <div>
+                <label class="label">API Key</label>
+                <input type="password" x-model="ai.api_key" class="input-field text-sm" :placeholder="ai.api_key_masked || '输入 API Key'">
+            </div>
+            <div>
+                <label class="label">超时（秒）</label>
+                <input type="number" x-model.number="ai.timeout_seconds" min="15" max="180" class="input-field text-sm">
+                <p class="text-xs text-gray-500 mt-1">建议 60-120 秒；较慢模型可临时调高到 180 秒。</p>
+            </div>
+        </div>
+
+        <div class="mt-4 p-3 rounded text-xs text-yellow-200" style="background-color: #422006; border: 1px solid #854d0e;">
+            AI 诊断会把站点域名、日志摘要、配置摘要和检查结果发送给所选服务商；不会发送数据库密码、AI Key、SSL 私钥、面板密码或面板数据库内容。
+        </div>
+        <div class="flex items-center space-x-3 mt-4">
+            <button @click="testAI()" :disabled="aiTesting" class="btn-secondary text-sm" x-text="aiTesting ? '测试中...' : '测试连接'"></button>
+            <button @click="saveAI()" :disabled="aiSaving" class="btn-primary text-sm" x-text="aiSaving ? '保存中...' : '保存 AI 设置'"></button>
+        </div>
+        <p x-show="aiTestResult" class="text-xs mt-2" :class="aiTestOK ? 'text-green-400' : 'text-red-400'" x-text="aiTestResult"></p>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
@@ -814,7 +818,8 @@ function panelSettings() {
             this.aiTesting = true;
             this.aiTestResult = '';
             try {
-                const r = await api('/ai/test', { method: 'POST', body: this.aiPayload(), timeout: 75000 });
+                const timeoutMs = Math.min((parseInt(this.ai.timeout_seconds) || 60) * 1000 + 30000, 210000);
+                const r = await api('/ai/test', { method: 'POST', body: this.aiPayload(), timeout: timeoutMs });
                 const d = r.data || {};
                 this.aiTestOK = !!d.ok;
                 this.aiTestResult = d.ok ? ('连接成功，延迟 ' + d.latency_ms + 'ms') : (d.message || '连接失败');

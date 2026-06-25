@@ -41,6 +41,10 @@ type AIDiagnoseRequest struct {
 	Symptom string `json:"symptom"`
 }
 
+type AIMessageRequest struct {
+	Content string `json:"content"`
+}
+
 type AITestRequest struct {
 	Provider       string `json:"provider"`
 	BaseURL        string `json:"base_url"`
@@ -99,6 +103,17 @@ type AISessionDetail struct {
 	ResponseChars int                 `json:"response_chars"`
 	CreatedAt     time.Time           `json:"created_at"`
 	UpdatedAt     time.Time           `json:"updated_at"`
+}
+
+type AIMessage struct {
+	ID            int       `json:"id"`
+	SessionID     int       `json:"session_id"`
+	Role          string    `json:"role"`
+	Content       string    `json:"content"`
+	PromptChars   int       `json:"prompt_chars,omitempty"`
+	ResponseChars int       `json:"response_chars,omitempty"`
+	ErrorMessage  string    `json:"error_message,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 func IsValidAIDiagnosisSymptom(symptom string) bool {

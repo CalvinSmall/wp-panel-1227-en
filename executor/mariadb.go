@@ -250,6 +250,47 @@ func ReadWPSiteURLs(dbName, tablePrefix string, cfg *config.Config) (siteURL, ho
 	return siteURL, homeURL, nil
 }
 
+func ReadWPDiagnosticOptions(dbName, tablePrefix string, cfg *config.Config) (map[string]string, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("面板配置未初始化")
+	}
+	if !isValidMySQLIdentifier(dbName) {
+		return nil, fmt.Errorf("invalid database name")
+	}
+	tableName, err := wpOptionsTableName(tablePrefix)
+	if err != nil {
+		return nil, err
+	}
+	query := fmt.Sprintf(
+		"SELECT option_name, option_value FROM `%s`.`%s` WHERE option_name IN ('template','stylesheet','active_plugins')",
+		dbName, tableName)
+	cmd := exec.Command("mysql", "-u", cfg.MariaDB.RootUser, "-N", "-e", query)
+	cmd.Env = append(os.Environ(), "MYSQL_PWD="+cfg.MariaDB.RootPassword)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("查询失败: %s", strings.TrimSpace(stderr.String()))
+	}
+
+	result := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		switch parts[0] {
+		case "template", "stylesheet", "active_plugins":
+			result[parts[0]] = parts[1]
+		}
+	}
+	return result, nil
+}
+
 // UpdateWPSiteURLs 更新 wp_options 中的 siteurl 和 home（仅更新非空字段）
 func UpdateWPSiteURLs(dbName, tablePrefix, newSiteURL, newHomeURL string, cfg *config.Config) error {
 	if newSiteURL == "" && newHomeURL == "" {

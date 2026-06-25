@@ -62,7 +62,7 @@ func TestFreshInstallRunsMigrationsAndRecordsLatestVersion(t *testing.T) {
 	if aiModel != "deepseek-v4-pro" {
 		t.Fatalf("ai default model = %q, want deepseek-v4-pro", aiModel)
 	}
-	for _, table := range []string{"ai_settings", "ai_sessions"} {
+	for _, table := range []string{"ai_settings", "ai_sessions", "ai_messages"} {
 		var exists int
 		if err := DB.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?", table).Scan(&exists); err != nil {
 			t.Fatalf("query %s table: %v", table, err)
@@ -129,6 +129,44 @@ func TestUpgradeAddsDocumentRootSubdirColumnToExistingSchema(t *testing.T) {
 	}
 	if defaultValue != "''" {
 		t.Fatalf("document_root_subdir default = %q, want %q", defaultValue, "''")
+	}
+}
+
+func TestUpgradeAddsAIMessagesTableToExistingSchema(t *testing.T) {
+	openTempDB(t)
+
+	if err := RunMigrations(); err != nil {
+		t.Fatalf("RunMigrations() error = %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("initial RunUpgrades() error = %v", err)
+	}
+	if _, err := DB.Exec("DELETE FROM schema_version"); err != nil {
+		t.Fatalf("delete schema_version: %v", err)
+	}
+	if _, err := DB.Exec("INSERT INTO schema_version (version) VALUES ('1.0.18')"); err != nil {
+		t.Fatalf("seed schema_version: %v", err)
+	}
+	if _, err := DB.Exec("DROP TABLE IF EXISTS ai_messages"); err != nil {
+		t.Fatalf("drop ai_messages: %v", err)
+	}
+
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("RunUpgrades() error = %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("second RunUpgrades() error = %v", err)
+	}
+
+	var tableExists, indexExists int
+	if err := DB.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'ai_messages'").Scan(&tableExists); err != nil {
+		t.Fatalf("query ai_messages table: %v", err)
+	}
+	if err := DB.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_ai_messages_session'").Scan(&indexExists); err != nil {
+		t.Fatalf("query ai_messages index: %v", err)
+	}
+	if tableExists != 1 || indexExists != 1 {
+		t.Fatalf("ai_messages table/index exists = %d/%d, want 1/1", tableExists, indexExists)
 	}
 }
 

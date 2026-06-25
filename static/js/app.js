@@ -1,7 +1,17 @@
 function api(path, options = {}) {
     const prefix = document.body.dataset.panelPrefix || '';
     const url = prefix + '/api' + path;
-    const { silent = false, suppressToast = false, ...fetchOptions } = options;
+    const { silent = false, suppressToast = false, timeout = 0, ...fetchOptions } = options;
+    let timeoutID = null;
+    let timedOut = false;
+    if (timeout > 0 && !fetchOptions.signal) {
+        const controller = new AbortController();
+        fetchOptions.signal = controller.signal;
+        timeoutID = setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+        }, timeout);
+    }
 
     const headers = {
         'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
@@ -43,6 +53,9 @@ function api(path, options = {}) {
             return data;
         })
         .catch(err => {
+            if (timedOut) {
+                err = new Error('请求等待超时，请稍后刷新历史记录查看是否已完成。');
+            }
             const message = friendlyAPIError(err);
             const displayErr = message === err.message ? err : new Error(message);
             if (err.conflicts) displayErr.conflicts = err.conflicts;
@@ -51,6 +64,9 @@ function api(path, options = {}) {
                 showToast(displayErr.message, 'error');
             }
             throw displayErr;
+        })
+        .finally(() => {
+            if (timeoutID) clearTimeout(timeoutID);
         });
 }
 

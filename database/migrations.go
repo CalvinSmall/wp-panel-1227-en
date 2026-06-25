@@ -415,4 +415,20 @@ var migrations = []string{
 	)`,
 	`CREATE INDEX IF NOT EXISTS idx_ai_sessions_site ON ai_sessions(site_id, created_at)`,
 	`CREATE INDEX IF NOT EXISTS idx_ai_sessions_status ON ai_sessions(site_id, status)`,
+
+	// ============================================================
+	// ai_messages
+	// ============================================================
+	`CREATE TABLE IF NOT EXISTS ai_messages (
+		id             INTEGER PRIMARY KEY AUTOINCREMENT,
+		session_id     INTEGER NOT NULL,
+		role           TEXT    NOT NULL DEFAULT '',
+		content        TEXT    NOT NULL DEFAULT '',
+		prompt_chars   INTEGER NOT NULL DEFAULT 0,
+		response_chars INTEGER NOT NULL DEFAULT 0,
+		error_message  TEXT    NOT NULL DEFAULT '',
+		created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (session_id) REFERENCES ai_sessions(id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_ai_messages_session ON ai_messages(session_id, created_at)`,
 }

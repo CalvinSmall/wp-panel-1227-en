@@ -263,6 +263,8 @@ func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version
 	protected.POST("/api/websites/:id/ai/diagnose", aiHandler.Diagnose)
 	protected.GET("/api/websites/:id/ai/sessions", aiHandler.ListSessions)
 	protected.GET("/api/websites/:id/ai/sessions/:session_id", aiHandler.GetSession)
+	protected.GET("/api/websites/:id/ai/sessions/:session_id/messages", aiHandler.ListMessages)
+	protected.POST("/api/websites/:id/ai/sessions/:session_id/messages", aiHandler.SendMessage)
 
 	extensionHandler := &handlers.ExtensionHandler{}
 	protected.GET("/api/extensions", extensionHandler.List)
@@ -281,6 +283,9 @@ func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version
 	})
 	protected.GET("/websites/:id", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "website_detail.html", pageData(suffix, "websites", "websites_detail_content", c))
+	})
+	protected.GET("/ai-diagnostics", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "ai_diagnostics.html", pageData(suffix, "ai-diagnostics", "ai_diagnostics_content", c))
 	})
 	protected.GET("/cron", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "cron.html", pageData(suffix, "cron", "cron_content", c))
@@ -329,16 +334,17 @@ func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version
 }
 
 var pageTitles = map[string]string{
-	"dashboard":  "控制台",
-	"websites":   "网站管理",
-	"cron":       "计划任务",
-	"firewall":   "安全防御",
-	"security":   "安全设置",
-	"files":      "文件管理",
-	"software":   "软件管理",
-	"alert":      "告警通知",
-	"extensions": "扩展配置",
-	"settings":   "面板设置",
+	"dashboard":      "控制台",
+	"websites":       "网站管理",
+	"ai-diagnostics": "AI 诊断",
+	"cron":           "计划任务",
+	"firewall":       "安全防御",
+	"security":       "安全设置",
+	"files":          "文件管理",
+	"software":       "软件管理",
+	"alert":          "告警通知",
+	"extensions":     "扩展配置",
+	"settings":       "面板设置",
 }
 
 func pageData(suffix string, active string, contentTpl string, c *gin.Context) gin.H {

@@ -34,6 +34,7 @@ var allowedCommands = map[string][]string{
 	"runuser":         {"-u", "-g", "--"},
 	"mysql":           {"-u", "-p", "-e", "-h", "-P", "--execute", "--host", "--password", "--user"},
 	"mysqladmin":      {"-u", "-p", "password", "create", "drop", "status"},
+	"php":             {"-l"},
 	"test":            {"-f", "-d", "-e", "-r", "-w", "-x", "-n", "-z"},
 	"cat":             {},
 	"openssl":         {"rand", "-base64", "x509", "-in", "-out", "-days"},
