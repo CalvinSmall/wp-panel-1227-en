@@ -76,7 +76,12 @@ func executeEnableSSL(task *Task) TaskResult {
 			return TaskResult{Success: false, Message: "证书验证失败"}
 		}
 	} else {
-		expiry, applyErr = obtainLegoCert(site.Domain, site.Aliases, site.WebRoot, certDir)
+		documentRoot, err := EnsureEffectiveDocumentRoot(site.WebRoot, site.SiteType, site.DocumentRootSubdir, site.SystemUser)
+		if err != nil {
+			return taskFailure("准备SSL验证目录失败", err)
+		}
+		expiry, applyErr = obtainLegoCert(site.Domain, site.Aliases,
+			documentRoot, certDir)
 		if applyErr != nil {
 			log.Printf("申请 Let's Encrypt 证书失败: %v", applyErr)
 			os.RemoveAll(certDir)
@@ -376,8 +381,8 @@ func executeRenewSSL(task *Task) TaskResult {
 	db := database.GetDB()
 
 	rows, err := db.Query(
-		`SELECT id, name, domain, aliases, status, system_user, web_root, log_dir,
-		        db_name, db_user, php_pool_path, nginx_conf_path, ssl_enabled,
+		`SELECT id, name, domain, aliases, status, system_user, web_root, document_root_subdir, log_dir,
+		        db_name, db_user, php_pool_path, nginx_conf_path, site_type, ssl_enabled,
 		        ssl_cert_path, ssl_key_path, template_version, ssl_expires_at
 		 FROM websites WHERE ssl_enabled = 1 AND ssl_cert_path != ''`,
 	)
@@ -400,8 +405,8 @@ func executeRenewSSL(task *Task) TaskResult {
 		var sslExpiresAt *time.Time
 		if scanErr := rows.Scan(
 			&w.ID, &w.Name, &w.Domain, &aliases, &status, &w.SystemUser,
-			&w.WebRoot, &w.LogDir, &w.DBName, &w.DBUser, &w.PHPPoolPath,
-			&w.NginxConfPath, &sslEnabled, &w.SSLCertPath, &w.SSLKeyPath,
+			&w.WebRoot, &w.DocumentRootSubdir, &w.LogDir, &w.DBName, &w.DBUser, &w.PHPPoolPath,
+			&w.NginxConfPath, &w.SiteType, &sslEnabled, &w.SSLCertPath, &w.SSLKeyPath,
 			&w.TemplateVersion, &sslExpiresAt,
 		); scanErr != nil {
 			failed = append(failed, w.Domain+"(读取失败)")
@@ -428,7 +433,14 @@ func executeRenewSSL(task *Task) TaskResult {
 			continue
 		}
 
-		newExpiry, renewErr := obtainLegoCert(w.Domain, w.Aliases, w.WebRoot,
+		documentRoot, docRootErr := EnsureEffectiveDocumentRoot(w.WebRoot, w.SiteType, w.DocumentRootSubdir, w.SystemUser)
+		if docRootErr != nil {
+			log.Printf("SSL续期准备验证目录失败 domain=%s: %v", w.Domain, docRootErr)
+			failed = append(failed, w.Domain+"(验证目录失败)")
+			continue
+		}
+
+		newExpiry, renewErr := obtainLegoCert(w.Domain, w.Aliases, documentRoot,
 			filepath.Join(cfg.Paths.Certificates, w.Domain))
 		if renewErr != nil {
 			log.Printf("SSL续期失败 domain=%s: %v", w.Domain, renewErr)

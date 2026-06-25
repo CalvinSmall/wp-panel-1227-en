@@ -26,7 +26,7 @@ import (
 )
 
 // canonical column list shared by all website queries.
-const websiteCols = `id, name, domain, aliases, status, system_user, web_root, log_dir,
+const websiteCols = `id, name, domain, aliases, status, system_user, web_root, document_root_subdir, log_dir,
 	db_name, db_user, php_pool_path, nginx_conf_path, site_type, ssl_enabled,
 	ssl_cert_path, ssl_key_path, ssl_expires_at, ssl_last_error, ssl_export_enabled, template_version, access_log_mode,
 	fastcgi_cache_enabled, fastcgi_cache_ttl, fastcgi_cache_key,
@@ -50,7 +50,7 @@ func scanWebsite(scanner func(dest ...interface{}) error) (*models.Website, erro
 
 	err := scanner(
 		&w.ID, &w.Name, &w.Domain, &aliases, &status, &w.SystemUser,
-		&w.WebRoot, &w.LogDir, &w.DBName, &w.DBUser, &w.PHPPoolPath,
+		&w.WebRoot, &w.DocumentRootSubdir, &w.LogDir, &w.DBName, &w.DBUser, &w.PHPPoolPath,
 		&w.NginxConfPath, &w.SiteType, &sslEnabled, &w.SSLCertPath, &w.SSLKeyPath,
 		&w.SSLExpiresAt, &w.SSLLastError, &sslExportEnabled, &w.TemplateVersion, &w.AccessLogMode,
 		&fCacheEnabled, &w.FCacheTTL, &w.FCacheKey,
@@ -359,6 +359,11 @@ func (h *WebsiteHandler) Create(c *gin.Context) {
 	if siteType != "php" {
 		siteType = "wordpress"
 	}
+	documentRootSubdir, err := executor.NormalizeDocumentRootSubdir(siteType, req.DocumentRootSubdir)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
+		return
+	}
 	if req.SSLEnabled {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 		preflight, preflightErr := runSSLPreflight(ctx, req.Domain, req.Aliases)
@@ -377,6 +382,7 @@ func (h *WebsiteHandler) Create(c *gin.Context) {
 		DBPassword:         req.DBPassword,
 		ExpiresAt:          req.ExpiresAt,
 		SiteType:           siteType,
+		DocumentRootSubdir: documentRootSubdir,
 		CleanDefaults:      req.CleanDefaults,
 		RemoveUnusedThemes: req.RemoveUnusedThemes,
 		InstallThemes:      req.InstallThemes,
@@ -387,6 +393,48 @@ func (h *WebsiteHandler) Create(c *gin.Context) {
 	result := <-task.ResultCh
 	if result.Success {
 		c.JSON(http.StatusOK, models.SuccessResponse(result.Data))
+	} else {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(result.Message))
+	}
+}
+
+func (h *WebsiteHandler) SetDocumentRoot(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的网站ID"))
+		return
+	}
+
+	site := getWebsiteByID(id)
+	if site == nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		return
+	}
+	if site.SiteType != "php" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("只有通用 PHP 网站支持修改 Web 入口目录"))
+		return
+	}
+
+	var req struct {
+		DocumentRootSubdir string `json:"document_root_subdir"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		return
+	}
+
+	documentRootSubdir, err := executor.NormalizeDocumentRootSubdir(site.SiteType, req.DocumentRootSubdir)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
+		return
+	}
+
+	task := executor.GlobalQueue.Enqueue(executor.TaskSetDocumentRoot, &executor.SetDocumentRootPayload{
+		Site: site, DocumentRootSubdir: documentRootSubdir,
+	})
+	result := <-task.ResultCh
+	if result.Success {
+		c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": result.Message}))
 	} else {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(result.Message))
 	}

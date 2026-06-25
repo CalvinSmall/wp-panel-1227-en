@@ -23,6 +23,7 @@ var migrations = []string{
 		status                TEXT    NOT NULL DEFAULT 'active',
 		system_user           TEXT    NOT NULL,
 		web_root              TEXT    NOT NULL,
+		document_root_subdir  TEXT    NOT NULL DEFAULT '',
 		log_dir               TEXT    NOT NULL,
 		db_name               TEXT    NOT NULL,
 		db_user               TEXT    NOT NULL,

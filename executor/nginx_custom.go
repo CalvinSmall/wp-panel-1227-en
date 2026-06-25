@@ -192,3 +192,55 @@ func boolToDBInt(v bool) int {
 	}
 	return 0
 }
+
+func executeSetDocumentRoot(task *Task) TaskResult {
+	payload, ok := task.Payload.(*SetDocumentRootPayload)
+	if !ok {
+		return TaskResult{Success: false, Message: "任务参数类型错误"}
+	}
+	site := payload.Site
+	if site == nil {
+		return TaskResult{Success: false, Message: "网站不存在"}
+	}
+	if site.SiteType != "php" {
+		return TaskResult{Success: false, Message: "只有通用 PHP 网站支持修改 Web 入口目录"}
+	}
+
+	documentRootSubdir, err := NormalizeDocumentRootSubdir(site.SiteType, payload.DocumentRootSubdir)
+	if err != nil {
+		return TaskResult{Success: false, Message: err.Error()}
+	}
+	if _, err := EnsureEffectiveDocumentRoot(site.WebRoot, site.SiteType, documentRootSubdir, site.SystemUser); err != nil {
+		return taskFailure("准备Web入口目录失败", err)
+	}
+
+	siteCopy := *site
+	siteCopy.DocumentRootSubdir = documentRootSubdir
+	nginxData, err := nginxDataFromSiteChecked(&siteCopy)
+	if err != nil {
+		return taskFailure("CDN 真实 IP 配置无效", err)
+	}
+
+	cfg := config.AppConfig
+	engine := NewTemplateEngine(cfg.Panel.BackupDir)
+	nginxConfig, err := engine.RenderNginxConfig(nginxData)
+	if err != nil {
+		log.Printf("渲染 Nginx 配置失败: %v", err)
+		return taskFailure("渲染 Nginx 配置失败", err)
+	}
+	if err := engine.ApplyNginxConfig(nginxConfig, site.NginxConfPath,
+		nginxEnabledPath(cfg, site.NginxConfPath, site.Domain)); err != nil {
+		log.Printf("应用 Nginx 配置失败: %v", err)
+		return taskFailure("应用 Nginx 配置失败", err)
+	}
+
+	db := database.GetDB()
+	if _, err := db.Exec("UPDATE websites SET document_root_subdir = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", documentRootSubdir, site.ID); err != nil {
+		return TaskResult{Success: false, Message: "保存 Web 入口目录失败: " + err.Error()}
+	}
+
+	if documentRootSubdir == "" {
+		return TaskResult{Success: true, Message: "Web 入口目录已切换为项目根"}
+	}
+	return TaskResult{Success: true, Message: "Web 入口目录已切换为 public"}
+}

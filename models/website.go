@@ -20,6 +20,7 @@ type Website struct {
 	Status             WebsiteStatus    `json:"status"`
 	SystemUser         string           `json:"system_user"`
 	WebRoot            string           `json:"web_root"`
+	DocumentRootSubdir string           `json:"document_root_subdir"`
 	LogDir             string           `json:"log_dir"`
 	DBName             string           `json:"db_name"`
 	DBUser             string           `json:"db_user"`
@@ -61,6 +62,7 @@ type CreateWebsiteRequest struct {
 	DBPassword         string   `json:"db_password"`
 	ExpiresAt          string   `json:"expires_at"`
 	SiteType           string   `json:"site_type"`
+	DocumentRootSubdir string   `json:"document_root_subdir"`
 	CleanDefaults      bool     `json:"clean_defaults"`
 	RemoveUnusedThemes bool     `json:"remove_unused_themes"`
 	InstallThemes      []string `json:"install_themes"`

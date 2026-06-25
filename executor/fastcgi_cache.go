@@ -207,18 +207,18 @@ func deleteRedisKeysByPrefix(prefix string) error {
 
 func RegenerateSiteNginx(siteID int) error {
 	db := database.GetDB()
-	var domain, aliases, siteType, systemUser, webRoot, logDir, accessLogMode, cacheKey, templateVer string
+	var domain, aliases, siteType, systemUser, webRoot, documentRootSubdir, logDir, accessLogMode, cacheKey, templateVer string
 	var phpPoolPath, nginxConfPath string
 	var sslEnabled, fCacheEnabled, xmlrpcEnabled, cdnRealIPEnabled int
 	var fCacheTTL int
 	var sslCertPath, sslKeyPath string
 
 	err := db.QueryRow(
-		`SELECT domain, aliases, site_type, system_user, web_root, log_dir, ssl_enabled,
+		`SELECT domain, aliases, site_type, system_user, web_root, document_root_subdir, log_dir, ssl_enabled,
 		        access_log_mode, fastcgi_cache_enabled, fastcgi_cache_ttl, fastcgi_cache_key,
 		        ssl_cert_path, ssl_key_path, template_version, xmlrpc_enabled, php_pool_path, nginx_conf_path, cdn_realip_enabled
 		 FROM websites WHERE id = ?`, siteID,
-	).Scan(&domain, &aliases, &siteType, &systemUser, &webRoot, &logDir, &sslEnabled, &accessLogMode, &fCacheEnabled, &fCacheTTL, &cacheKey, &sslCertPath, &sslKeyPath, &templateVer, &xmlrpcEnabled, &phpPoolPath, &nginxConfPath, &cdnRealIPEnabled)
+	).Scan(&domain, &aliases, &siteType, &systemUser, &webRoot, &documentRootSubdir, &logDir, &sslEnabled, &accessLogMode, &fCacheEnabled, &fCacheTTL, &cacheKey, &sslCertPath, &sslKeyPath, &templateVer, &xmlrpcEnabled, &phpPoolPath, &nginxConfPath, &cdnRealIPEnabled)
 	if err != nil || domain == "" {
 		if err != nil {
 			return fmt.Errorf("查询站点失败(site %d): %w", siteID, err)
@@ -246,7 +246,7 @@ func RegenerateSiteNginx(siteID int) error {
 		Domain:        domain,
 		Aliases:       aliasList,
 		ServerNames:   buildServerNames(domain, aliasList),
-		WebRoot:       webRoot,
+		WebRoot:       EffectiveDocumentRoot(webRoot, siteType, documentRootSubdir),
 		LogDir:        logDir,
 		SystemUser:    systemUser,
 		SiteType:      siteType,

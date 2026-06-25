@@ -142,6 +142,8 @@ func (q *TaskQueue) worker() {
 				result = executeSetAccessLogMode(task)
 			case TaskSetCDNRealIP:
 				result = executeSetCDNRealIP(task)
+			case TaskSetDocumentRoot:
+				result = executeSetDocumentRoot(task)
 			case TaskRenewSSL:
 				result = executeRenewSSL(task)
 			case TaskRenderCron:
@@ -242,6 +244,10 @@ func logOp(task *Task, result TaskResult) {
 		}
 	case TaskSetCDNRealIP:
 		if p, ok := task.Payload.(*SetCDNRealIPPayload); ok && p.Site != nil {
+			target = p.Site.Domain
+		}
+	case TaskSetDocumentRoot:
+		if p, ok := task.Payload.(*SetDocumentRootPayload); ok && p.Site != nil {
 			target = p.Site.Domain
 		}
 	case TaskRenewSSL:

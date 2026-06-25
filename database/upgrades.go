@@ -201,6 +201,30 @@ var upgrades = []Upgrade{
 		Description: "新增站点级 SSL 证书导出开关",
 		Func:        ensureSSLExportEnabledColumn,
 	},
+	{
+		Version:     "1.0.17",
+		Description: "新增 PHP 站点 Web 入口目录配置",
+		Func:        ensureDocumentRootSubdirColumn,
+	},
+}
+
+func ensureDocumentRootSubdirColumn() error {
+	var tableExists int
+	if err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'websites'`).Scan(&tableExists); err != nil {
+		return err
+	}
+	if tableExists == 0 {
+		return nil
+	}
+	var exists int
+	if err := DB.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = 'document_root_subdir'`).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 1 {
+		return nil
+	}
+	_, err := DB.Exec(`ALTER TABLE websites ADD COLUMN document_root_subdir TEXT NOT NULL DEFAULT ''`)
+	return err
 }
 
 func ensureSSLLastErrorColumn() error {

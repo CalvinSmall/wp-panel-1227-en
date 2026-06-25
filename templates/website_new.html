@@ -33,6 +33,14 @@
                 </div>
                 <p class="text-xs text-gray-500 mt-1" x-show="siteType === 'php'">通用 PHP 网站请自行设置并记录密码，遗忘后需通过详情页修改密码获取新密码。</p>
             </div>
+            <div class="mb-4" x-show="siteType === 'php'">
+                <label class="label">Web 入口目录</label>
+                <select x-model="documentRootSubdir" class="input-field">
+                    <option value="">项目根</option>
+                    <option value="public">public（Laravel / Symfony 等框架）</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Laravel 等入口在 public/index.php 的程序请选择 public；普通 PHP 程序选择项目根。</p>
+            </div>
             <div class="mb-4">
                 <label class="label">网站到期时间（可选）</label>
                 <input type="date" x-model="expiresAt" class="input-field">
@@ -107,6 +115,7 @@ function createWebsite() {
         sslEnabled: false,
         expiresAt: '',
         siteType: 'wordpress',
+        documentRootSubdir: '',
         cleanDefaults: true,
         removeUnusedThemes: true,
         extensions: [],
@@ -170,6 +179,9 @@ function createWebsite() {
                     expires_at: this.expiresAt || null,
                     site_type: this.siteType
                 };
+                if (this.siteType === 'php') {
+                    body.document_root_subdir = this.documentRootSubdir;
+                }
                 if (this.siteType === 'wordpress') {
                     body.clean_defaults = this.cleanDefaults;
                     body.remove_unused_themes = this.removeUnusedThemes;

@@ -53,6 +53,17 @@
                 </div>
                 <div><dt class="text-sm text-gray-400">系统用户</dt><dd class="text-white font-mono" x-text="site.system_user"></dd></div>
                 <div><dt class="text-sm text-gray-400">网站根目录</dt><dd class="text-white font-mono text-sm" x-text="site.web_root"></dd></div>
+                <div x-show="site.site_type === 'php'">
+                    <dt class="text-sm text-gray-400">Web 入口目录</dt>
+                    <dd class="flex items-center space-x-2 mt-1">
+                        <select x-model="documentRootSubdir" class="input-field text-sm py-1 w-56">
+                            <option value="">项目根</option>
+                            <option value="public">public（Laravel / Symfony 等框架）</option>
+                        </select>
+                        <button @click="saveDocumentRoot()" :disabled="documentRootSaving" class="btn-primary text-xs py-1 px-2" x-text="documentRootSaving ? '保存中...' : '保存'"></button>
+                    </dd>
+                    <p class="text-xs text-gray-500 mt-1">网站根目录仍用于文件管理和备份；这里只改变 Nginx 对外访问的 root。</p>
+                </div>
                 <div><dt class="text-sm text-gray-400">日志目录</dt><dd class="text-white font-mono text-sm" x-text="site.log_dir"></dd></div>
                 <div>
                     <dt class="text-sm text-gray-400">到期时间</dt>
@@ -540,6 +551,8 @@ function websiteDetail() {
         monitoringEnabled: false,
         monitoringInterval: 5,
         monitoringSaving: false,
+        documentRootSubdir: '',
+        documentRootSaving: false,
         cdnGroups: [],
         cdnRealIPEnabled: false,
         cdnRealIPGroupIDs: [],
@@ -582,6 +595,7 @@ function websiteDetail() {
                     this.logRetentionDays = r.data.log_retention_days || 7;
                     this.monitoringEnabled = r.data.monitoring_enabled || false;
                     this.monitoringInterval = r.data.monitoring_interval || 5;
+                    this.documentRootSubdir = r.data.document_root_subdir || '';
                     this.cdnRealIPEnabled = r.data.cdn_realip_enabled || false;
                     this.cdnRealIPGroupIDs = (r.data.cdn_realip_groups || []).map(g => g.id);
                     this.editTablePrefix = r.data.table_prefix || '';
@@ -840,6 +854,23 @@ function websiteDetail() {
                     this.accessLogMode = r.data.access_log_mode || 'off';
                 }
             } catch(e) { /* 静默失败 */ }
+        },
+        async saveDocumentRoot() {
+            if (!this.site || this.site.site_type !== 'php') return;
+            this.documentRootSaving = true;
+            try {
+                const r = await api('/websites/' + this.site.id + '/document-root', {
+                    method: 'PUT',
+                    body: { document_root_subdir: this.documentRootSubdir }
+                });
+                if (r.success) {
+                    showToast(r.data?.message || 'Web 入口目录已保存', 'success');
+                    await this.fetchDetail();
+                } else {
+                    showToast(r.data?.message || '保存失败', 'error');
+                }
+            } catch(e) { showToast('操作失败: ' + e.message, 'error'); }
+            this.documentRootSaving = false;
         },
         async saveNginxCustom() {
             this.nginxSubmitting = true;

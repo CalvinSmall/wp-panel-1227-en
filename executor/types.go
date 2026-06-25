@@ -23,6 +23,7 @@ const (
 	TaskSaveNginxCustom  TaskType = "save_nginx_custom"
 	TaskSetAccessLogMode TaskType = "set_access_log_mode"
 	TaskSetCDNRealIP     TaskType = "set_cdn_realip"
+	TaskSetDocumentRoot  TaskType = "set_document_root"
 	TaskRenewSSL         TaskType = "renew_ssl"
 	TaskRenderCron       TaskType = "render_cron"
 	TaskRunCron          TaskType = "run_cron"
@@ -64,6 +65,7 @@ type CreateSitePayload struct {
 	DBPassword         string
 	ExpiresAt          string
 	SiteType           string
+	DocumentRootSubdir string
 	CleanDefaults      bool     `json:"clean_defaults"`
 	RemoveUnusedThemes bool     `json:"remove_unused_themes"`
 	InstallThemes      []string `json:"install_themes"`
@@ -119,6 +121,11 @@ type SetCDNRealIPPayload struct {
 	Site     *models.Website `json:"-"`
 	Enabled  bool            `json:"enabled"`
 	GroupIDs []int           `json:"group_ids"`
+}
+
+type SetDocumentRootPayload struct {
+	Site               *models.Website `json:"-"`
+	DocumentRootSubdir string          `json:"document_root_subdir"`
 }
 
 type RunCronPayload struct {

@@ -38,7 +38,7 @@ func TestFreshInstallRunsMigrationsAndRecordsLatestVersion(t *testing.T) {
 		t.Fatalf("version = %q, want %q", version, LatestVersion())
 	}
 
-	for _, col := range []string{"php_pool_path", "nginx_conf_path", "wp_memory_limit", "cdn_realip_enabled", "ssl_last_error", "ssl_export_enabled"} {
+	for _, col := range []string{"php_pool_path", "nginx_conf_path", "wp_memory_limit", "cdn_realip_enabled", "ssl_last_error", "ssl_export_enabled", "document_root_subdir"} {
 		var exists int
 		if err := DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = ?", col).Scan(&exists); err != nil {
 			t.Fatalf("query websites column %s: %v", col, err)
@@ -73,6 +73,46 @@ func TestFreshInstallRunsMigrationsAndRecordsLatestVersion(t *testing.T) {
 		if got != setting.want {
 			t.Fatalf("%s = %q, want %q", setting.key, got, setting.want)
 		}
+	}
+}
+
+func TestUpgradeAddsDocumentRootSubdirColumnToExistingSchema(t *testing.T) {
+	openTempDB(t)
+
+	if err := RunMigrations(); err != nil {
+		t.Fatalf("RunMigrations() error = %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("initial RunUpgrades() error = %v", err)
+	}
+	if _, err := DB.Exec("DELETE FROM schema_version"); err != nil {
+		t.Fatalf("delete schema_version: %v", err)
+	}
+	if _, err := DB.Exec("INSERT INTO schema_version (version) VALUES ('1.0.16')"); err != nil {
+		t.Fatalf("seed schema_version: %v", err)
+	}
+
+	if _, err := DB.Exec("ALTER TABLE websites DROP COLUMN document_root_subdir"); err != nil {
+		t.Fatalf("drop document_root_subdir: %v", err)
+	}
+
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("RunUpgrades() error = %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("second RunUpgrades() error = %v", err)
+	}
+
+	var exists int
+	var defaultValue string
+	if err := DB.QueryRow("SELECT COUNT(*), COALESCE(MAX(dflt_value), '') FROM pragma_table_info('websites') WHERE name = 'document_root_subdir'").Scan(&exists, &defaultValue); err != nil {
+		t.Fatalf("query document_root_subdir: %v", err)
+	}
+	if exists != 1 {
+		t.Fatalf("document_root_subdir exists = %d, want 1", exists)
+	}
+	if defaultValue != "''" {
+		t.Fatalf("document_root_subdir default = %q, want %q", defaultValue, "''")
 	}
 }
 

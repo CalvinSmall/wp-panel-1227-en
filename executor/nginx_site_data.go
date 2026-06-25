@@ -28,7 +28,7 @@ func nginxDataFromSiteChecked(site *models.Website) (*NginxSiteData, error) {
 		Domain:        site.Domain,
 		Aliases:       aliases,
 		ServerNames:   buildServerNames(site.Domain, aliases),
-		WebRoot:       site.WebRoot,
+		WebRoot:       EffectiveDocumentRoot(site.WebRoot, site.SiteType, site.DocumentRootSubdir),
 		LogDir:        site.LogDir,
 		SystemUser:    site.SystemUser,
 		UseSSL:        site.SSLEnabled,
