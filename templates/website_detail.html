@@ -331,7 +331,115 @@ location ^~ /api/ {
         </div>
     </div>
 
-    <!-- Row 3: 网站日志 -->
+    <!-- Row 3: AI 诊断 -->
+    <div class="mt-6">
+        <div class="card">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-white">AI 诊断</h3>
+                    <p class="text-xs text-gray-500 mt-1">只读取该网站日志和配置摘要，不会自动修改文件、数据库或服务器配置。</p>
+                </div>
+                <button @click="fetchAISessions()" class="btn-secondary text-sm">刷新记录</button>
+            </div>
+            <div class="p-3 rounded text-xs text-yellow-200 mb-4" style="background-color: #422006; border: 1px solid #854d0e;">
+                诊断上下文会发送给面板设置中配置的 AI 服务商，可能包含域名、日志摘要、配置摘要和最近操作；不会发送数据库密码、AI Key、SSL 私钥或面板密码。
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div>
+                    <label class="label">诊断类型</label>
+                    <select x-model="aiSymptom" class="input-field text-sm">
+                        <template x-for="item in aiSymptoms" :key="item.value">
+                            <option :value="item.value" x-text="item.label"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="md:col-span-2 flex items-end gap-3">
+                    <button @click="runAIDiagnosis()" :disabled="aiDiagnosing" class="btn-primary text-sm" x-text="aiDiagnosing ? '诊断中...' : '开始诊断'"></button>
+                    <span x-show="aiDiagnosing" class="text-xs text-gray-400">正在收集日志并请求 AI 服务，可能需要 20-60 秒。</span>
+                </div>
+            </div>
+            <p x-show="aiError" class="text-sm text-red-400 mb-4" x-text="aiError"></p>
+
+            <div x-show="aiReport || aiRawText" class="mb-5 p-4 rounded" style="background-color: #0f172a; border: 1px solid #334155;">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                        <p class="text-sm font-semibold text-white" x-text="aiReport?.summary || 'AI 诊断报告'"></p>
+                        <p class="text-xs text-gray-400 mt-1" x-show="aiReport?.user_friendly_explanation" x-text="aiReport?.user_friendly_explanation"></p>
+                    </div>
+                    <span x-show="aiReport?.risk_level" class="text-xs px-2 py-1 rounded" :class="aiRiskClass(aiReport?.risk_level)" x-text="aiRiskText(aiReport?.risk_level)"></span>
+                </div>
+                <div x-show="aiReport?.likely_causes?.length" class="mb-4">
+                    <p class="text-xs text-gray-400 mb-2">可能原因</p>
+                    <template x-for="cause in aiReport.likely_causes" :key="cause.title">
+                        <div class="mb-3 p-3 rounded" style="background-color: #020617; border: 1px solid #1e293b;">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm text-white" x-text="cause.title"></span>
+                                <span class="text-xs text-gray-500" x-text="'置信度：' + aiConfidenceText(cause.confidence)"></span>
+                            </div>
+                            <ul class="text-xs text-gray-400 space-y-1 list-disc list-inside">
+                                <template x-for="ev in (cause.evidence || [])" :key="ev">
+                                    <li x-text="ev"></li>
+                                </template>
+                            </ul>
+                        </div>
+                    </template>
+                </div>
+                <div x-show="aiReport?.recommended_actions?.length">
+                    <p class="text-xs text-gray-400 mb-2">建议操作</p>
+                    <template x-for="action in aiReport.recommended_actions" :key="action.label">
+                        <div class="mb-3 p-3 rounded" style="background-color: #020617; border: 1px solid #1e293b;">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm text-white" x-text="action.label"></span>
+                                <span class="text-xs px-2 py-0.5 rounded" :class="aiRiskClass(action.risk)" x-text="aiRiskText(action.risk)"></span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2" x-text="action.description"></p>
+                            <ul class="text-xs text-gray-500 space-y-1 list-disc list-inside" x-show="action.manual_steps?.length">
+                                <template x-for="step in action.manual_steps" :key="step">
+                                    <li x-text="step"></li>
+                                </template>
+                            </ul>
+                            <p x-show="action.panel_action_hint" class="text-xs text-blue-300 mt-2" x-text="action.panel_action_hint"></p>
+                        </div>
+                    </template>
+                </div>
+                <p x-show="aiReport?.needs_more_info" class="text-xs text-yellow-400 mt-2">AI 认为当前信息不足，请根据上方建议补充信息后重新诊断。</p>
+                <pre x-show="!aiReport && aiRawText" x-text="aiRawText" class="text-xs text-gray-300 whitespace-pre-wrap overflow-auto max-h-80"></pre>
+            </div>
+
+            <details>
+                <summary class="cursor-pointer text-blue-400 hover:text-blue-300 text-xs" x-text="`历史诊断（${aiSessions.length} 条）`"></summary>
+                <div class="mt-2 overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="border-b border-gray-700 text-gray-400">
+                            <tr>
+                                <th class="py-2 text-left">时间</th>
+                                <th class="py-2 text-left">类型</th>
+                                <th class="py-2 text-left">状态</th>
+                                <th class="py-2 text-left">摘要</th>
+                                <th class="py-2 text-left">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="s in aiSessions" :key="s.id">
+                                <tr class="border-b border-gray-700/50">
+                                    <td class="py-2 text-xs whitespace-nowrap" x-text="fmtTime(s.created_at)"></td>
+                                    <td class="py-2 text-xs whitespace-nowrap" x-text="aiSymptomLabel(s.symptom)"></td>
+                                    <td class="py-2 text-xs whitespace-nowrap" x-text="aiStatusText(s.status)"></td>
+                                    <td class="py-2 text-xs text-gray-400" x-text="s.error_message || s.summary_excerpt || '--'"></td>
+                                    <td class="py-2"><button @click="loadAISession(s.id)" class="btn-secondary text-xs py-1 px-2">查看</button></td>
+                                </tr>
+                            </template>
+                            <tr x-show="aiSessions.length === 0">
+                                <td colspan="5" class="py-4 text-center text-gray-500">暂无 AI 诊断记录</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <!-- Row 4: 网站日志 -->
     <div class="mt-6">
         <div class="card">
             <h3 class="text-lg font-semibold text-white mb-4">网站日志</h3>
@@ -573,6 +681,20 @@ function websiteDetail() {
         newSiteURL: '',
         newHomeURL: '',
         siteURLSubmitting: false,
+        aiSymptom: 'site_500',
+        aiSymptoms: [
+            { value: 'site_500', label: '网站 500 / 白屏' },
+            { value: 'wp_admin_down', label: '后台打不开' },
+            { value: 'ssl_failure', label: 'SSL 失败' },
+            { value: 'db_connection', label: '数据库连接问题' },
+            { value: 'cache_issue', label: '缓存异常' },
+            { value: 'performance', label: '网站速度慢' }
+        ],
+        aiDiagnosing: false,
+        aiReport: null,
+        aiRawText: '',
+        aiError: '',
+        aiSessions: [],
         init() {
             this.restorePollingActive = true;
             window.addEventListener('beforeunload', () => { this.restorePollingActive = false; });
@@ -609,6 +731,7 @@ function websiteDetail() {
             this.fetchBackups();
             this.fetchBackupSettings();
             this.fetchCDNGroups();
+            this.fetchAISessions();
         },
         async fetchCDNGroups() {
             try {
@@ -1011,6 +1134,77 @@ function websiteDetail() {
                 const r = await api('/websites/' + this.site.id + '/install-plugin/status');
                 if (r.success) this.pluginStatus = r.data.status;
             } catch(e) {}
+        },
+        aiSymptomLabel(value) {
+            const found = this.aiSymptoms.find(item => item.value === value);
+            return found ? found.label : value;
+        },
+        aiStatusText(status) {
+            const map = { pending: '等待中', running: '诊断中', completed: '已完成', failed: '失败' };
+            return map[status] || status;
+        },
+        aiRiskText(risk) {
+            const map = { low: '低风险', medium: '中风险', high: '高风险' };
+            return map[risk] || (risk || '');
+        },
+        aiRiskClass(risk) {
+            if (risk === 'high') return 'bg-red-900/60 text-red-200';
+            if (risk === 'medium') return 'bg-yellow-900/60 text-yellow-200';
+            return 'bg-green-900/60 text-green-200';
+        },
+        aiConfidenceText(confidence) {
+            const map = { low: '低', medium: '中', high: '高' };
+            return map[confidence] || (confidence || '未知');
+        },
+        async fetchAISessions() {
+            if (!this.site) return;
+            try {
+                const r = await api('/websites/' + this.site.id + '/ai/sessions', { silent: true });
+                if (r.success) this.aiSessions = r.data || [];
+            } catch(e) {}
+        },
+        async runAIDiagnosis() {
+            if (!this.site) return;
+            this.aiDiagnosing = true;
+            this.aiError = '';
+            this.aiReport = null;
+            this.aiRawText = '';
+            try {
+                const r = await api('/websites/' + this.site.id + '/ai/diagnose', {
+                    method: 'POST',
+                    body: { symptom: this.aiSymptom },
+                    timeout: 90000
+                });
+                const d = r.data || {};
+                if (d.status === 'failed') {
+                    this.aiError = d.error_message || 'AI 诊断失败';
+                    showToast(this.aiError, 'error');
+                } else if (d.status === 'running') {
+                    this.aiError = d.message || '该网站已有 AI 诊断正在进行';
+                    showToast(this.aiError, 'info');
+                } else {
+                    this.aiReport = d.report || null;
+                    this.aiRawText = d.raw_text || '';
+                    showToast('AI 诊断完成', 'success');
+                }
+                await this.fetchAISessions();
+            } catch(e) {
+                this.aiError = e.message;
+                showToast(e.message, 'error');
+            }
+            this.aiDiagnosing = false;
+        },
+        async loadAISession(sessionID) {
+            if (!this.site || !sessionID) return;
+            try {
+                const r = await api('/websites/' + this.site.id + '/ai/sessions/' + sessionID);
+                if (r.success) {
+                    this.aiReport = r.data.report || null;
+                    this.aiRawText = r.data.raw_text || '';
+                    this.aiError = r.data.error_message || '';
+                    if (this.aiError) showToast(this.aiError, 'error');
+                }
+            } catch(e) { showToast(e.message, 'error'); }
         },
         async installPlugin() {
             this.pluginInstalling = true;

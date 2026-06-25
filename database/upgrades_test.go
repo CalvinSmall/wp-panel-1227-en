@@ -55,6 +55,22 @@ func TestFreshInstallRunsMigrationsAndRecordsLatestVersion(t *testing.T) {
 	if groupCount < 2 {
 		t.Fatalf("builtin cdn realip groups = %d, want at least 2", groupCount)
 	}
+	var aiModel string
+	if err := DB.QueryRow("SELECT model FROM ai_settings WHERE id = 1").Scan(&aiModel); err != nil {
+		t.Fatalf("query ai_settings: %v", err)
+	}
+	if aiModel != "deepseek-v4-pro" {
+		t.Fatalf("ai default model = %q, want deepseek-v4-pro", aiModel)
+	}
+	for _, table := range []string{"ai_settings", "ai_sessions"} {
+		var exists int
+		if err := DB.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?", table).Scan(&exists); err != nil {
+			t.Fatalf("query %s table: %v", table, err)
+		}
+		if exists != 1 {
+			t.Fatalf("%s exists = %d, want 1", table, exists)
+		}
+	}
 	for _, setting := range []struct {
 		key  string
 		want string

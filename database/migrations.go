@@ -377,4 +377,42 @@ var migrations = []string{
 			updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 	`INSERT OR IGNORE INTO remote_backup_settings (id) VALUES (1)`,
+
+	// ============================================================
+	// ai_settings
+	// ============================================================
+	`CREATE TABLE IF NOT EXISTS ai_settings (
+		id              INTEGER PRIMARY KEY,
+		enabled         INTEGER NOT NULL DEFAULT 0,
+		provider        TEXT    NOT NULL DEFAULT 'deepseek',
+		base_url        TEXT    NOT NULL DEFAULT 'https://api.deepseek.com',
+		model           TEXT    NOT NULL DEFAULT 'deepseek-v4-pro',
+		api_key         TEXT    NOT NULL DEFAULT '',
+		timeout_seconds INTEGER NOT NULL DEFAULT 60,
+		created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`INSERT OR IGNORE INTO ai_settings (id) VALUES (1)`,
+
+	// ============================================================
+	// ai_sessions
+	// ============================================================
+	`CREATE TABLE IF NOT EXISTS ai_sessions (
+		id             INTEGER PRIMARY KEY AUTOINCREMENT,
+		site_id        INTEGER NOT NULL,
+		symptom        TEXT    NOT NULL DEFAULT '',
+		status         TEXT    NOT NULL DEFAULT 'pending',
+		risk_level     TEXT    NOT NULL DEFAULT '',
+		summary        TEXT    NOT NULL DEFAULT '',
+		report_json    TEXT    NOT NULL DEFAULT '',
+		raw_text       TEXT    NOT NULL DEFAULT '',
+		prompt_chars   INTEGER NOT NULL DEFAULT 0,
+		response_chars INTEGER NOT NULL DEFAULT 0,
+		error_message  TEXT    NOT NULL DEFAULT '',
+		created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (site_id) REFERENCES websites(id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_ai_sessions_site ON ai_sessions(site_id, created_at)`,
+	`CREATE INDEX IF NOT EXISTS idx_ai_sessions_status ON ai_sessions(site_id, status)`,
 }

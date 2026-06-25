@@ -240,6 +240,7 @@ func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version
 	protected.POST("/api/files/fix-permissions", fileHandler.FixPermissions)
 
 	settingsHandler := &handlers.SettingsHandler{}
+	aiHandler := &handlers.AIHandler{}
 	protected.GET("/api/settings", settingsHandler.GetSettings)
 	protected.PUT("/api/settings", settingsHandler.UpdateSettings)
 	protected.GET("/api/settings/logs", settingsHandler.GetOperationLogs)
@@ -256,6 +257,12 @@ func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version
 	protected.DELETE("/api/settings/db-backup", settingsHandler.DeleteDBBackup)
 	protected.GET("/api/settings/db-backup/:filename/download", settingsHandler.DownloadDBBackup)
 	protected.GET("/api/proxy/test", settingsHandler.TestProxy)
+	protected.GET("/api/ai/settings", aiHandler.GetSettings)
+	protected.PUT("/api/ai/settings", aiHandler.SaveSettings)
+	protected.POST("/api/ai/test", aiHandler.Test)
+	protected.POST("/api/websites/:id/ai/diagnose", aiHandler.Diagnose)
+	protected.GET("/api/websites/:id/ai/sessions", aiHandler.ListSessions)
+	protected.GET("/api/websites/:id/ai/sessions/:session_id", aiHandler.GetSession)
 
 	extensionHandler := &handlers.ExtensionHandler{}
 	protected.GET("/api/extensions", extensionHandler.List)
