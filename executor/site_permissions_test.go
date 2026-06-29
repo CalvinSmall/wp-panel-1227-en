@@ -173,3 +173,41 @@ func TestWPFileLockRuntimeWritablePathPolicy(t *testing.T) {
 		t.Fatal("upgrade-temp-backup directory should stay locked")
 	}
 }
+
+func TestApplyWPFileModsLockBlockFallbackForNonstandardWPConfig(t *testing.T) {
+	content := "<?php\n" +
+		"define('DB_NAME', 'wordpress');\n" +
+		"define('DB_USER', 'admin');\n"
+	locked, err := applyWPFileModsLockBlock(content, true)
+	if err != nil {
+		t.Fatalf("apply lock: %v", err)
+	}
+	if !strings.Contains(locked, wpPanelFileLockBegin) {
+		t.Fatal("managed lock block should be injected for nonstandard wp-config")
+	}
+	if !strings.Contains(locked, "define('DISALLOW_FILE_MODS', true);") {
+		t.Fatalf("managed lock constant should be present: %s", locked)
+	}
+	if !strings.Contains(locked, "<?php") {
+		t.Fatal("original PHP open tag should remain")
+	}
+
+	unlocked, err := applyWPFileModsLockBlock(locked, false)
+	if err != nil {
+		t.Fatalf("remove lock: %v", err)
+	}
+	if strings.Contains(unlocked, wpPanelFileLockBegin) || strings.Contains(unlocked, "DISALLOW_FILE_MODS") {
+		t.Fatalf("managed lock block should be removed: %s", unlocked)
+	}
+
+	configWithClose := "<?php\n" +
+		"define('DB_NAME', 'wordpress');\n" +
+		"?>\n"
+	got := insertBeforeMarker(configWithClose, wpPanelFileLockBegin+"\n"+"define('DISALLOW_FILE_MODS', true);\n"+wpPanelFileLockEnd+"\n")
+	if !strings.Contains(got, wpPanelFileLockBegin) {
+		t.Fatal("should inject before closing PHP tag when marker is missing")
+	}
+	if idxTag := strings.Index(got, wpPanelFileLockBegin); idxTag >= strings.Index(got, "?>") {
+		t.Fatal("managed block should be before ?> when inserted by fallback")
+	}
+}

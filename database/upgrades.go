@@ -332,6 +332,11 @@ var upgrades = []Upgrade{
 			`CREATE INDEX IF NOT EXISTS idx_file_security_events_site ON file_security_events(site_id, resolved_at, last_seen)`,
 		},
 	},
+	{
+		Version:     "1.0.23",
+		Description: "补充 WordPress 文件锁定开启时间字段",
+		Func:        ensureFileLockEnabledAtColumn,
+	},
 }
 
 func ensureFileLockEnabledColumn() error {
@@ -350,6 +355,34 @@ func ensureFileLockEnabledColumn() error {
 		return nil
 	}
 	_, err := DB.Exec(`ALTER TABLE websites ADD COLUMN file_lock_enabled INTEGER NOT NULL DEFAULT 0`)
+	return err
+}
+
+func ensureFileLockEnabledAtColumn() error {
+	var tableExists int
+	if err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'websites'`).Scan(&tableExists); err != nil {
+		return err
+	}
+	if tableExists == 0 {
+		return nil
+	}
+	var exists int
+	if err := DB.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = 'file_lock_enabled_at'`).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 1 {
+		return nil
+	}
+	_, err := DB.Exec(`ALTER TABLE websites ADD COLUMN file_lock_enabled_at TEXT NOT NULL DEFAULT ''`)
+	if err != nil {
+		return err
+	}
+	_, err = DB.Exec(`
+		UPDATE websites
+		SET file_lock_enabled_at = CURRENT_TIMESTAMP
+		WHERE file_lock_enabled = 1
+			AND COALESCE(file_lock_enabled_at, '') = ''
+	`)
 	return err
 }
 

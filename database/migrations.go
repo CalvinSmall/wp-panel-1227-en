@@ -51,6 +51,7 @@ var migrations = []string{
 		wp_post_revisions     INTEGER NOT NULL DEFAULT -1,
 		wp_memory_limit       TEXT    NOT NULL DEFAULT '',
 		file_lock_enabled     INTEGER NOT NULL DEFAULT 0,
+		file_lock_enabled_at  TEXT    NOT NULL DEFAULT '',
 		log_retention_days    INTEGER NOT NULL DEFAULT 7,
 		cdn_realip_enabled    INTEGER NOT NULL DEFAULT 0,
 		expires_at            DATETIME,

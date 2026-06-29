@@ -12,11 +12,11 @@ import (
 var validMemoryLimit = regexp.MustCompile(`^\d+[KMG]?$`)
 
 type WPOptimizations struct {
-	DisableUpdates    bool
+	DisableUpdates     bool
 	DisableFileEditing bool
-	WPDebug           bool
-	WPPostRevisions   int    // -1 = 不设置, >=0 = define 的值
-	WPMemoryLimit     string // 空 = 不设置, 如 "128M"
+	WPDebug            bool
+	WPPostRevisions    int    // -1 = 不设置, >=0 = define 的值
+	WPMemoryLimit      string // 空 = 不设置, 如 "128M"
 }
 
 func ApplyWPOptimizations(webRoot string, opts WPOptimizations) error {
@@ -111,9 +111,28 @@ func insertBeforeMarker(content, insertion string) string {
 		marker = "require_once ABSPATH . 'wp-settings.php';"
 		idx = strings.Index(content, marker)
 	}
-	if idx > 0 {
+	if idx >= 0 {
 		return content[:idx] + insertion + content[idx:]
 	}
-	// fallback: 追加到文件末尾 require_once 之前是最后手段，这里直接返回原内容
-	return content
+
+	idx = strings.LastIndex(content, "?>")
+	if idx > 0 {
+		if idx > 0 && content[idx-1] != '\n' {
+			insertion = "\n" + insertion
+		}
+		return content[:idx] + insertion + content[idx:]
+	}
+
+	phpOpen := "<?php"
+	idx = strings.Index(content, phpOpen)
+	if idx >= 0 {
+		lineBreak := strings.IndexAny(content[idx+len(phpOpen):], "\r\n")
+		if lineBreak >= 0 {
+			insertPos := idx + len(phpOpen) + lineBreak + 1
+			return content[:insertPos] + insertion + content[insertPos:]
+		}
+		return content[:idx+len(phpOpen)] + "\n" + insertion + "\n" + content[idx+len(phpOpen):]
+	}
+
+	return content + "\n" + insertion
 }

@@ -185,7 +185,10 @@
                 <p class="text-xs text-gray-500 mt-1">记录运行数据目录 PHP 执行尝试和扫描发现的可疑 PHP 文件，仅展示和告警，不自动封禁、不删除文件。</p>
                 <p class="text-xs text-gray-500 mt-1" x-show="fileSecuritySummary" x-text="`本次刷新：扫描 ${fileSecuritySummary.sites_scanned || 0} 个站点，发现 ${fileSecuritySummary.file_events || 0} 个文件事件，导入 ${fileSecuritySummary.access_events || 0} 次访问事件。`"></p>
             </div>
-            <button @click="refreshFileSecurityEvents()" :disabled="fileSecurityLoading" class="btn-secondary text-xs py-1.5 px-3" x-text="fileSecurityLoading ? '刷新中...' : '刷新事件'"></button>
+                <div class="flex items-center space-x-2">
+                    <button @click="refreshFileSecurityEvents(false)" :disabled="fileSecurityLoading" class="btn-secondary text-xs py-1.5 px-3" x-text="fileSecurityLoading ? '刷新中...' : '增量刷新'"></button>
+                    <button @click="refreshFileSecurityEvents(true)" :disabled="fileSecurityLoading" class="btn-danger text-xs py-1.5 px-3" x-text="fileSecurityLoading ? '扫描中...' : '清除并重新扫描'"></button>
+                </div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full">
@@ -373,10 +376,12 @@ function firewallManager() {
             } catch(e) { showToast('读取 WordPress 可疑访问分析失败: ' + e.message, 'error'); }
             finally { this.securityReportLoading = false; }
         },
-        async refreshFileSecurityEvents() {
+        async refreshFileSecurityEvents(clearFirst = false) {
+            if (clearFirst && !(await confirmModal('确认清空历史事件并重新扫描？'))) return;
             this.fileSecurityLoading = true;
             try {
-                const r = await api('/firewall/file-security-events/refresh', { method: 'POST' });
+                const url = '/firewall/file-security-events/refresh' + (clearFirst ? '?clear=1' : '');
+                const r = await api(url, { method: 'POST' });
                 if (r.success) {
                     this.fileSecurityEvents = r.data?.events || [];
                     this.fileSecuritySummary = r.data?.summary || null;

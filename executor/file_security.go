@@ -27,10 +27,11 @@ var (
 )
 
 type fileSecuritySite struct {
-	ID      int
-	Domain  string
-	WebRoot string
-	LogDir  string
+	ID            int
+	Domain        string
+	WebRoot       string
+	LogDir        string
+	LockEnabledAt time.Time
 }
 
 type fileSecurityRecord struct {
@@ -121,8 +122,23 @@ func ListFileSecurityEvents(limit int) ([]models.FileSecurityEvent, error) {
 	return events, rows.Err()
 }
 
+func ClearFileSecurityEvents() error {
+	db := database.GetDB()
+	if db == nil {
+		return fmt.Errorf("database is nil")
+	}
+	_, err := db.Exec(`DELETE FROM file_security_events`)
+	return err
+}
+
 func listFileSecuritySites(db *sql.DB) ([]fileSecuritySite, error) {
-	rows, err := db.Query(`SELECT id, domain, web_root, log_dir FROM websites WHERE site_type = 'wordpress' ORDER BY domain`)
+	rows, err := db.Query(`
+		SELECT id, domain, web_root, log_dir, file_lock_enabled_at
+		FROM websites
+		WHERE site_type = 'wordpress'
+			AND file_lock_enabled = 1
+			AND COALESCE(file_lock_enabled_at, '') <> ''
+		ORDER BY domain`)
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +147,13 @@ func listFileSecuritySites(db *sql.DB) ([]fileSecuritySite, error) {
 	sites := []fileSecuritySite{}
 	for rows.Next() {
 		var site fileSecuritySite
-		if err := rows.Scan(&site.ID, &site.Domain, &site.WebRoot, &site.LogDir); err != nil {
+		var lockEnabledAt string
+		if err := rows.Scan(&site.ID, &site.Domain, &site.WebRoot, &site.LogDir, &lockEnabledAt); err != nil {
 			return nil, err
+		}
+		site.LockEnabledAt = parseFileLockEnabledTime(lockEnabledAt)
+		if site.LockEnabledAt.IsZero() {
+			continue
 		}
 		sites = append(sites, site)
 	}
@@ -169,8 +190,14 @@ func scanSiteSuspiciousRuntimeFiles(db *sql.DB, site fileSecuritySite) (int, err
 			if err != nil {
 				return nil
 			}
+			if info.ModTime().Before(site.LockEnabledAt) {
+				return nil
+			}
 			relPath := siteRelativeSlashPath(webRoot, path)
 			if relPath == "" {
+				return nil
+			}
+			if isLanguageL10nRuntimePHP(relPath) {
 				return nil
 			}
 			seen[relPath] = true
@@ -215,11 +242,18 @@ func importSiteRuntimePHPAccessEvents(db *sql.DB, site fileSecuritySite) (int, e
 		if requestPath == "" {
 			continue
 		}
-		status, _ := strconv.Atoi(m[5])
-		seenAt := formatEventTime(parseNginxAccessTime(m[2]))
-		if seenAt == "" {
-			seenAt = formatEventTime(time.Now())
+		if isLanguageL10nRuntimePHP(requestPath) {
+			continue
 		}
+		status, _ := strconv.Atoi(m[5])
+		accessTime := parseNginxAccessTime(m[2])
+		if accessTime.IsZero() {
+			continue
+		}
+		if accessTime.Before(site.LockEnabledAt) {
+			continue
+		}
+		seenAt := formatEventTime(accessTime)
 		key := strings.Join([]string{m[1], m[3], requestPath}, "\x00")
 		record := aggregates[key]
 		if record.EventCount == 0 {
@@ -257,6 +291,33 @@ func importSiteRuntimePHPAccessEvents(db *sql.DB, site fileSecuritySite) (int, e
 		count += record.EventCount
 	}
 	return count, nil
+}
+
+func isLanguageL10nRuntimePHP(path string) bool {
+	normalized := strings.ToLower(filepath.ToSlash(path))
+	if !strings.HasPrefix(normalized, "/wp-content/languages/") {
+		return false
+	}
+	return strings.HasSuffix(normalized, ".l10n.php")
+}
+
+func parseFileLockEnabledTime(raw string) time.Time {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}
+	}
+	layouts := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04:05Z07:00",
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+	}
+	for _, layout := range layouts {
+		if t, err := time.ParseInLocation(layout, raw, time.Local); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
 }
 
 func upsertFileSecurityEvent(db *sql.DB, event fileSecurityRecord) error {

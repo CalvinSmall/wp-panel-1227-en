@@ -38,7 +38,7 @@ func TestFreshInstallRunsMigrationsAndRecordsLatestVersion(t *testing.T) {
 		t.Fatalf("version = %q, want %q", version, LatestVersion())
 	}
 
-	for _, col := range []string{"php_pool_path", "nginx_conf_path", "wp_memory_limit", "file_lock_enabled", "cdn_realip_enabled", "ssl_last_error", "ssl_export_enabled", "document_root_subdir"} {
+	for _, col := range []string{"php_pool_path", "nginx_conf_path", "wp_memory_limit", "file_lock_enabled", "file_lock_enabled_at", "cdn_realip_enabled", "ssl_last_error", "ssl_export_enabled", "document_root_subdir"} {
 		var exists int
 		if err := DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = ?", col).Scan(&exists); err != nil {
 			t.Fatalf("query websites column %s: %v", col, err)
@@ -165,6 +165,9 @@ func TestUpgradeAddsFileLockEnabledColumnToExistingSchema(t *testing.T) {
 	if _, err := DB.Exec("ALTER TABLE websites DROP COLUMN file_lock_enabled"); err != nil {
 		t.Fatalf("drop file_lock_enabled: %v", err)
 	}
+	if _, err := DB.Exec("ALTER TABLE websites DROP COLUMN file_lock_enabled_at"); err != nil {
+		t.Fatalf("drop file_lock_enabled_at: %v", err)
+	}
 
 	if err := RunUpgrades(); err != nil {
 		t.Fatalf("RunUpgrades() error = %v", err)
@@ -179,6 +182,59 @@ func TestUpgradeAddsFileLockEnabledColumnToExistingSchema(t *testing.T) {
 	}
 	if exists != 1 {
 		t.Fatalf("file_lock_enabled exists = %d, want 1", exists)
+	}
+	if err := DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = 'file_lock_enabled_at'").Scan(&exists); err != nil {
+		t.Fatalf("query file_lock_enabled_at: %v", err)
+	}
+	if exists != 1 {
+		t.Fatalf("file_lock_enabled_at exists = %d, want 1", exists)
+	}
+}
+
+func TestUpgradeAddsFileLockEnabledAtColumnToExistingSchema(t *testing.T) {
+	openTempDB(t)
+
+	if err := RunMigrations(); err != nil {
+		t.Fatalf("RunMigrations() error = %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("initial RunUpgrades() error = %v", err)
+	}
+	if _, err := DB.Exec("DELETE FROM schema_version"); err != nil {
+		t.Fatalf("delete schema_version: %v", err)
+	}
+	if _, err := DB.Exec("INSERT INTO schema_version (version) VALUES ('1.0.22')"); err != nil {
+		t.Fatalf("seed schema_version: %v", err)
+	}
+	if _, err := DB.Exec("ALTER TABLE websites DROP COLUMN file_lock_enabled_at"); err != nil {
+		t.Fatalf("drop file_lock_enabled_at: %v", err)
+	}
+	if _, err := DB.Exec(`INSERT INTO websites
+		(name, domain, status, system_user, web_root, log_dir, db_name, db_user, php_pool_path, nginx_conf_path, file_lock_enabled)
+		VALUES ('demo', 'example.com', 'active', 'wp_demo', '/tmp/www', '/tmp/log', 'db', 'dbuser', '/tmp/php.conf', '/tmp/nginx.conf', 1)`); err != nil {
+		t.Fatalf("insert legacy file-lock-enabled site: %v", err)
+	}
+
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("RunUpgrades() error = %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("second RunUpgrades() error = %v", err)
+	}
+
+	var exists int
+	if err := DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('websites') WHERE name = 'file_lock_enabled_at'").Scan(&exists); err != nil {
+		t.Fatalf("query file_lock_enabled_at: %v", err)
+	}
+	if exists != 1 {
+		t.Fatalf("file_lock_enabled_at exists = %d, want 1", exists)
+	}
+	var enabledAt string
+	if err := DB.QueryRow("SELECT file_lock_enabled_at FROM websites WHERE domain = 'example.com'").Scan(&enabledAt); err != nil {
+		t.Fatalf("query example site lock time: %v", err)
+	}
+	if enabledAt == "" {
+		t.Fatalf("legacy file-lock-enabled site should backfill file_lock_enabled_at")
 	}
 }
 

@@ -118,6 +118,12 @@ func (h *FirewallHandler) ListFileSecurityEvents(c *gin.Context) {
 
 func (h *FirewallHandler) RefreshFileSecurityEvents(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if clearMode, err := strconv.ParseBool(c.Query("clear")); err == nil && clearMode {
+		if err := executor.ClearFileSecurityEvents(); err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("清理文件安全事件失败"))
+			return
+		}
+	}
 	summary, err := executor.RefreshFileSecurityEvents()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("刷新文件安全事件失败"))

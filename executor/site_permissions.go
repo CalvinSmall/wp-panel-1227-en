@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/naibabiji/wp-panel/database"
 	"github.com/naibabiji/wp-panel/models"
@@ -287,16 +288,18 @@ func executeSetFileLock(task *Task) TaskResult {
 	}
 
 	enabled := 0
+	lockEnabledAt := ""
 	message := "文件锁定已关闭"
 	if payload.Enabled {
 		enabled = 1
+		lockEnabledAt = formatEventTime(time.Now())
 		message = "文件锁定已开启"
 	} else if wpConfigHasUserFileModsLock(site.WebRoot) {
 		message = "文件锁定已关闭，但 wp-config.php 中仍存在用户自定义 DISALLOW_FILE_MODS=true，WordPress 后台文件修改仍会被禁止"
 	}
 	if _, err := database.GetDB().Exec(
-		"UPDATE websites SET file_lock_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-		enabled, site.ID,
+		"UPDATE websites SET file_lock_enabled = ?, file_lock_enabled_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		enabled, lockEnabledAt, site.ID,
 	); err != nil {
 		return taskFailure("保存文件锁定状态失败", err)
 	}
