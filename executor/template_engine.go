@@ -542,7 +542,11 @@ server {
     }
 
     {{end}}
-    location ~* ^/wp-content/uploads/.*\.(php|phtml|phar|php[0-9])$ {
+    location ~* ^/(wp-config\.php|wordfence-waf\.php|php\.ini)$ {
+        return 404;
+    }
+
+    location ~* ^/wp-content/(?!plugins/|themes/|mu-plugins/).*\.(php|phtml|phar|php[0-9])$ {
         return 404;
     }
 
@@ -729,7 +733,11 @@ server {
     }
 
     {{end}}
-    location ~* ^/wp-content/uploads/.*\.(php|phtml|phar|php[0-9])$ {
+    location ~* ^/(wp-config\.php|wordfence-waf\.php|php\.ini)$ {
+        return 404;
+    }
+
+    location ~* ^/wp-content/(?!plugins/|themes/|mu-plugins/).*\.(php|phtml|phar|php[0-9])$ {
         return 404;
     }
 

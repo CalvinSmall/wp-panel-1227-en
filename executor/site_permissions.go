@@ -27,6 +27,24 @@ var (
 	disallowFileModsTruePattern  = regexp.MustCompile(`(?im)^\s*define\s*\(\s*['"]DISALLOW_FILE_MODS['"]\s*,\s*true\s*\)\s*;\s*$`)
 )
 
+var wpFileLockCodeDirs = map[string]struct{}{
+	"mu-plugins": {},
+	"plugins":    {},
+	"themes":     {},
+}
+
+var wpFileLockLockedContentDirs = map[string]struct{}{
+	"upgrade":             {},
+	"upgrade-temp-backup": {},
+}
+
+var wpFileLockConfigNames = map[string]struct{}{
+	".user.ini":         {},
+	"php.ini":           {},
+	"wordfence-waf.php": {},
+	"wp-config.php":     {},
+}
+
 func siteOwner(systemUser string) string {
 	return systemUser + ":" + systemUser
 }
@@ -124,6 +142,82 @@ func isPathWithinRoot(rootPath, targetPath string) bool {
 		return false
 	}
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
+}
+
+func IsWPExecutableFile(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".php", ".phtml", ".phar", ".php3", ".php4", ".php5", ".php7", ".php8":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsWPFileLockRuntimeWritablePath(webRoot, targetPath string, isDir, allowExecutableCleanup bool) bool {
+	relParts, ok := wpFileLockRelParts(webRoot, targetPath)
+	if !ok || len(relParts) < 3 || relParts[0] != "wp-content" {
+		return false
+	}
+	if _, locked := wpFileLockCodeDirs[relParts[1]]; locked {
+		return false
+	}
+	if _, locked := wpFileLockLockedContentDirs[relParts[1]]; locked {
+		return false
+	}
+	if wpFileLockSensitiveConfigName(relParts, targetPath) {
+		return false
+	}
+	if !isDir && IsWPExecutableFile(targetPath) {
+		return allowExecutableCleanup && len(relParts) >= 3
+	}
+	return true
+}
+
+func wpFileLockPermissionWritablePath(webRoot, targetPath string, isDir bool) bool {
+	relParts, ok := wpFileLockRelParts(webRoot, targetPath)
+	if !ok || len(relParts) == 0 {
+		return false
+	}
+	if len(relParts) == 2 && relParts[0] == "wp-content" && isDir {
+		if _, locked := wpFileLockCodeDirs[relParts[1]]; locked {
+			return false
+		}
+		if _, locked := wpFileLockLockedContentDirs[relParts[1]]; locked {
+			return false
+		}
+		if wpFileLockSensitiveConfigName(relParts, targetPath) {
+			return false
+		}
+		return true
+	}
+	return IsWPFileLockRuntimeWritablePath(webRoot, targetPath, isDir, false)
+}
+
+func wpFileLockSensitiveConfigName(relParts []string, targetPath string) bool {
+	base := strings.ToLower(filepath.Base(targetPath))
+	if base == ".htaccess" {
+		return len(relParts) <= 2
+	}
+	_, locked := wpFileLockConfigNames[base]
+	return locked
+}
+
+func wpFileLockRelParts(webRoot, targetPath string) ([]string, bool) {
+	root := filepath.Clean(webRoot)
+	target := filepath.Clean(targetPath)
+	if runtime.GOOS == "windows" {
+		root = strings.ToLower(root)
+		target = strings.ToLower(target)
+	}
+	rel, err := filepath.Rel(root, target)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, false
+	}
+	parts := strings.Split(rel, string(filepath.Separator))
+	if len(parts) == 0 || parts[0] == "." || parts[0] == "" {
+		return nil, false
+	}
+	return parts, true
 }
 
 func ChownSitePath(path, allowedRoot, systemUser string) error {
@@ -235,21 +329,30 @@ func ApplySiteFileLock(site *models.Website) error {
 		return err
 	}
 
-	uploadsDir := filepath.Join(webRoot, "wp-content", "uploads")
-	if err := rejectSymlinkPath(filepath.Join(webRoot, "wp-config.php")); err != nil {
-		return err
-	}
-	if err := rejectSymlinkPath(filepath.Join(webRoot, "wp-content")); err != nil {
-		return err
-	}
-	if err := rejectSymlinkPath(uploadsDir); err != nil {
-		return err
+	for _, path := range []string{
+		filepath.Join(webRoot, "wp-config.php"),
+		filepath.Join(webRoot, ".user.ini"),
+		filepath.Join(webRoot, ".htaccess"),
+		filepath.Join(webRoot, "php.ini"),
+		filepath.Join(webRoot, "wordfence-waf.php"),
+		filepath.Join(webRoot, "wp-admin"),
+		filepath.Join(webRoot, "wp-includes"),
+		filepath.Join(webRoot, "wp-content"),
+		filepath.Join(webRoot, "wp-content", "plugins"),
+		filepath.Join(webRoot, "wp-content", "themes"),
+		filepath.Join(webRoot, "wp-content", "mu-plugins"),
+	} {
+		if err := rejectSymlinkPath(path); err != nil {
+			return err
+		}
 	}
 	if err := setWPFileModsLock(webRoot, true); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
-		return err
+	for _, dir := range []string{"uploads", "cache", "languages", "wflogs"} {
+		if err := os.MkdirAll(filepath.Join(webRoot, "wp-content", dir), 0755); err != nil {
+			return err
+		}
 	}
 
 	return filepath.WalkDir(webRoot, func(path string, d fs.DirEntry, err error) error {
@@ -259,7 +362,7 @@ func ApplySiteFileLock(site *models.Website) error {
 		if d.Type()&os.ModeSymlink != 0 {
 			return nil
 		}
-		if isPathWithinRoot(uploadsDir, path) {
+		if wpFileLockPermissionWritablePath(webRoot, path, d.IsDir()) {
 			return applyOwnerMode(path, uid, gid, modeForWritablePath(d))
 		}
 		mode := os.FileMode(0444)

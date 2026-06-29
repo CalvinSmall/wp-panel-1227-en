@@ -85,17 +85,28 @@ func TestCleanupNginxConfigBackupsNoopCases(t *testing.T) {
 	}
 }
 
-func TestWordPressTemplatesBlockUploadPHPExecution(t *testing.T) {
-	rule := "wp-content/uploads/.*\\.(php|phtml|phar|php[0-9])"
+func TestWordPressTemplatesBlockRuntimePHPExecution(t *testing.T) {
+	rule := "wp-content/(?!plugins/|themes/|mu-plugins/).*\\.(php|phtml|phar|php[0-9])"
+	rootConfigRule := "wp-config\\.php|wordfence-waf\\.php|php\\.ini"
 	for name, tmpl := range map[string]string{
 		"http":  nginxHTTPTemplate,
 		"https": nginxHTTPSTemplate,
 	} {
 		if !strings.Contains(tmpl, rule) {
-			t.Fatalf("%s template missing uploads PHP deny rule", name)
+			t.Fatalf("%s template missing wp-content runtime PHP deny rule", name)
 		}
-		if strings.Index(tmpl, rule) > strings.Index(tmpl, "location ~ \\.php$") {
+		if !strings.Contains(tmpl, rootConfigRule) {
+			t.Fatalf("%s template missing root config deny rule", name)
+		}
+		phpLocationIndex := strings.Index(tmpl, "location ~ \\.php$")
+		if phpLocationIndex < 0 {
+			t.Fatalf("%s template missing generic PHP location", name)
+		}
+		if strings.Index(tmpl, rule) > phpLocationIndex {
 			t.Fatalf("%s template deny rule must appear before generic PHP location", name)
+		}
+		if strings.Index(tmpl, rootConfigRule) > phpLocationIndex {
+			t.Fatalf("%s template root config deny rule must appear before generic PHP location", name)
 		}
 	}
 	for name, tmpl := range map[string]string{
@@ -103,7 +114,7 @@ func TestWordPressTemplatesBlockUploadPHPExecution(t *testing.T) {
 		"php-https": phpHTTPSTemplate,
 	} {
 		if strings.Contains(tmpl, rule) {
-			t.Fatalf("%s template should not include WordPress uploads rule", name)
+			t.Fatalf("%s template should not include WordPress runtime PHP rule", name)
 		}
 	}
 }

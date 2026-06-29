@@ -91,7 +91,7 @@ func (h *FileHandler) RemoteImport(c *gin.Context) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
 		return
 	}
-	if err := checkSiteFileLockWrite(*req.SiteID, destPath, false); err != nil {
+	if err := checkSiteFileLockWrite(*req.SiteID, destPath, false, false); err != nil {
 		respondFileWriteError(c, err)
 		return
 	}

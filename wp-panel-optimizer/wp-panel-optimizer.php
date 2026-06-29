@@ -3,7 +3,7 @@
  * Plugin Name: WP Panel Optimizer
  * Plugin URI:  https://github.com/naibabiji/wp-panel
  * Description: 与 WP Panel 面板配合，管理 FastCGI 缓存、预加载、调试模式、文章修订、内存限制等优化项。发布/更新文章自动清除缓存。
- * Version:     1.1.6
+ * Version:     1.1.7
  * Author:      WP Panel
  * Author URI:  https://blog.naibabiji.com
  * License:     GPL-2.0+
@@ -34,7 +34,7 @@ function wpp_optimizer_uninstall() {
 
 class WP_Panel_Optimizer {
 
-    const VERSION = '1.1.6';
+    const VERSION = '1.1.7';
 
     const OPTION_FCACHE_ENABLED = 'wpp_optimizer_fcache_enabled';
     const OPTION_FCACHE_TTL     = 'wpp_optimizer_fcache_ttl';
@@ -289,7 +289,7 @@ class WP_Panel_Optimizer {
                 <div class="notice notice-error"><p><strong>配置文件缺失</strong> — 请在 WP Panel 面板中进入该网站详情页，点击 WordPress 优化卡片的「安装配套插件」按钮完成初始化。</p></div>
             <?php endif; ?>
             <?php if ($fileLockEnabled): ?>
-                <div class="notice notice-warning"><p><strong>WP Panel 文件锁定已开启。</strong>发文章、编辑页面、上传图片不受影响；安装、更新、删除插件或主题，以及修改代码文件会被阻止。如需维护代码，请先到 WP Panel 网站详情页解除文件锁定。</p></div>
+                <div class="notice notice-warning"><p><strong>WP Panel 文件锁定已开启。</strong>发文章、编辑页面、上传图片、生成缓存和写入插件运行日志不受影响；安装、更新、删除插件或主题，以及修改代码和站点配置会被阻止。如需维护插件主题或首次配置安全/缓存插件，请先到 WP Panel 网站详情页解除文件锁定。</p></div>
             <?php endif; ?>
             <div id="wpp-verify-msg"></div>
             <hr>
@@ -528,7 +528,7 @@ class WP_Panel_Optimizer {
         if (!self::sync_file_lock_state()) {
             return;
         }
-        echo '<div class="notice notice-warning"><p><strong>WP Panel 文件锁定已开启。</strong>发文章、编辑页面、上传图片不受影响；安装、更新、删除插件或主题，以及修改代码文件会被阻止。如需维护代码，请先到 WP Panel 网站详情页解除文件锁定。</p></div>';
+        echo '<div class="notice notice-warning"><p><strong>WP Panel 文件锁定已开启。</strong>发文章、编辑页面、上传图片、生成缓存和写入插件运行日志不受影响；安装、更新、删除插件或主题，以及修改代码和站点配置会被阻止。如需维护插件主题或首次配置安全/缓存插件，请先到 WP Panel 网站详情页解除文件锁定。</p></div>';
     }
 
     public static function admin_bar_button($bar) {

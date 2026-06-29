@@ -66,7 +66,7 @@
             </select>
         </div>
         <div x-show="selectedSiteLocked()" class="mb-4 p-3 bg-yellow-900/30 border border-yellow-700 text-yellow-100 rounded text-sm">
-            当前 WordPress 站点已开启文件锁定。发文章和上传媒体不受影响；代码目录修改以及 uploads 下 PHP 文件写入会被阻止。
+            当前 WordPress 站点已开启文件锁定。媒体上传、缓存、翻译和安全插件日志等运行数据可继续写入；核心、插件、主题、站点配置和 PHP 可执行文件写入会被阻止。
         </div>
 
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">

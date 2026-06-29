@@ -220,10 +220,19 @@ func TestTarArchiveRejectsPathTraversal(t *testing.T) {
 	}
 }
 
-func TestFileLockWriteGuardAllowsUploadsMediaAndBlocksCode(t *testing.T) {
+func TestFileLockWriteGuardAllowsRuntimeDataAndBlocksCode(t *testing.T) {
 	root := t.TempDir()
-	uploads := filepath.Join(root, "wp-content", "uploads")
-	if err := os.MkdirAll(uploads, 0755); err != nil {
+	wpContent := filepath.Join(root, "wp-content")
+	uploads := filepath.Join(wpContent, "uploads")
+	cache := filepath.Join(wpContent, "cache")
+	languages := filepath.Join(wpContent, "languages")
+	wflogs := filepath.Join(wpContent, "wflogs")
+	for _, dir := range []string{uploads, cache, languages, wflogs} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(wpContent, "plugins"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	site := &models.Website{
@@ -232,17 +241,42 @@ func TestFileLockWriteGuardAllowsUploadsMediaAndBlocksCode(t *testing.T) {
 		FileLockEnabled: true,
 	}
 
-	if err := checkFileLockWrite(site, filepath.Join(uploads, "photo.jpg"), false); err != nil {
-		t.Fatalf("uploads media should be allowed: %v", err)
+	for _, target := range []string{
+		filepath.Join(uploads, "photo.jpg"),
+		filepath.Join(cache, "page.html"),
+		filepath.Join(cache, "pages", ".htaccess"),
+		filepath.Join(languages, "zh_CN.mo"),
+		filepath.Join(wflogs, "config-livewaf.php.json"),
+	} {
+		if err := checkFileLockWrite(site, target, false, false); err != nil {
+			t.Fatalf("runtime data write should be allowed for %s: %v", target, err)
+		}
 	}
-	if err := checkFileLockWrite(site, filepath.Join(uploads, "shell.php"), false); !isFileLockWriteError(err) {
-		t.Fatalf("uploads PHP error = %v, want file lock rejection", err)
+	for _, target := range []string{
+		filepath.Join(uploads, "shell.php"),
+		filepath.Join(cache, "shell.phtml"),
+		filepath.Join(wpContent, "advanced-cache.php"),
+		filepath.Join(wpContent, ".user.ini"),
+		filepath.Join(cache, ".user.ini"),
+		filepath.Join(wpContent, "upgrade", "wordpress.zip"),
+		filepath.Join(wpContent, "upgrade-temp-backup", "plugins", "plugin.zip"),
+		filepath.Join(root, "wordfence-waf.php"),
+	} {
+		if err := checkFileLockWrite(site, target, false, false); !isFileLockWriteError(err) {
+			t.Fatalf("locked file write error for %s = %v, want file lock rejection", target, err)
+		}
 	}
-	if err := checkFileLockWrite(site, filepath.Join(root, "wp-content", "plugins", "plugin.php"), false); !isFileLockWriteError(err) {
+	if err := checkFileLockWrite(site, filepath.Join(root, "wp-content", "plugins", "plugin.php"), false, false); !isFileLockWriteError(err) {
 		t.Fatalf("code directory write error = %v, want file lock rejection", err)
 	}
-	if err := checkFileLockWrite(site, filepath.Join(uploads, "shell.php"), true); err != nil {
-		t.Fatalf("uploads PHP deletion should be allowed: %v", err)
+	if err := checkFileLockWrite(site, filepath.Join(uploads, "shell.php"), false, true); err != nil {
+		t.Fatalf("runtime PHP cleanup should be allowed: %v", err)
+	}
+	if err := checkFileLockWrite(site, filepath.Join(wpContent, "advanced-cache.php"), false, true); !isFileLockWriteError(err) {
+		t.Fatalf("drop-in PHP cleanup error = %v, want file lock rejection", err)
+	}
+	if err := checkFileLockWrite(site, filepath.Join(wpContent, "new-plugin-data"), true, false); !isFileLockWriteError(err) {
+		t.Fatalf("top-level runtime directory creation error = %v, want file lock rejection", err)
 	}
 }
 
@@ -266,7 +300,7 @@ func TestFileLockWriteGuardRejectsUploadsSymlinkEscape(t *testing.T) {
 	}
 
 	target := filepath.Join(uploads, "linked", "photo.jpg")
-	if err := checkFileLockWrite(site, target, false); !isFileLockWriteError(err) {
+	if err := checkFileLockWrite(site, target, false, false); !isFileLockWriteError(err) {
 		t.Fatalf("symlink escape error = %v, want file lock rejection", err)
 	}
 }

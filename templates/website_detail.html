@@ -1038,8 +1038,8 @@ function websiteDetail() {
         },
         async toggleFileLock(enabled) {
             const prompt = enabled
-                ? '开启文件锁定后，WordPress 可继续发文章和上传媒体，但插件、主题、核心文件和代码目录修改会被阻止。确认开启？'
-                : '解除文件锁定后，WordPress 后台和面板文件管理器可再次修改代码文件。确认解除？';
+                ? '开启文件锁定后，WordPress 可继续发文章、上传媒体、生成缓存和写入插件运行日志，但核心、插件、主题和站点配置修改会被阻止。安装/更新插件主题或首次配置安全/缓存插件前请临时解除锁定。确认开启？'
+                : '解除文件锁定后，WordPress 后台和面板文件管理器可再次修改代码与站点配置。确认解除？';
             if (!await confirmModal(prompt)) return;
             this.fileLockSaving = true;
             try {

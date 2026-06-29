@@ -115,3 +115,61 @@ func TestWPConfigHasUserFileModsLockIgnoresManagedBlock(t *testing.T) {
 		t.Fatal("user-defined DISALLOW_FILE_MODS=true should be reported")
 	}
 }
+
+func TestWPFileLockRuntimeWritablePathPolicy(t *testing.T) {
+	root := t.TempDir()
+
+	allowed := []string{
+		filepath.Join(root, "wp-content", "uploads", "2026", "photo.jpg"),
+		filepath.Join(root, "wp-content", "cache", "page.html"),
+		filepath.Join(root, "wp-content", "cache", "pages", ".htaccess"),
+		filepath.Join(root, "wp-content", "languages", "zh_CN.mo"),
+		filepath.Join(root, "wp-content", "wflogs", "rules.php.json"),
+	}
+	for _, path := range allowed {
+		if !IsWPFileLockRuntimeWritablePath(root, path, false, false) {
+			t.Fatalf("%s should be writable runtime data", path)
+		}
+	}
+
+	blocked := []string{
+		filepath.Join(root, "index.php"),
+		filepath.Join(root, "wp-config.php"),
+		filepath.Join(root, "wordfence-waf.php"),
+		filepath.Join(root, "wp-content"),
+		filepath.Join(root, "wp-content", "advanced-cache.php"),
+		filepath.Join(root, "wp-content", ".user.ini"),
+		filepath.Join(root, "wp-content", "cache", ".user.ini"),
+		filepath.Join(root, "wp-content", "upgrade", "wordpress.zip"),
+		filepath.Join(root, "wp-content", "upgrade", "update.php"),
+		filepath.Join(root, "wp-content", "upgrade-temp-backup", "plugins", "plugin.zip"),
+		filepath.Join(root, "wp-content", "uploads", "shell.php"),
+		filepath.Join(root, "wp-content", "plugins", "plugin.php"),
+		filepath.Join(root, "wp-content", "themes", "theme", "functions.php"),
+		filepath.Join(root, "wp-content", "mu-plugins", "loader.php"),
+	}
+	for _, path := range blocked {
+		if IsWPFileLockRuntimeWritablePath(root, path, false, false) {
+			t.Fatalf("%s should be blocked by file lock", path)
+		}
+	}
+
+	if !IsWPFileLockRuntimeWritablePath(root, filepath.Join(root, "wp-content", "uploads", "shell.php"), false, true) {
+		t.Fatal("runtime PHP cleanup should be allowed when explicitly requested")
+	}
+	if IsWPFileLockRuntimeWritablePath(root, filepath.Join(root, "wp-content", "advanced-cache.php"), false, true) {
+		t.Fatal("drop-in PHP should stay blocked even during cleanup")
+	}
+	if wpFileLockPermissionWritablePath(root, filepath.Join(root, "wp-content"), true) {
+		t.Fatal("wp-content root should not be writable")
+	}
+	if !wpFileLockPermissionWritablePath(root, filepath.Join(root, "wp-content", "cache"), true) {
+		t.Fatal("existing runtime directories should be writable")
+	}
+	if wpFileLockPermissionWritablePath(root, filepath.Join(root, "wp-content", "upgrade"), true) {
+		t.Fatal("upgrade directory should stay locked")
+	}
+	if wpFileLockPermissionWritablePath(root, filepath.Join(root, "wp-content", "upgrade-temp-backup"), true) {
+		t.Fatal("upgrade-temp-backup directory should stay locked")
+	}
+}

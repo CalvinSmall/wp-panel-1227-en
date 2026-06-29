@@ -180,7 +180,7 @@ func (e *fileLockWriteError) Error() string {
 }
 
 func newFileLockWriteError() error {
-	return &fileLockWriteError{message: "该站点已开启文件锁定，仅允许在 wp-content/uploads 下写入非 PHP 媒体文件"}
+	return &fileLockWriteError{message: "该站点已开启文件锁定，仅允许写入 wp-content 下的运行数据目录，且禁止写入 PHP 可执行文件"}
 }
 
 func isFileLockWriteError(err error) bool {
@@ -207,56 +207,29 @@ func fileLockSite(siteID int) *models.Website {
 	return site
 }
 
-func pathWithinClean(rootPath, targetPath string) bool {
-	root := filepath.Clean(rootPath)
-	target := filepath.Clean(targetPath)
-	if runtime.GOOS == "windows" {
-		root = strings.ToLower(root)
-		target = strings.ToLower(target)
-	}
-	rel, err := filepath.Rel(root, target)
-	if err != nil {
-		return false
-	}
-	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
-}
-
-func isPHPExecutablePath(path string) bool {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".php", ".phtml", ".phar", ".php3", ".php4", ".php5", ".php7", ".php8":
-		return true
-	default:
-		return false
-	}
-}
-
-func checkFileLockWrite(site *models.Website, targetPath string, allowPHPInUploads bool) error {
+func checkFileLockWrite(site *models.Website, targetPath string, targetIsDir, allowExecutableCleanup bool) error {
 	if site == nil || !site.FileLockEnabled || site.SiteType != "wordpress" {
 		return nil
 	}
 	if !isPathWithin(site.WebRoot, targetPath) {
 		return newFileLockWriteError()
 	}
+	resolvedRoot, err := resolvePathForAccess(site.WebRoot)
+	if err != nil {
+		return newFileLockWriteError()
+	}
 	resolvedTarget, err := resolvePathForAccess(targetPath)
 	if err != nil {
 		return newFileLockWriteError()
 	}
-	uploadsRoot := filepath.Join(site.WebRoot, "wp-content", "uploads")
-	resolvedUploadsRoot, err := resolvePathForAccess(uploadsRoot)
-	if err != nil {
-		return newFileLockWriteError()
-	}
-	if !pathWithinClean(resolvedUploadsRoot, resolvedTarget) {
-		return newFileLockWriteError()
-	}
-	if !allowPHPInUploads && isPHPExecutablePath(resolvedTarget) {
+	if !executor.IsWPFileLockRuntimeWritablePath(resolvedRoot, resolvedTarget, targetIsDir, allowExecutableCleanup) {
 		return newFileLockWriteError()
 	}
 	return nil
 }
 
-func checkSiteFileLockWrite(siteID int, targetPath string, allowPHPInUploads bool) error {
-	return checkFileLockWrite(fileLockSite(siteID), targetPath, allowPHPInUploads)
+func checkSiteFileLockWrite(siteID int, targetPath string, targetIsDir, allowExecutableCleanup bool) error {
+	return checkFileLockWrite(fileLockSite(siteID), targetPath, targetIsDir, allowExecutableCleanup)
 }
 
 func checkTransferFileLock(srcSiteID, destSiteID int, items []fileTransferItem, move bool) error {
@@ -264,7 +237,11 @@ func checkTransferFileLock(srcSiteID, destSiteID int, items []fileTransferItem, 
 	destSite := fileLockSite(destSiteID)
 	for _, item := range items {
 		if move {
-			if err := checkFileLockWrite(srcSite, item.src, true); err != nil {
+			info, err := os.Stat(item.src)
+			if err != nil {
+				return err
+			}
+			if err := checkFileLockWrite(srcSite, item.src, info.IsDir(), true); err != nil {
 				return err
 			}
 		}
@@ -284,7 +261,7 @@ func checkFileLockCopyDestination(site *models.Website, src, dest string) error 
 		return err
 	}
 	if !info.IsDir() {
-		return checkFileLockWrite(site, dest, false)
+		return checkFileLockWrite(site, dest, false, false)
 	}
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -298,7 +275,7 @@ func checkFileLockCopyDestination(site *models.Website, src, dest string) error 
 		if rel != "." {
 			target = filepath.Join(dest, rel)
 		}
-		return checkFileLockWrite(site, target, info.IsDir())
+		return checkFileLockWrite(site, target, info.IsDir(), false)
 	})
 }
 
@@ -711,7 +688,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
 		return
 	}
-	if err := checkSiteFileLockWrite(siteID, destPath, false); err != nil {
+	if err := checkSiteFileLockWrite(siteID, destPath, false, false); err != nil {
 		respondFileWriteError(c, err)
 		return
 	}
@@ -765,7 +742,7 @@ func (h *FileHandler) UploadInit(c *gin.Context) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
 		return
 	}
-	if err := checkSiteFileLockWrite(siteID, destPath, false); err != nil {
+	if err := checkSiteFileLockWrite(siteID, destPath, false, false); err != nil {
 		respondFileWriteError(c, err)
 		return
 	}
@@ -906,7 +883,7 @@ func (h *FileHandler) UploadComplete(c *gin.Context) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
 		return
 	}
-	if err := checkSiteFileLockWrite(session.SiteID, destPath, false); err != nil {
+	if err := checkSiteFileLockWrite(session.SiteID, destPath, false, false); err != nil {
 		respondFileWriteError(c, err)
 		return
 	}
@@ -1021,14 +998,13 @@ func (h *FileHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
 		return
 	}
-	if err := checkSiteFileLockWrite(siteID, fullPath, true); err != nil {
-		respondFileWriteError(c, err)
-		return
-	}
-
 	info, err := os.Stat(fullPath)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse("路径不存在"))
+		return
+	}
+	if err := checkSiteFileLockWrite(siteID, fullPath, info.IsDir(), true); err != nil {
+		respondFileWriteError(c, err)
 		return
 	}
 
@@ -1074,11 +1050,16 @@ func (h *FileHandler) Rename(c *gin.Context) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
 		return
 	}
-	if err := checkSiteFileLockWrite(req.SiteID, oldFull, true); err != nil {
+	info, err := os.Stat(oldFull)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("路径不存在"))
+		return
+	}
+	if err := checkSiteFileLockWrite(req.SiteID, oldFull, info.IsDir(), true); err != nil {
 		respondFileWriteError(c, err)
 		return
 	}
-	if err := checkSiteFileLockWrite(req.SiteID, newFull, false); err != nil {
+	if err := checkSiteFileLockWrite(req.SiteID, newFull, info.IsDir(), false); err != nil {
 		respondFileWriteError(c, err)
 		return
 	}
@@ -1168,7 +1149,7 @@ func (h *FileHandler) BatchCompress(c *gin.Context) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("压缩文件名非法"))
 		return
 	}
-	if err := checkSiteFileLockWrite(req.SiteID, zipPath, false); err != nil {
+	if err := checkSiteFileLockWrite(req.SiteID, zipPath, false, false); err != nil {
 		respondFileWriteError(c, err)
 		return
 	}
@@ -1286,7 +1267,7 @@ func (h *FileHandler) Compress(c *gin.Context) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("压缩文件名非法"))
 		return
 	}
-	if err := checkSiteFileLockWrite(siteID, zipPath, false); err != nil {
+	if err := checkSiteFileLockWrite(siteID, zipPath, false, false); err != nil {
 		respondFileWriteError(c, err)
 		return
 	}
@@ -1487,7 +1468,7 @@ func checkTarArchive(archivePath, format, basePath, destDir string, overwrite bo
 		if skip {
 			continue
 		}
-		if err := checkFileLockWrite(lockSite, target, hdr.Typeflag == tar.TypeDir); err != nil {
+		if err := checkFileLockWrite(lockSite, target, hdr.Typeflag == tar.TypeDir, false); err != nil {
 			return nil, err
 		}
 		if hdr.Typeflag == tar.TypeDir || overwrite {
@@ -1528,7 +1509,7 @@ func extractTarArchive(archivePath, format, basePath, destDir string, lockSite *
 		if skip {
 			continue
 		}
-		if err := checkFileLockWrite(lockSite, target, hdr.Typeflag == tar.TypeDir); err != nil {
+		if err := checkFileLockWrite(lockSite, target, hdr.Typeflag == tar.TypeDir, false); err != nil {
 			return err
 		}
 
@@ -1662,7 +1643,7 @@ func (h *FileHandler) Decompress(c *gin.Context) {
 		if skip {
 			continue
 		}
-		if err := checkFileLockWrite(lockSite, target, f.FileInfo().IsDir()); err != nil {
+		if err := checkFileLockWrite(lockSite, target, f.FileInfo().IsDir(), false); err != nil {
 			c.JSON(http.StatusLocked, models.ErrorResponse(err.Error()))
 			return
 		}
@@ -1686,7 +1667,7 @@ func (h *FileHandler) Decompress(c *gin.Context) {
 		if skip {
 			continue
 		}
-		if err := checkFileLockWrite(lockSite, target, f.FileInfo().IsDir()); err != nil {
+		if err := checkFileLockWrite(lockSite, target, f.FileInfo().IsDir(), false); err != nil {
 			c.JSON(http.StatusLocked, models.ErrorResponse(err.Error()))
 			return
 		}
@@ -2176,7 +2157,7 @@ func (h *FileHandler) CreateDir(c *gin.Context) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("路径越权"))
 		return
 	}
-	if err := checkSiteFileLockWrite(siteID, fullPath, true); err != nil {
+	if err := checkSiteFileLockWrite(siteID, fullPath, true, false); err != nil {
 		respondFileWriteError(c, err)
 		return
 	}
