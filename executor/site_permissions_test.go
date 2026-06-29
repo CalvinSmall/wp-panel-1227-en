@@ -64,7 +64,7 @@ func TestApplyWPFileModsLockBlockAddsAndRemovesManagedBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply lock: %v", err)
 	}
-	if !strings.Contains(locked, wpPanelFileLockBegin) || !strings.Contains(locked, "define('DISALLOW_FILE_MODS', true);") {
+	if !strings.Contains(locked, wpPanelFileLockBegin) || !strings.Contains(locked, "define('DISALLOW_FILE_MODS', true);") || !strings.Contains(locked, "define('FS_METHOD', 'direct');") {
 		t.Fatalf("managed lock block missing:\n%s", locked)
 	}
 	if strings.Index(locked, wpPanelFileLockBegin) > strings.Index(locked, "/* That's all, stop editing!") {
@@ -77,6 +77,46 @@ func TestApplyWPFileModsLockBlockAddsAndRemovesManagedBlock(t *testing.T) {
 	}
 	if strings.Contains(unlocked, wpPanelFileLockBegin) || strings.Contains(unlocked, "DISALLOW_FILE_MODS") {
 		t.Fatalf("managed lock block was not removed:\n%s", unlocked)
+	}
+}
+
+func TestApplyWPFileModsLockBlockAddsFSMethodForUserDefinedDisallow(t *testing.T) {
+	content := "<?php\n" +
+		"define('DISALLOW_FILE_MODS', true);\n"
+	locked, err := applyWPFileModsLockBlock(content, true)
+	if err != nil {
+		t.Fatalf("apply lock: %v", err)
+	}
+	if strings.Count(locked, "define('DISALLOW_FILE_MODS', true);") != 1 {
+		t.Fatalf("managed block should not add duplicate DISALLOW_FILE_MODS: %s", locked)
+	}
+	if !strings.Contains(locked, "define('FS_METHOD', 'direct');") {
+		t.Fatalf("managed block should ensure FS_METHOD direct: %s", locked)
+	}
+}
+
+func TestApplyWPFileModsLockBlockClearsManagedFSMethodOnUnlock(t *testing.T) {
+	content := "<?php\n" +
+		"define('DISALLOW_FILE_MODS', true);\n" +
+		"define('FS_METHOD', 'ftp');\n" +
+		"/* That's all, stop editing! Happy publishing. */\n"
+	locked, err := applyWPFileModsLockBlock(content, true)
+	if err != nil {
+		t.Fatalf("apply lock: %v", err)
+	}
+	if !strings.Contains(locked, wpPanelFileLockBegin) {
+		t.Fatalf("managed block should be present while locked: %s", locked)
+	}
+
+	unlocked, err := applyWPFileModsLockBlock(locked, false)
+	if err != nil {
+		t.Fatalf("remove lock: %v", err)
+	}
+	if strings.Contains(unlocked, wpPanelFileLockBegin) {
+		t.Fatalf("managed block should be removed after unlock: %s", unlocked)
+	}
+	if strings.Contains(unlocked, "define('FS_METHOD', 'direct');") {
+		t.Fatal("managed FS_METHOD direct should be removed after unlock")
 	}
 }
 

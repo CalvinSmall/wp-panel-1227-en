@@ -26,6 +26,7 @@ var (
 	disallowFileModsPattern      = regexp.MustCompile(`(?im)^\s*define\s*\(\s*['"]DISALLOW_FILE_MODS['"]\s*,\s*[^)]+\)\s*;\s*$`)
 	disallowFileModsFalsePattern = regexp.MustCompile(`(?im)^\s*define\s*\(\s*['"]DISALLOW_FILE_MODS['"]\s*,\s*false\s*\)\s*;\s*$`)
 	disallowFileModsTruePattern  = regexp.MustCompile(`(?im)^\s*define\s*\(\s*['"]DISALLOW_FILE_MODS['"]\s*,\s*true\s*\)\s*;\s*$`)
+	fsMethodPattern             = regexp.MustCompile(`(?im)^\s*define\s*\(\s*['"]FS_METHOD['"]\s*,\s*[^)]+\)\s*;\s*$`)
 )
 
 var wpFileLockCodeDirs = map[string]struct{}{
@@ -519,10 +520,19 @@ func applyWPFileModsLockBlock(content string, enabled bool) (string, error) {
 		return "", fmt.Errorf("wp-config.php already defines DISALLOW_FILE_MODS as false")
 	}
 	if disallowFileModsPattern.MatchString(content) {
-		return content, nil
+		content = fsMethodPattern.ReplaceAllString(content, "")
+		block := wpPanelFileLockBegin + "\n" +
+			"define('FS_METHOD', 'direct');\n" +
+			wpPanelFileLockEnd + "\n"
+		next := insertBeforeMarker(content, block)
+		if next == content {
+			return "", fmt.Errorf("wp-config.php marker not found")
+		}
+		return next, nil
 	}
 	block := wpPanelFileLockBegin + "\n" +
 		"define('DISALLOW_FILE_MODS', true);\n" +
+		"define('FS_METHOD', 'direct');\n" +
 		wpPanelFileLockEnd + "\n"
 	next := insertBeforeMarker(content, block)
 	if next == content {
