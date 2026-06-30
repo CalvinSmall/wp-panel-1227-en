@@ -350,16 +350,22 @@ location ^~ /api/ {
         <div class="card">
             <h3 class="text-lg font-semibold text-white mb-4">网站日志</h3>
             <div class="flex flex-wrap items-center gap-2 mb-3">
-                <button @click="logType='access'; fetchLogs()" :class="logType === 'access' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">访问日志</button>
-                <button @click="logType='error'; fetchLogs()" :class="logType === 'error' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">错误日志</button>
-                <button x-show="site.site_type === 'wordpress'" @click="logType='security'; fetchLogs()" :class="logType === 'security' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">安全日志</button>
+                <button @click="selectLogType('access')" :class="logType === 'access' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">访问日志</button>
+                <button @click="selectLogType('error')" :class="logType === 'error' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">错误日志</button>
+                <button x-show="site.site_type === 'wordpress'" @click="selectLogType('security')" :class="logType === 'security' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">安全日志</button>
                 <button @click="fetchLogs()" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">刷新</button>
                 <button @click="clearLogs()" class="text-sm py-1 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;">清空</button>
                 <button @click="logFullscreen = true" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">全屏查看</button>
+                <button @click="downloadLogFile(currentLogFilename())" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">下载当前完整日志</button>
                 <select @change="setAccessLogMode($event.target.value)" x-model="accessLogMode" x-show="logType === 'access'" class="input-field w-28 text-sm py-1">
                     <option value="off">关闭日志</option>
                     <option value="error_only">仅异常</option>
                     <option value="full">全部记录</option>
+                </select>
+                <select x-model.number="logLineLimit" @change="fetchLogs()" class="input-field w-28 text-sm py-1">
+                    <option value="200">最近 200 行</option>
+                    <option value="1000">最近 1000 行</option>
+                    <option value="5000">最近 5000 行</option>
                 </select>
                 <div class="flex items-center gap-1 text-sm text-gray-400 whitespace-nowrap">
                     <span>保留</span>
@@ -367,7 +373,47 @@ location ^~ /api/ {
                     <span>天</span>
                 </div>
             </div>
+            <p class="text-xs text-gray-500 mb-3">当前区域仅预览当前日志文件的最近行数，默认最近 200 行；完整当天日志和历史轮转日志请下载分析。</p>
             <pre x-text="logContent" class="w-full rounded p-3 text-xs font-mono overflow-auto" style="background-color: #0f172a; border: 1px solid #334155; color: #94a3b8; max-height: 400px; white-space: pre-wrap; word-break: break-all;"></pre>
+            <div class="mt-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-sm font-medium text-white">历史日志下载</h4>
+                    <button @click="fetchLogFiles()" class="text-xs py-1 px-2 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">刷新列表</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr>
+                                <th class="table-header">文件</th>
+                                <th class="table-header">大小</th>
+                                <th class="table-header">修改时间</th>
+                                <th class="table-header">状态</th>
+                                <th class="table-header text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="file in logFiles" :key="file.name">
+                                <tr class="table-row">
+                                    <td class="table-cell font-mono text-xs" x-text="file.name"></td>
+                                    <td class="table-cell" x-text="formatBytes(file.size || 0)"></td>
+                                    <td class="table-cell" x-text="fmtTime(file.modified_at)"></td>
+                                    <td class="table-cell">
+                                        <span x-show="file.current" class="badge-success">当前</span>
+                                        <span x-show="!file.current && file.compressed" class="badge-info">压缩</span>
+                                        <span x-show="!file.current && !file.compressed" class="badge-warning">轮转</span>
+                                    </td>
+                                    <td class="table-cell text-right">
+                                        <button @click="downloadLogFile(file.name)" class="btn-primary text-xs py-1 px-2">下载</button>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr x-show="logFiles.length === 0">
+                                <td colspan="5" class="table-cell text-center text-gray-500 py-4">暂无可下载日志文件</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -376,10 +422,16 @@ location ^~ /api/ {
         <div class="flex items-center justify-between px-6 py-3 border-b border-gray-700">
             <div class="flex items-center space-x-4 text-sm">
                 <span class="text-white font-semibold" x-text="logType === 'access' ? '访问日志' : (logType === 'security' ? '安全日志' : '错误日志')"></span>
-                <button @click="logType='access'; fetchLogs()" :class="logType === 'access' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">访问日志</button>
-                <button @click="logType='error'; fetchLogs()" :class="logType === 'error' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">错误日志</button>
-                <button x-show="site.site_type === 'wordpress'" @click="logType='security'; fetchLogs()" :class="logType === 'security' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">安全日志</button>
+                <button @click="selectLogType('access')" :class="logType === 'access' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">访问日志</button>
+                <button @click="selectLogType('error')" :class="logType === 'error' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">错误日志</button>
+                <button x-show="site.site_type === 'wordpress'" @click="selectLogType('security')" :class="logType === 'security' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">安全日志</button>
                 <button @click="fetchLogs()" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">刷新</button>
+                <select x-model.number="logLineLimit" @change="fetchLogs()" class="input-field w-28 text-sm py-1">
+                    <option value="200">最近 200 行</option>
+                    <option value="1000">最近 1000 行</option>
+                    <option value="5000">最近 5000 行</option>
+                </select>
+                <button @click="downloadLogFile(currentLogFilename())" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">下载当前完整日志</button>
             </div>
             <button @click="logFullscreen = false" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
         </div>
@@ -546,6 +598,8 @@ function websiteDetail() {
         restorePollingActive: true,
         logType: 'access',
         logContent: '',
+        logLineLimit: 200,
+        logFiles: [],
         logFullscreen: false,
         nginxPreContent: '',
         nginxContent: '',
@@ -621,6 +675,7 @@ function websiteDetail() {
             this.fetchNginxCustom();
             this.fetchPluginStatus();
             this.fetchLogs();
+            this.fetchLogFiles();
             this.fetchBackups();
             this.fetchBackupSettings();
             this.fetchCDNGroups();
@@ -905,11 +960,36 @@ function websiteDetail() {
         async fetchLogs() {
             if (!this.site) return;
             try {
-                const r = await api('/websites/' + this.site.id + '/logs?type=' + this.logType);
+                let url = '/websites/' + this.site.id + '/logs?type=' + this.logType + '&lines=' + encodeURIComponent(this.logLineLimit || 200);
+                const r = await api(url);
                 if (r.success) {
                     this.logContent = r.data.content;
                 }
             } catch(e) { showToast('加载日志失败: ' + e.message, 'error'); }
+        },
+        async fetchLogFiles() {
+            if (!this.site) return;
+            try {
+                const r = await api('/websites/' + this.site.id + '/log-files?type=' + this.logType);
+                if (r.success) {
+                    this.logFiles = r.data.files || [];
+                }
+            } catch(e) { showToast('加载日志文件列表失败: ' + e.message, 'error'); }
+        },
+        selectLogType(type) {
+            this.logType = type;
+            this.fetchLogs();
+            this.fetchLogFiles();
+        },
+        currentLogFilename() {
+            if (this.logType === 'error') return 'error.log';
+            if (this.logType === 'security') return 'wp-security.log';
+            return 'access.log';
+        },
+        downloadLogFile(filename) {
+            if (!this.site || !filename) return;
+            const prefix = document.body.dataset.panelPrefix || '';
+            window.open(prefix + '/api/websites/' + this.site.id + '/logs/download?type=' + encodeURIComponent(this.logType) + '&file=' + encodeURIComponent(filename));
         },
         async setAccessLogMode(mode) {
             try {
@@ -933,6 +1013,7 @@ function websiteDetail() {
                 if (r.success) {
                     showToast('日志已清空', 'success');
                     this.logContent = '（日志为空或文件不存在）';
+                    this.fetchLogFiles();
                 }
             } catch(e) { showToast('操作失败: ' + e.message, 'error'); }
         },

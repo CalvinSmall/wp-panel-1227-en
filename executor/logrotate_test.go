@@ -14,6 +14,9 @@ func TestRenderSiteLogrotateConfigIncludesAllSiteLogs(t *testing.T) {
 		"/www/wwwlogs/example.com/php-error.log",
 		"/www/wwwlogs/example.com/php-slow.log",
 		"rotate 7",
+		"dateext",
+		"dateformat -%Y-%m-%d",
+		"dateyesterday",
 		"copytruncate",
 	} {
 		if !strings.Contains(config, want) {

@@ -155,6 +155,8 @@ func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version
 	protected.GET("/api/websites/:id/wp-site-urls", websiteHandler.GetWPSiteURLs)
 	protected.PUT("/api/websites/:id/wp-site-urls", websiteHandler.UpdateWPSiteURLs)
 	protected.GET("/api/websites/:id/logs", websiteHandler.ViewLogs)
+	protected.GET("/api/websites/:id/log-files", websiteHandler.ListLogFiles)
+	protected.GET("/api/websites/:id/logs/download", websiteHandler.DownloadLogFile)
 	protected.DELETE("/api/websites/:id/logs", websiteHandler.ClearLogs)
 	protected.PUT("/api/websites/:id/domains", websiteHandler.UpdateDomains)
 	protected.PUT("/api/websites/:id/cache", websiteHandler.UpdateCache)

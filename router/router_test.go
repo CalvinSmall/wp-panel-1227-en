@@ -82,6 +82,21 @@ func TestRenderedPageScriptsParse(t *testing.T) {
 	}
 }
 
+func TestWebsiteLogRoutesRegistered(t *testing.T) {
+	source, err := os.ReadFile("router.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, route := range []string{
+		`protected.GET("/api/websites/:id/log-files", websiteHandler.ListLogFiles)`,
+		`protected.GET("/api/websites/:id/logs/download", websiteHandler.DownloadLogFile)`,
+	} {
+		if !bytes.Contains(source, []byte(route)) {
+			t.Fatalf("router.go missing route %s", route)
+		}
+	}
+}
+
 func renderPage(t *testing.T, page, content string) []byte {
 	t.Helper()
 	data := map[string]any{

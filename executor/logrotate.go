@@ -98,6 +98,9 @@ func renderSiteLogrotateConfig(domain, logDir string, retentionDays int) string 
     notifempty
     compress
     delaycompress
+    dateext
+    dateformat -%%Y-%%m-%%d
+    dateyesterday
     copytruncate
 }
 `, domain, logDir, logDir, logDir, logDir, logDir, retentionDays)

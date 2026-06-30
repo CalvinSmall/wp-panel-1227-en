@@ -2,7 +2,16 @@ package handlers
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/naibabiji/wp-panel/database"
 )
 
 func TestNormalizeWPSiteURL(t *testing.T) {
@@ -39,4 +48,227 @@ func TestReinstallWordPressErrorMessageHidesUnknownDetails(t *testing.T) {
 	if msg != "WordPress 重装失败" {
 		t.Fatalf("message = %q", msg)
 	}
+}
+
+func TestIsAllowedSiteLogFilenameSupportsCurrentLegacyAndDateNames(t *testing.T) {
+	valid := []string{
+		"access.log",
+		"access.log.1",
+		"access.log.2.gz",
+		"access.log-2026-06-29",
+		"access.log-2026-06-29.gz",
+	}
+	for _, name := range valid {
+		if !isAllowedSiteLogFilename("access", name) {
+			t.Fatalf("expected %q to be allowed", name)
+		}
+	}
+}
+
+func TestIsAllowedSiteLogFilenameRejectsWrongTypeAndTraversal(t *testing.T) {
+	invalid := []string{
+		"error.log",
+		"access.log.backup",
+		"access.log-2026-99-99",
+		"../access.log",
+		"sub/access.log",
+		`sub\access.log`,
+	}
+	for _, name := range invalid {
+		if isAllowedSiteLogFilename("access", name) {
+			t.Fatalf("expected %q to be rejected", name)
+		}
+	}
+}
+
+func TestResolveSiteLogFileRequiresAbsoluteLogDir(t *testing.T) {
+	if _, err := resolveSiteLogFile("relative/logs", "access", "access.log"); err == nil {
+		t.Fatal("expected relative log dir to be rejected")
+	}
+}
+
+func TestAllDigitsEdgeCases(t *testing.T) {
+	cases := []struct {
+		value string
+		want  bool
+	}{
+		{"", false},
+		{"123", true},
+		{"abc", false},
+		{"12a", false},
+	}
+	for _, tc := range cases {
+		if got := allDigits(tc.value); got != tc.want {
+			t.Fatalf("allDigits(%q) = %v; want %v", tc.value, got, tc.want)
+		}
+	}
+}
+
+func TestListSiteLogFilesIncludesCurrentLegacyAndDateFiles(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{
+		"access.log",
+		"access.log.1",
+		"access.log-2026-06-29.gz",
+		"error.log",
+		"access.log.backup",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(filepath.Join(dir, "access.log"), filepath.Join(dir, "access.log.2")); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := listSiteLogFiles(dir, "access")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, 0, len(files))
+	for _, file := range files {
+		got = append(got, file.Name)
+	}
+	want := map[string]bool{
+		"access.log":               true,
+		"access.log.1":             true,
+		"access.log-2026-06-29.gz": true,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("files = %v; want only %v", got, want)
+	}
+	for _, name := range got {
+		if !want[name] {
+			t.Fatalf("unexpected file %q in %v", name, got)
+		}
+	}
+	if !files[0].Current || files[0].Name != "access.log" {
+		t.Fatalf("current log should be listed first, got %+v", files)
+	}
+}
+
+func TestListLogFilesHandlerReturnsFiles(t *testing.T) {
+	router, logDir, siteID := setupWebsiteLogFilesHandlerTest(t, "wordpress")
+	if err := os.WriteFile(filepath.Join(logDir, "access.log"), []byte("current"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(logDir, "access.log-2026-06-29.gz"), []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := performWebsiteLogRequest(router, http.MethodGet, "/api/websites/"+siteID+"/log-files?type=access")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "access.log") || !strings.Contains(body, "access.log-2026-06-29.gz") {
+		t.Fatalf("body missing log files: %s", body)
+	}
+}
+
+func TestListLogFilesHandlerRejectsSecurityLogsForNonWordPressSite(t *testing.T) {
+	router, _, siteID := setupWebsiteLogFilesHandlerTest(t, "php")
+
+	rec := performWebsiteLogRequest(router, http.MethodGet, "/api/websites/"+siteID+"/log-files?type=security")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
+func TestDownloadLogFileHandlerRejectsMissingWebsite(t *testing.T) {
+	router, _, _ := setupWebsiteLogFilesHandlerTest(t, "wordpress")
+
+	rec := performWebsiteLogRequest(router, http.MethodGet, "/api/websites/999/logs/download?type=access&file=access.log")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+}
+
+func TestDownloadLogFileHandlerRejectsInvalidType(t *testing.T) {
+	router, _, siteID := setupWebsiteLogFilesHandlerTest(t, "wordpress")
+
+	rec := performWebsiteLogRequest(router, http.MethodGet, "/api/websites/"+siteID+"/logs/download?type=debug&file=access.log")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
+func TestDownloadLogFileHandlerRejectsSymlink(t *testing.T) {
+	router, logDir, siteID := setupWebsiteLogFilesHandlerTest(t, "wordpress")
+	target := filepath.Join(logDir, "access.log")
+	if err := os.WriteFile(target, []byte("current"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(logDir, "access.log.1")); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := performWebsiteLogRequest(router, http.MethodGet, "/api/websites/"+siteID+"/logs/download?type=access&file=access.log.1")
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusForbidden, rec.Body.String())
+	}
+}
+
+func TestDownloadLogFileHandlerReturnsFile(t *testing.T) {
+	router, logDir, siteID := setupWebsiteLogFilesHandlerTest(t, "wordpress")
+	if err := os.WriteFile(filepath.Join(logDir, "access.log"), []byte("current log"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := performWebsiteLogRequest(router, http.MethodGet, "/api/websites/"+siteID+"/logs/download?type=access&file=access.log")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if rec.Body.String() != "current log" {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+	if cd := rec.Header().Get("Content-Disposition"); !strings.Contains(cd, "access.log") {
+		t.Fatalf("Content-Disposition = %q, want access.log", cd)
+	}
+}
+
+func setupWebsiteLogFilesHandlerTest(t *testing.T, siteType string) (*gin.Engine, string, string) {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	_ = database.Close()
+	if err := database.Open(filepath.Join(t.TempDir(), "panel.db")); err != nil {
+		t.Fatalf("database.Open: %v", err)
+	}
+	if err := database.RunMigrations(); err != nil {
+		t.Fatalf("RunMigrations: %v", err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+
+	logDir := t.TempDir()
+	result, err := database.GetDB().Exec(`
+		INSERT INTO websites (
+			name, domain, aliases, status, system_user, web_root, log_dir,
+			db_name, db_user, php_pool_path, nginx_conf_path, site_type
+		) VALUES (
+			'example', 'example.com', '', 'active', 'wp_example', ?, ?,
+			'db_example', 'user_example', '/etc/php/8.3/fpm/pool.d/example.conf',
+			'/etc/nginx/sites-available/example.conf', ?
+		)
+	`, t.TempDir(), logDir, siteType)
+	if err != nil {
+		t.Fatalf("insert website: %v", err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("LastInsertId: %v", err)
+	}
+
+	router := gin.New()
+	handler := &WebsiteHandler{}
+	router.GET("/api/websites/:id/log-files", handler.ListLogFiles)
+	router.GET("/api/websites/:id/logs/download", handler.DownloadLogFile)
+	return router, logDir, strconv.FormatInt(id, 10)
+}
+
+func performWebsiteLogRequest(router *gin.Engine, method, path string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
 }

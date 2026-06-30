@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -35,6 +36,14 @@ const websiteCols = `id, name, domain, aliases, status, system_user, web_root, d
 		file_lock_enabled, log_retention_days, cdn_realip_enabled, expires_at, created_at, updated_at`
 
 const fileLockBlockedMessage = "该站点已开启文件锁定，请先解除文件锁定后再执行此维护操作"
+
+type siteLogFileInfo struct {
+	Name       string    `json:"name"`
+	Size       int64     `json:"size"`
+	ModifiedAt time.Time `json:"modified_at"`
+	Current    bool      `json:"current"`
+	Compressed bool      `json:"compressed"`
+}
 
 // scanWebsite scans the canonical columns into a Website model.
 // scanner is either row.Scan (for QueryRow) or rows.Scan (for Rows).
@@ -1140,22 +1149,22 @@ func (h *WebsiteHandler) ViewLogs(c *gin.Context) {
 
 	linesStr := c.DefaultQuery("lines", "200")
 	lines, _ := strconv.Atoi(linesStr)
-	if lines <= 0 || lines > 1000 {
+	if lines <= 0 || lines > 5000 {
 		lines = 200
 	}
 
-	var logFile string
-	if logType == "error" {
-		logFile = filepath.Join(site.LogDir, "error.log")
-	} else if logType == "security" {
-		logFile = filepath.Join(site.LogDir, "wp-security.log")
-	} else {
-		logFile = filepath.Join(site.LogDir, "access.log")
+	baseName, ok := siteLogBaseName(logType)
+	if !ok {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("日志类型无效，仅支持 error、access 或 security"))
+		return
 	}
-
-	cleanPath := filepath.Clean(logFile)
-	if !strings.HasPrefix(cleanPath, filepath.Clean(site.LogDir)) {
+	cleanPath, err := resolveSiteLogFile(site.LogDir, logType, baseName)
+	if err != nil {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("禁止访问该路径"))
+		return
+	}
+	if info, err := os.Lstat(cleanPath); err == nil && !info.Mode().IsRegular() {
+		c.JSON(http.StatusForbidden, models.ErrorResponse("禁止访问该日志文件"))
 		return
 	}
 
@@ -1171,6 +1180,82 @@ func (h *WebsiteHandler) ViewLogs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"log_type": logType, "content": content}))
+}
+
+func (h *WebsiteHandler) ListLogFiles(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的网站ID"))
+		return
+	}
+
+	site := getWebsiteByID(id)
+	if site == nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		return
+	}
+
+	logType := c.Query("type")
+	if logType != "error" && logType != "access" && logType != "security" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("日志类型无效，仅支持 error、access 或 security"))
+		return
+	}
+	if logType == "security" && site.SiteType != "wordpress" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("仅 WordPress 站点支持安全日志"))
+		return
+	}
+
+	files, err := listSiteLogFiles(site.LogDir, logType)
+	if err != nil {
+		c.JSON(http.StatusForbidden, models.ErrorResponse("读取日志文件列表失败"))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"log_type": logType, "files": files}))
+}
+
+func (h *WebsiteHandler) DownloadLogFile(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的网站ID"))
+		return
+	}
+
+	site := getWebsiteByID(id)
+	if site == nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		return
+	}
+
+	logType := c.Query("type")
+	if logType != "error" && logType != "access" && logType != "security" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("日志类型无效，仅支持 error、access 或 security"))
+		return
+	}
+	if logType == "security" && site.SiteType != "wordpress" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("仅 WordPress 站点支持安全日志"))
+		return
+	}
+
+	filename := strings.TrimSpace(c.Query("file"))
+	cleanPath, err := resolveSiteLogFile(site.LogDir, logType, filename)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("日志文件名无效"))
+		return
+	}
+
+	info, err := os.Lstat(cleanPath)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("日志文件不存在"))
+		return
+	}
+	if !info.Mode().IsRegular() {
+		c.JSON(http.StatusForbidden, models.ErrorResponse("禁止下载该日志文件"))
+		return
+	}
+
+	c.Header("Cache-Control", "no-store")
+	c.FileAttachment(cleanPath, filename)
 }
 
 func (h *WebsiteHandler) ClearLogs(c *gin.Context) {
@@ -1196,18 +1281,18 @@ func (h *WebsiteHandler) ClearLogs(c *gin.Context) {
 		return
 	}
 
-	var logFile string
-	if logType == "error" {
-		logFile = filepath.Join(site.LogDir, "error.log")
-	} else if logType == "security" {
-		logFile = filepath.Join(site.LogDir, "wp-security.log")
-	} else {
-		logFile = filepath.Join(site.LogDir, "access.log")
+	baseName, ok := siteLogBaseName(logType)
+	if !ok {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("日志类型无效，仅支持 error、access 或 security"))
+		return
 	}
-
-	cleanPath := filepath.Clean(logFile)
-	if !strings.HasPrefix(cleanPath, filepath.Clean(site.LogDir)) {
+	cleanPath, err := resolveSiteLogFile(site.LogDir, logType, baseName)
+	if err != nil {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("禁止访问该路径"))
+		return
+	}
+	if info, err := os.Lstat(cleanPath); err == nil && !info.Mode().IsRegular() {
+		c.JSON(http.StatusForbidden, models.ErrorResponse("禁止清空该日志文件"))
 		return
 	}
 
@@ -1252,6 +1337,128 @@ func tailFile(path string, n int) string {
 		lines = lines[len(lines)-n:]
 	}
 	return strings.Join(lines, "\n")
+}
+
+func siteLogBaseName(logType string) (string, bool) {
+	switch logType {
+	case "access":
+		return "access.log", true
+	case "error":
+		return "error.log", true
+	case "security":
+		return "wp-security.log", true
+	default:
+		return "", false
+	}
+}
+
+func isAllowedSiteLogFilename(logType, name string) bool {
+	baseName, ok := siteLogBaseName(logType)
+	if !ok || name == "" || name != filepath.Base(name) {
+		return false
+	}
+	if strings.ContainsAny(name, `/\`) || strings.ContainsRune(name, 0) {
+		return false
+	}
+	if name == baseName {
+		return true
+	}
+
+	if strings.HasPrefix(name, baseName+".") {
+		suffix := strings.TrimPrefix(name, baseName+".")
+		suffix = strings.TrimSuffix(suffix, ".gz")
+		return suffix != "" && allDigits(suffix)
+	}
+
+	if strings.HasPrefix(name, baseName+"-") {
+		suffix := strings.TrimPrefix(name, baseName+"-")
+		suffix = strings.TrimSuffix(suffix, ".gz")
+		_, err := time.Parse("2006-01-02", suffix)
+		return err == nil
+	}
+
+	return false
+}
+
+func allDigits(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func resolveSiteLogFile(logDir, logType, filename string) (string, error) {
+	if !isAllowedSiteLogFilename(logType, filename) {
+		return "", fmt.Errorf("invalid log filename")
+	}
+	cleanLogDir := filepath.Clean(logDir)
+	if cleanLogDir == "." || !filepath.IsAbs(cleanLogDir) {
+		return "", fmt.Errorf("invalid log dir")
+	}
+	cleanPath := filepath.Clean(filepath.Join(cleanLogDir, filename))
+	if filepath.Dir(cleanPath) != cleanLogDir {
+		return "", fmt.Errorf("log path outside site log dir")
+	}
+	return cleanPath, nil
+}
+
+func listSiteLogFiles(logDir, logType string) ([]siteLogFileInfo, error) {
+	baseName, ok := siteLogBaseName(logType)
+	if !ok {
+		return nil, fmt.Errorf("invalid log type")
+	}
+	cleanLogDir := filepath.Clean(logDir)
+	if cleanLogDir == "." || !filepath.IsAbs(cleanLogDir) {
+		return nil, fmt.Errorf("invalid log dir")
+	}
+
+	entries, err := os.ReadDir(cleanLogDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []siteLogFileInfo{}, nil
+		}
+		return nil, err
+	}
+
+	files := make([]siteLogFileInfo, 0, len(entries))
+	for _, entry := range entries {
+		name := entry.Name()
+		if !isAllowedSiteLogFilename(logType, name) {
+			continue
+		}
+		cleanPath, err := resolveSiteLogFile(cleanLogDir, logType, name)
+		if err != nil {
+			continue
+		}
+		info, err := os.Lstat(cleanPath)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		files = append(files, siteLogFileInfo{
+			Name:       name,
+			Size:       info.Size(),
+			ModifiedAt: info.ModTime(),
+			Current:    name == baseName,
+			Compressed: strings.HasSuffix(name, ".gz"),
+		})
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].Current != files[j].Current {
+			return files[i].Current
+		}
+		if !files[i].ModifiedAt.Equal(files[j].ModifiedAt) {
+			return files[i].ModifiedAt.After(files[j].ModifiedAt)
+		}
+		return files[i].Name < files[j].Name
+	})
+
+	return files, nil
 }
 
 func (h *WebsiteHandler) GetNginxCustom(c *gin.Context) {
