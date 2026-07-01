@@ -10,12 +10,39 @@ import (
 	"github.com/naibabiji/wp-panel/config"
 	"github.com/naibabiji/wp-panel/database"
 	"github.com/naibabiji/wp-panel/handlers"
+	"github.com/naibabiji/wp-panel/i18n"
 	"github.com/naibabiji/wp-panel/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
 var panelVersion string
+
+var i18nKeys = []string{
+	"auth.connect_failed",
+	"auth.login_failed",
+	"auth.missing_credentials",
+	"auth.session_expired",
+	"common.cancel",
+	"common.confirm",
+	"common.network_error",
+	"common.operation_failed",
+	"common.request_cancelled",
+	"common.request_failed",
+	"common.request_timeout",
+	"common.service_busy",
+	"common.service_exception",
+	"dashboard.chart_load",
+	"dashboard.chart_memory",
+	"dashboard.system_updates",
+	"dashboard.tooltip_time",
+	"dashboard.update_available",
+	"files.root_directory",
+	"security.cdn_mode_cloudflare_auto",
+	"security.cdn_mode_compatible_missing_origin_ips",
+	"security.cdn_mode_compatible_no_origin_ips",
+	"security.cdn_mode_strict_trusted_ips",
+}
 
 func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version string, configPath string) *gin.Engine {
 	panelVersion = version
@@ -96,10 +123,12 @@ func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version
 	})
 
 	panelGroup.GET("/login", func(c *gin.Context) {
+		i18n.MaybeSetLanguageCookie(c.Writer, c.Request)
+		lang := i18n.LangFromRequest(c.Request)
 		middleware.SetCSRFToken(c)
 		csrfToken := middleware.GetCSRFToken(c)
 		c.HTML(http.StatusOK, "login.html", gin.H{
-			"Title":        "登录",
+			"Title":        i18n.T(lang, "auth.login"),
 			"PanelTitle":   handlers.GetPanelTitle(),
 			"PanelVersion": version,
 			"AssetVersion": version,
@@ -107,6 +136,8 @@ func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version
 			"Active":       "login",
 			"AssetPrefix":  prefix + "/assets",
 			"CSRFToken":    csrfToken,
+			"Lang":         lang,
+			"MessagesJSON": i18n.MessagesJSON(lang, i18nKeys),
 		})
 	})
 
@@ -334,29 +365,31 @@ func SetupRouter(cfg *config.Config, tmplFS embed.FS, staticFS embed.FS, version
 	protected.GET("/api/system/updates", sysUpdateHandler.Check)
 	protected.POST("/api/system/updates/do", sysUpdateHandler.Update)
 
-	tmpl := template.Must(template.New("").ParseFS(tmplFS, "templates/*.html"))
+	tmpl := template.Must(template.New("").Funcs(i18n.FuncMap()).ParseFS(tmplFS, "templates/*.html"))
 	r.SetHTMLTemplate(tmpl)
 
 	return r
 }
 
-var pageTitles = map[string]string{
-	"dashboard":      "控制台",
-	"websites":       "网站管理",
-	"ai-diagnostics": "AI 诊断",
-	"cron":           "计划任务",
-	"firewall":       "安全防御",
-	"security":       "安全设置",
-	"files":          "文件管理",
-	"software":       "软件管理",
-	"alert":          "告警通知",
-	"extensions":     "扩展配置",
-	"settings":       "面板设置",
+var pageTitleKeys = map[string]string{
+	"dashboard":      "nav.dashboard",
+	"websites":       "nav.websites",
+	"ai-diagnostics": "nav.ai_diagnostics",
+	"cron":           "nav.cron",
+	"firewall":       "nav.firewall",
+	"security":       "nav.security",
+	"files":          "nav.files",
+	"software":       "nav.software",
+	"alert":          "nav.alert",
+	"extensions":     "nav.extensions",
+	"settings":       "nav.settings",
 }
 
 func pageData(suffix string, active string, contentTpl string, c *gin.Context) gin.H {
+	i18n.MaybeSetLanguageCookie(c.Writer, c.Request)
+	lang := i18n.LangFromRequest(c.Request)
 	csrfToken := middleware.GetCSRFToken(c)
-	title := pageTitles[active]
+	title := i18n.T(lang, pageTitleKeys[active])
 	return gin.H{
 		"Title":           title,
 		"PanelTitle":      handlers.GetPanelTitle(),
@@ -367,5 +400,7 @@ func pageData(suffix string, active string, contentTpl string, c *gin.Context) g
 		"Active":          active,
 		"AssetPrefix":     "/" + suffix + "/assets",
 		"CSRFToken":       csrfToken,
+		"Lang":            lang,
+		"MessagesJSON":    i18n.MessagesJSON(lang, i18nKeys),
 	}
 }

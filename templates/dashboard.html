@@ -3,11 +3,11 @@
 <div>
     <div class="flex items-center justify-between mb-6" x-data="versionCheck()" x-init="check()">
         <div class="flex items-center space-x-3">
-            <h2 class="text-xl font-bold text-white">控制台</h2>
+            <h2 class="text-xl font-bold text-white">{{t .Lang "nav.dashboard"}}</h2>
             <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded">{{.PanelVersion}}</span>
-            <a x-show="hasUpdate" href="/{{.RandomSuffix}}/settings" class="text-xs bg-yellow-600 text-yellow-100 px-2 py-0.5 rounded hover:bg-yellow-500" x-text="'发现新版本 ' + latestVersion"></a>
-            <a x-show="sysCount > 0" href="/{{.RandomSuffix}}/settings" class="text-xs bg-red-700 text-red-100 px-2 py-0.5 rounded hover:bg-red-600" x-text="sysCount + ' 个系统更新'"></a>
-            <span x-show="checking" class="text-xs text-gray-600">检查更新中...</span>
+            <a x-show="hasUpdate" href="/{{.RandomSuffix}}/settings" class="text-xs bg-yellow-600 text-yellow-100 px-2 py-0.5 rounded hover:bg-yellow-500" x-text="t('dashboard.update_available', { version: latestVersion })"></a>
+            <a x-show="sysCount > 0" href="/{{.RandomSuffix}}/settings" class="text-xs bg-red-700 text-red-100 px-2 py-0.5 rounded hover:bg-red-600" x-text="t('dashboard.system_updates', { count: sysCount })"></a>
+            <span x-show="checking" class="text-xs text-gray-600">{{t .Lang "dashboard.checking_updates"}}</span>
         </div>
     </div>
     <div x-data="announcement()" x-init="fetch()" class="mb-4" x-show="visible">
@@ -16,7 +16,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
             </svg>
             <div x-html="content" class="flex-1"></div>
-            <button @click="dismiss()" class="ml-3 flex-shrink-0 text-blue-400 hover:text-blue-200 transition-colors" title="关闭">
+            <button @click="dismiss()" class="ml-3 flex-shrink-0 text-blue-400 hover:text-blue-200 transition-colors" title="{{t .Lang "dashboard.close"}}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -25,37 +25,37 @@
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6" x-data="dashboardStats()" x-init="fetchStats()">
         <div class="card">
-            <p class="text-gray-400 text-sm">CPU 使用率</p>
+            <p class="text-gray-400 text-sm">{{t .Lang "dashboard.cpu_usage"}}</p>
             <p class="text-3xl font-bold text-white mt-2" x-text="stats.cpu_percent?.toFixed(1) + '%'">--</p>
         </div>
         <div class="card">
-            <p class="text-gray-400 text-sm">内存使用率</p>
+            <p class="text-gray-400 text-sm">{{t .Lang "dashboard.memory_usage"}}</p>
             <p class="text-3xl font-bold text-white mt-2" x-text="stats.memory_percent?.toFixed(1) + '%'">--</p>
             <p class="text-xs text-gray-500 mt-1" x-text="formatBytes(stats.memory_used_bytes) + ' / ' + formatBytes(stats.memory_total_bytes)"></p>
         </div>
         <div class="card">
-            <p class="text-gray-400 text-sm">磁盘使用率</p>
+            <p class="text-gray-400 text-sm">{{t .Lang "dashboard.disk_usage"}}</p>
             <p class="text-3xl font-bold text-white mt-2" x-text="stats.disk_total_bytes ? (stats.disk_used_bytes / stats.disk_total_bytes * 100).toFixed(1) + '%' : '--' ">--</p>
             <p class="text-xs text-gray-500 mt-1" x-text="formatBytes(stats.disk_used_bytes) + ' / ' + formatBytes(stats.disk_total_bytes)"></p>
         </div>
         <div class="card">
-            <p class="text-gray-400 text-sm">系统负载</p>
+            <p class="text-gray-400 text-sm">{{t .Lang "dashboard.system_load"}}</p>
             <p class="text-3xl font-bold text-white mt-2" x-text="stats.load_avg_1?.toFixed(1)">--</p>
             <p class="text-xs text-gray-500 mt-1" x-text="stats.load_avg_5?.toFixed(1) + ' / ' + stats.load_avg_15?.toFixed(1)"></p>
         </div>
         <div class="card">
-            <p class="text-gray-400 text-sm">运行时间</p>
+            <p class="text-gray-400 text-sm">{{t .Lang "dashboard.uptime"}}</p>
             <p class="text-3xl font-bold text-white mt-2" x-text="formatUptime(stats.uptime)">--</p>
         </div>
     </div>
 
     <div class="card mb-6" x-data="{ range: '24h' }">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-white">历史趋势</h3>
+            <h3 class="text-lg font-semibold text-white">{{t .Lang "dashboard.history_trend"}}</h3>
             <div class="flex space-x-1">
-                <button @click="range='24h'; fetchMetrics('24h')" :class="range === '24h' ? 'btn-primary text-xs' : 'btn-secondary text-xs'" class="py-1 px-3">24小时</button>
-                <button @click="range='7d'; fetchMetrics('7d')" :class="range === '7d' ? 'btn-primary text-xs' : 'btn-secondary text-xs'" class="py-1 px-3">7天</button>
-                <button @click="range='15d'; fetchMetrics('15d')" :class="range === '15d' ? 'btn-primary text-xs' : 'btn-secondary text-xs'" class="py-1 px-3">15天</button>
+                <button @click="range='24h'; fetchMetrics('24h')" :class="range === '24h' ? 'btn-primary text-xs' : 'btn-secondary text-xs'" class="py-1 px-3">{{t .Lang "dashboard.hours_24"}}</button>
+                <button @click="range='7d'; fetchMetrics('7d')" :class="range === '7d' ? 'btn-primary text-xs' : 'btn-secondary text-xs'" class="py-1 px-3">{{t .Lang "dashboard.days_7"}}</button>
+                <button @click="range='15d'; fetchMetrics('15d')" :class="range === '15d' ? 'btn-primary text-xs' : 'btn-secondary text-xs'" class="py-1 px-3">{{t .Lang "dashboard.days_15"}}</button>
             </div>
         </div>
         <canvas id="metricsCanvas" class="w-full" height="80"></canvas>
@@ -63,20 +63,20 @@
 
     <div class="card mb-6" x-data="siteResources()" x-init="initFetch()">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-white">网站资源</h3>
+            <h3 class="text-lg font-semibold text-white">{{t .Lang "dashboard.site_resources"}}</h3>
             <div class="flex items-center space-x-3">
                 <span class="text-xs text-gray-500" x-show="since" x-text="since"></span>
-                <button @click="fetch()" class="btn-secondary text-xs py-1 px-3">刷新</button>
+                <button @click="fetch()" class="btn-secondary text-xs py-1 px-3">{{t .Lang "dashboard.refresh"}}</button>
             </div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead class="border-b border-gray-700 text-gray-400">
                     <tr>
-                        <th class="py-2 text-left">网站</th>
+                        <th class="py-2 text-left">{{t .Lang "dashboard.site"}}</th>
                         <th class="py-2 text-right w-20">CPU</th>
-                        <th class="py-2 text-right w-20">内存</th>
-                        <th class="py-2 text-right w-20">进程</th>
+                        <th class="py-2 text-right w-20">{{t .Lang "dashboard.memory"}}</th>
+                        <th class="py-2 text-right w-20">{{t .Lang "dashboard.processes"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -91,12 +91,12 @@
                         </tr>
                     </template>
                     <tr x-show="sites.length === 0">
-                        <td colspan="4" class="py-4 text-center text-gray-500">暂无运行中的网站进程</td>
+                        <td colspan="4" class="py-4 text-center text-gray-500">{{t .Lang "dashboard.no_running_site_processes"}}</td>
                     </tr>
                 </tbody>
             </table>
         </div>
-        <p class="text-xs text-gray-600 mt-3">通过扫描各网站 PHP-FPM 进程的系统用户，聚合每个站点所有进程的 CPU 和内存占用。刷新间隔 30 秒。</p>
+        <p class="text-xs text-gray-600 mt-3">{{t .Lang "dashboard.site_resources_note"}}</p>
     </div>
 </div>
 
@@ -186,8 +186,8 @@ function dashboardStats() {
                 labels: [],
                 datasets: [
                     { label: 'CPU %', borderColor: '#3b82f6', backgroundColor: '#3b82f6', data: [], tension: 0.3, pointRadius: 0, pointHoverRadius: 5 },
-                    { label: '内存 %', borderColor: '#22c55e', backgroundColor: '#22c55e', data: [], tension: 0.3, pointRadius: 0, pointHoverRadius: 5 },
-                    { label: '负载', borderColor: '#eab308', backgroundColor: '#eab308', data: [], tension: 0.3, pointRadius: 0, pointHoverRadius: 5 },
+                    { label: t('dashboard.chart_memory'), borderColor: '#22c55e', backgroundColor: '#22c55e', data: [], tension: 0.3, pointRadius: 0, pointHoverRadius: 5 },
+                    { label: t('dashboard.chart_load'), borderColor: '#eab308', backgroundColor: '#eab308', data: [], tension: 0.3, pointRadius: 0, pointHoverRadius: 5 },
                 ]
             },
             options: {
@@ -213,7 +213,7 @@ function dashboardStats() {
                         intersect: false,
                         callbacks: {
                             title: function(items) {
-                                return '时间: ' + items[0].label;
+                                return t('dashboard.tooltip_time', { time: items[0].label });
                             },
                             label: function(item) {
                                 return item.dataset.label + ': ' + item.parsed.y.toFixed(2);
@@ -242,7 +242,7 @@ function siteResources() {
                 const r = await api('/dashboard/site-resources');
                 if (r.success) this.sites = r.data || [];
                 const now = new Date();
-                this.since = now.toLocaleTimeString('zh-CN');
+                this.since = now.toLocaleTimeString(currentLocale());
             } catch(e) {}
         },
         initFetch() {

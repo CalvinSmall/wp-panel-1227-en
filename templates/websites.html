@@ -2,29 +2,31 @@
 {{define "websites_content"}}
 <div x-data="websiteList()" x-init="fetchList()">
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-white">网站管理</h2>
-        <a href="/{{.RandomSuffix}}/websites/new" class="btn-primary">创建网站</a>
+        <h2 class="text-xl font-bold text-white">{{t .Lang "nav.websites"}}</h2>
+        <a href="/{{.RandomSuffix}}/websites/new" class="btn-primary">{{t .Lang "website.create_site"}}</a>
     </div>
 
     <!-- 重装 WordPress 对话框 -->
     <div x-show="reinstallModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="reinstallModal.show = false">
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 class="text-lg font-bold text-white mb-2" x-text="'重装 WordPress — ' + (reinstallModal.site?.domain || '')"></h3>
-            <p class="text-sm text-red-400 mb-4">⚠ 此操作将删除所有网站文件、清空数据库并重新部署全新 WordPress，所有数据不可恢复。</p>
+            <h3 class="text-lg font-bold text-white mb-2">
+                {{t .Lang "website.reinstall_wordpress"}} <span x-text="reinstallModal.site ? '— ' + reinstallModal.site.domain : ''"></span>
+            </h3>
+            <p class="text-sm text-red-400 mb-4">{{t .Lang "website.reinstall_warning"}}</p>
 
             <label class="flex items-center space-x-2 cursor-pointer mb-3">
                 <input type="checkbox" x-model="reinstallModal.cleanDefaults" class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600">
-                <span class="text-gray-300 text-sm">自动清理默认插件（Akismet + Hello Dolly）</span>
+                <span class="text-gray-300 text-sm">{{t .Lang "website.clean_default_plugins"}}</span>
             </label>
 
             <label class="flex items-center space-x-2 cursor-pointer mb-4">
                 <input type="checkbox" x-model="reinstallModal.removeUnusedThemes" class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600">
-                <span class="text-gray-300 text-sm">删除未使用的默认主题（Twenty Twenty-Four / Twenty Twenty-Three）</span>
+                <span class="text-gray-300 text-sm">{{t .Lang "website.remove_unused_default_themes"}}</span>
             </label>
 
             <div class="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                    <p class="text-xs text-gray-500 mb-2">安装主题</p>
+                    <p class="text-xs text-gray-500 mb-2">{{t .Lang "website.install_themes"}}</p>
                     <template x-for="t in reinstallModal.extensions.filter(e => e.etype === 'theme' && e.enabled)" :key="t.id">
                         <label class="flex items-center space-x-2 cursor-pointer mb-1">
                             <input type="checkbox" :value="t.slug" x-model="reinstallModal.installThemes" class="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-600">
@@ -33,7 +35,7 @@
                     </template>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-500 mb-2">安装插件</p>
+                    <p class="text-xs text-gray-500 mb-2">{{t .Lang "website.install_plugins"}}</p>
                     <template x-for="p in reinstallModal.extensions.filter(e => e.etype === 'plugin' && e.enabled)" :key="p.id">
                         <label class="flex items-center space-x-2 cursor-pointer mb-1">
                             <input type="checkbox" :value="p.slug" x-model="reinstallModal.installPlugins" class="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-600">
@@ -44,8 +46,8 @@
             </div>
 
             <div class="flex justify-end space-x-3">
-                <button @click="reinstallModal.show = false" class="btn-secondary text-sm">取消</button>
-                <button @click="doReinstallWP()" class="text-sm py-2 px-4 rounded text-white" style="background-color: #7f1d1d;">确认重装</button>
+                <button @click="reinstallModal.show = false" class="btn-secondary text-sm">{{t .Lang "website.cancel"}}</button>
+                <button @click="doReinstallWP()" class="text-sm py-2 px-4 rounded text-white" style="background-color: #7f1d1d;">{{t .Lang "website.confirm_reinstall"}}</button>
             </div>
         </div>
     </div>
@@ -55,17 +57,17 @@
             <table class="w-full">
                 <thead class="border-b border-gray-700">
                     <tr>
-                        <th class="table-header">域名</th>
-                        <th class="table-header">状态</th>
-                        <th class="table-header">文件锁定</th>
+                        <th class="table-header">{{t .Lang "website.domain"}}</th>
+                        <th class="table-header">{{t .Lang "website.status"}}</th>
+                        <th class="table-header">{{t .Lang "website.file_lock_column"}}</th>
                         <th class="table-header">SSL</th>
-                        <th class="table-header">监控</th>
-                        <th class="table-header">缓存</th>
-                        <th class="table-header">日志</th>
-                        <th class="table-header">DB备份</th>
-                        <th class="table-header">创建时间</th>
-                        <th class="table-header">到期时间</th>
-                        <th class="table-header">操作</th>
+                        <th class="table-header">{{t .Lang "website.monitoring"}}</th>
+                        <th class="table-header">{{t .Lang "website.cache"}}</th>
+                        <th class="table-header">{{t .Lang "website.logs"}}</th>
+                        <th class="table-header">{{t .Lang "website.db_backup"}}</th>
+                        <th class="table-header">{{t .Lang "website.created_at"}}</th>
+                        <th class="table-header">{{t .Lang "website.expiry_time"}}</th>
+                        <th class="table-header">{{t .Lang "website.actions"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -109,19 +111,19 @@
                             <td class="table-cell text-xs" x-text="site.expires_at ? new Date(site.expires_at).toLocaleDateString('zh-CN') : '永不到期'"></td>
                             <td class="table-cell">
                                 <div class="flex space-x-2">
-                                    <a :href="'/{{$.RandomSuffix}}/websites/' + site.id" class="btn-secondary text-xs py-1 px-2">详情</a>
-                                    <a :href="'/{{$.RandomSuffix}}/files?site_id=' + site.id" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">文件</a>
+                                    <a :href="'/{{$.RandomSuffix}}/websites/' + site.id" class="btn-secondary text-xs py-1 px-2">{{t .Lang "website.details"}}</a>
+                                    <a :href="'/{{$.RandomSuffix}}/files?site_id=' + site.id" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.file_short"}}</a>
                                     <button @click="toggleStatus(site)" class="text-xs py-1 px-2 rounded"
                                             :class="site.status === 'active' ? 'btn-warning bg-yellow-700 hover:bg-yellow-600 text-white' : 'btn-success text-xs'"
                                             x-text="site.status === 'active' ? '暂停' : '启用'"></button>
                                     <button x-show="site.site_type === 'wordpress'" @click="reinstallWP(site)" :disabled="reinstallingId === site.id" class="text-xs py-1 px-2 rounded" style="background-color: #7f1d1d; color: #fca5a5;" x-text="reinstallingId === site.id ? '重装中...' : '重装'"></button>
-                                    <button @click="deleteSite(site)" class="btn-danger text-xs py-1 px-2">删除</button>
+                                    <button @click="deleteSite(site)" class="btn-danger text-xs py-1 px-2">{{t .Lang "website.delete"}}</button>
                                 </div>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="websites.length === 0">
-                        <td colspan="11" class="table-cell text-center text-gray-500 py-8">暂无网站</td>
+                        <td colspan="11" class="table-cell text-center text-gray-500 py-8">{{t .Lang "website.no_websites"}}</td>
                     </tr>
                 </tbody>
             </table>

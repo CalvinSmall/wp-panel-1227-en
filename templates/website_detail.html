@@ -3,8 +3,8 @@
 <div x-data="websiteDetail()" x-init="init()">
 
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-white">网站详情</h2>
-        <a href="/{{.RandomSuffix}}/websites" class="btn-secondary">返回列表</a>
+        <h2 class="text-xl font-bold text-white">{{t .Lang "website.detail_title"}}</h2>
+        <a href="/{{.RandomSuffix}}/websites" class="btn-secondary">{{t .Lang "website.back_to_list"}}</a>
     </div>
 
     <div x-show="loading" class="text-center py-8">
@@ -16,26 +16,26 @@
     <!-- Row 1: 基本信息 | 网站监控 + 数据库 -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">基本信息</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "website.basic_info"}}</h3>
             <dl class="space-y-3">
-                <div><dt class="text-sm text-gray-400">域名</dt><dd><a :href="(site.ssl_enabled ? 'https' : 'http') + '://' + site.domain" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline" x-text="site.domain"></a></dd></div>
-                <div><dt class="text-sm text-gray-400">别名</dt><dd class="text-white" x-text="site.aliases || '无'"></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.domain"}}</dt><dd><a :href="(site.ssl_enabled ? 'https' : 'http') + '://' + site.domain" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline" x-text="site.domain"></a></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.aliases"}}</dt><dd class="text-white" x-text="site.aliases || '无'"></dd></div>
                 <div class="pt-2">
-                    <button @click="domainModalOpen = true; editDomain = site.domain; editAliasesStr = site.aliases || ''" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">编辑域名</button>
-                    <a :href="(document.body.dataset.panelPrefix || '') + '/files?site_id=' + site.id" class="text-sm py-1.5 px-3 rounded ml-2 inline-block" style="background-color: #1e3a5f; color: #93c5fd;">文件管理</a>
-                    <a :href="(document.body.dataset.panelPrefix || '') + '/ai-diagnostics?site_id=' + site.id" class="text-sm py-1.5 px-3 rounded ml-2 inline-block" style="background-color: #14532d; color: #86efac;">AI 诊断</a>
+                    <button @click="domainModalOpen = true; editDomain = site.domain; editAliasesStr = site.aliases || ''" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.edit_domain"}}</button>
+                    <a :href="(document.body.dataset.panelPrefix || '') + '/files?site_id=' + site.id" class="text-sm py-1.5 px-3 rounded ml-2 inline-block" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "nav.files"}}</a>
+                    <a :href="(document.body.dataset.panelPrefix || '') + '/ai-diagnostics?site_id=' + site.id" class="text-sm py-1.5 px-3 rounded ml-2 inline-block" style="background-color: #14532d; color: #86efac;">{{t .Lang "nav.ai_diagnostics"}}</a>
                 </div>
-                <div><dt class="text-sm text-gray-400">状态</dt><dd><span :class="site.status === 'active' ? 'badge-success' : 'badge-warning'" x-text="site.status === 'active' ? '运行中' : '已暂停'"></span></dd></div>
-                <div><dt class="text-sm text-gray-400">类型</dt><dd class="text-white" x-text="site.site_type === 'php' ? '通用 PHP 网站' : 'WordPress'"></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.status"}}</dt><dd><span :class="site.status === 'active' ? 'badge-success' : 'badge-warning'" x-text="site.status === 'active' ? '运行中' : '已暂停'"></span></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.type"}}</dt><dd class="text-white" x-text="site.site_type === 'php' ? '通用 PHP 网站' : 'WordPress'"></dd></div>
                 <div class="pt-2 border-t border-gray-700/50">
-                    <dt class="text-sm text-gray-400 mb-2">CDN 真实 IP</dt>
+                    <dt class="text-sm text-gray-400 mb-2">{{t .Lang "website.cdn_real_ip"}}</dt>
                     <div class="rounded border border-blue-900/60 bg-blue-950/30 p-2 mb-2 text-xs text-blue-200">
-                        <p>Cloudflare 真实 IP 已由系统自动处理，无需在这里选择。</p>
-                        <p class="mt-1 text-blue-200/80">这里仅用于阿里云 ESA、腾讯 EdgeOne、又拍云或其他非 Cloudflare CDN。</p>
+                        <p>{{t .Lang "website.cloudflare_realip_auto"}}</p>
+                        <p class="mt-1 text-blue-200/80">{{t .Lang "website.non_cloudflare_cdn_notice"}}</p>
                     </div>
                     <label class="flex items-center space-x-2 text-sm text-gray-300 mb-2">
                         <input type="checkbox" x-model="cdnRealIPEnabled">
-                        <span>启用其他 CDN 真实 IP</span>
+                        <span>{{t .Lang "website.enable_other_cdn_realip"}}</span>
                     </label>
                     <div x-show="cdnRealIPEnabled" class="space-y-2">
                         <template x-for="g in selectableCDNGroups()" :key="g.id">
@@ -47,77 +47,77 @@
                                 </span>
                             </label>
                         </template>
-                        <p x-show="selectableCDNGroups().length === 0" class="text-xs text-gray-500">暂无可选择的非 Cloudflare CDN 配置组，请先到安全设置中新增。</p>
+                        <p x-show="selectableCDNGroups().length === 0" class="text-xs text-gray-500">{{t .Lang "website.no_non_cloudflare_cdn_groups"}}</p>
                         <p class="text-xs text-gray-500" x-text="cdnRealIPModeText()"></p>
                     </div>
                     <button @click="saveCDNRealIP()" :disabled="cdnRealIPSaving" class="btn-primary text-sm mt-2" x-text="cdnRealIPSaving ? '保存中...' : '保存其他 CDN 设置'"></button>
                 </div>
-                <div><dt class="text-sm text-gray-400">系统用户</dt><dd class="text-white font-mono" x-text="site.system_user"></dd></div>
-                <div><dt class="text-sm text-gray-400">网站根目录</dt><dd class="text-white font-mono text-sm" x-text="site.web_root"></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.system_user"}}</dt><dd class="text-white font-mono" x-text="site.system_user"></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.site_root"}}</dt><dd class="text-white font-mono text-sm" x-text="site.web_root"></dd></div>
                 <div x-show="site.site_type === 'php'">
-                    <dt class="text-sm text-gray-400">Web 入口目录</dt>
+                    <dt class="text-sm text-gray-400">{{t .Lang "website.document_root"}}</dt>
                     <dd class="flex items-center space-x-2 mt-1">
                         <select x-model="documentRootSubdir" class="input-field text-sm py-1 w-56">
-                            <option value="">项目根</option>
-                            <option value="public">public（Laravel / Symfony 等框架）</option>
+                            <option value="">{{t .Lang "website.project_root"}}</option>
+                            <option value="public">{{t .Lang "website.public_root_option"}}</option>
                         </select>
                         <button @click="saveDocumentRoot()" :disabled="documentRootSaving" class="btn-primary text-xs py-1 px-2" x-text="documentRootSaving ? '保存中...' : '保存'"></button>
                     </dd>
-                    <p class="text-xs text-gray-500 mt-1">网站根目录仍用于文件管理和备份；这里只改变 Nginx 对外访问的 root。</p>
+                    <p class="text-xs text-gray-500 mt-1">{{t .Lang "website.document_root_detail_help"}}</p>
                 </div>
-                <div><dt class="text-sm text-gray-400">日志目录</dt><dd class="text-white font-mono text-sm" x-text="site.log_dir"></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.log_dir"}}</dt><dd class="text-white font-mono text-sm" x-text="site.log_dir"></dd></div>
                 <div>
-                    <dt class="text-sm text-gray-400">到期时间</dt>
+                    <dt class="text-sm text-gray-400">{{t .Lang "website.expiry_time"}}</dt>
                     <dd class="text-white" x-show="!editingExpiry" x-text="site.expires_at ? new Date(site.expires_at).toLocaleDateString('zh-CN') : '未设置'"></dd>
                     <div x-show="editingExpiry" class="flex items-center space-x-2">
                         <input type="date" x-model="expiresAtInput" class="input-field text-sm py-1 w-44">
                         <button @click="saveExpiry()" :disabled="expirySaving" class="btn-primary text-xs py-1 px-2" x-text="expirySaving ? '保存中...' : '保存'"></button>
-                        <button @click="editingExpiry = false" class="text-gray-400 hover:text-white text-xs">取消</button>
+                        <button @click="editingExpiry = false" class="text-gray-400 hover:text-white text-xs">{{t .Lang "website.cancel"}}</button>
                     </div>
                 </div>
                 <div class="pt-1" x-show="!editingExpiry">
-                    <button @click="editingExpiry = true; expiresAtInput = site.expires_at ? site.expires_at.substring(0, 10) : ''" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">编辑到期时间</button>
+                    <button @click="editingExpiry = true; expiresAtInput = site.expires_at ? site.expires_at.substring(0, 10) : ''" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.edit_expiry_time"}}</button>
                 </div>
             </dl>
         </div>
 
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">网站监控</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "website.site_monitoring"}}</h3>
             <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer mb-3">
                 <input type="checkbox" x-model="monitoringEnabled">
-                <span>启用网站监控</span>
+                <span>{{t .Lang "website.enable_site_monitoring"}}</span>
             </label>
             <div x-show="monitoringEnabled" class="flex items-center space-x-2 mb-4">
-                <span class="text-xs text-gray-500">检测间隔</span>
+                <span class="text-xs text-gray-500">{{t .Lang "website.check_interval"}}</span>
                 <select x-model="monitoringInterval" class="input-field w-24 text-sm py-1">
-                    <option value="1">1 分钟</option>
-                    <option value="5">5 分钟</option>
-                    <option value="10">10 分钟</option>
-                    <option value="30">30 分钟</option>
+                    <option value="1">{{t .Lang "website.minute_1"}}</option>
+                    <option value="5">{{t .Lang "website.minute_5"}}</option>
+                    <option value="10">{{t .Lang "website.minute_10"}}</option>
+                    <option value="30">{{t .Lang "website.minute_30"}}</option>
                 </select>
             </div>
             <button @click="saveMonitoring()" :disabled="monitoringSaving" class="btn-primary text-sm" x-text="monitoringSaving ? '保存中...' : '保存设置'"></button>
-            <p x-show="monitoringEnabled" class="text-xs text-gray-500 mt-3">定期检测网站 HTTP 状态码，异常时通过告警通知发送邮件。需先在「告警通知」页面配置 SMTP。</p>
-            <p x-show="!monitoringEnabled" class="text-xs text-gray-600 mt-3">开启后可定期检测网站是否可访问，异常时邮件通知。</p>
+            <p x-show="monitoringEnabled" class="text-xs text-gray-500 mt-3">{{t .Lang "website.monitoring_enabled_help"}}</p>
+            <p x-show="!monitoringEnabled" class="text-xs text-gray-600 mt-3">{{t .Lang "website.monitoring_disabled_help"}}</p>
 
             <hr class="my-5 border-gray-700">
 
-            <h3 class="text-lg font-semibold text-white mb-4">数据库</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "website.database"}}</h3>
             <dl class="space-y-3 mb-4">
-                <div><dt class="text-sm text-gray-400">数据库名</dt><dd class="text-white font-mono text-sm" x-text="site.db_name"></dd></div>
-                <div><dt class="text-sm text-gray-400">用户名</dt><dd class="text-white font-mono text-sm" x-text="site.db_user"></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.database_name"}}</dt><dd class="text-white font-mono text-sm" x-text="site.db_name"></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.username"}}</dt><dd class="text-white font-mono text-sm" x-text="site.db_user"></dd></div>
                 <div x-show="site.site_type === 'wordpress'">
-                    <dt class="text-sm text-gray-400">表前缀</dt>
+                    <dt class="text-sm text-gray-400">{{t .Lang "website.table_prefix"}}</dt>
                     <dd class="flex items-center space-x-2 mt-1">
-                        <input type="text" x-model="editTablePrefix" class="input-field text-sm font-mono py-1 w-28" placeholder="如 wp_">
+                        <input type="text" x-model="editTablePrefix" class="input-field text-sm font-mono py-1 w-28" placeholder="{{t .Lang "website.table_prefix_placeholder"}}">
                         <button @click="detectTablePrefix()" :disabled="detectingPrefix" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;" x-text="detectingPrefix ? '检测中...' : '自动检测'"></button>
                     </dd>
-                    <p class="text-xs text-gray-500 mt-1">搬家后如数据库表前缀与 wp-config.php 不一致，可在此修改。点击「自动检测」从数据库读取实际前缀。</p>
+                    <p class="text-xs text-gray-500 mt-1">{{t .Lang "website.table_prefix_help"}}</p>
                 </div>
             </dl>
-            <button @click="dbPasswordModal = true" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">修改密码</button>
+            <button @click="dbPasswordModal = true" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.change_password"}}</button>
             <button @click="fixWPConfig()" :disabled="dbSubmitting" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #14532d; color: #86efac;" x-text="dbSubmitting ? '处理中...' : '同步数据库信息'"></button>
-            <button @click="openSiteURLModal()" x-show="site.site_type === 'wordpress'" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #1e3a5f; color: #93c5fd;">修改站点URL</button>
+            <button @click="openSiteURLModal()" x-show="site.site_type === 'wordpress'" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.change_site_url"}}</button>
             <button @click="clearDatabase()" :disabled="dbSubmitting" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #7f1d1d; color: #fca5a5;" x-text="dbSubmitting ? '清空中...' : '清空数据库'"></button>
 
             <hr class="my-4 border-gray-700">
@@ -131,12 +131,12 @@
             <div class="flex items-center space-x-3 mb-3 p-2 rounded" style="background-color: #0f172a;">
                 <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" x-model="backupEnabled" @change="saveBackupSettings()">
-                    <span>自动备份（每天 4:00）</span>
+                    <span>{{t .Lang "website.auto_backup"}}</span>
                 </label>
                 <label class="flex items-center space-x-2 text-sm text-gray-300 ml-4">
-                    <span>保留</span>
+                    <span>{{t .Lang "website.keep"}}</span>
                     <input type="number" x-model.number="backupKeepCount" @change="saveBackupSettings()" class="input-field w-16 text-sm py-0.5 text-center" min="1" max="30">
-                    <span>份</span>
+                    <span>{{t .Lang "website.copies"}}</span>
                 </label>
             </div>
 
@@ -146,11 +146,11 @@
                     <table class="w-full text-sm">
                         <thead class="border-b border-gray-700 text-gray-400">
                             <tr>
-                                <th class="py-2 text-left whitespace-nowrap">文件名</th>
-                                <th class="py-2 text-left whitespace-nowrap">大小</th>
-                                <th class="py-2 text-left whitespace-nowrap">时间</th>
-                                <th class="py-2 text-left whitespace-nowrap">类型</th>
-                                <th class="py-2 text-left w-36">操作</th>
+                                <th class="py-2 text-left whitespace-nowrap">{{t .Lang "website.filename"}}</th>
+                                <th class="py-2 text-left whitespace-nowrap">{{t .Lang "website.size"}}</th>
+                                <th class="py-2 text-left whitespace-nowrap">{{t .Lang "website.time"}}</th>
+                                <th class="py-2 text-left whitespace-nowrap">{{t .Lang "website.type"}}</th>
+                                <th class="py-2 text-left w-36">{{t .Lang "website.actions"}}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -162,15 +162,15 @@
                                     <td class="py-2 whitespace-nowrap"><span :class="b.auto ? 'badge-info' : 'badge-success'" class="text-xs" x-text="b.auto ? '自动' : '手动'"></span></td>
                                     <td class="py-2">
                                         <div class="flex flex-wrap gap-1">
-                                            <button @click="downloadBackup(b)" class="btn-primary text-xs py-1 px-2">下载</button>
+                                            <button @click="downloadBackup(b)" class="btn-primary text-xs py-1 px-2">{{t .Lang "website.download"}}</button>
                                             <button @click="restoreBackup(b)" :disabled="restoringId" class="text-xs py-1 px-2 rounded" style="background-color: #7f1d1d; color: #fca5a5;" x-text="restoringId === b.id ? '恢复中...' : '恢复'"></button>
-                                            <button @click="deleteBackup(b)" :disabled="restoringId" class="btn-secondary text-xs py-1 px-2">删除</button>
+                                            <button @click="deleteBackup(b)" :disabled="restoringId" class="btn-secondary text-xs py-1 px-2">{{t .Lang "website.delete"}}</button>
                                         </div>
                                     </td>
                                 </tr>
                             </template>
                             <tr x-show="backups.length === 0">
-                                <td colspan="5" class="py-4 text-center text-gray-500">暂无备份记录</td>
+                                <td colspan="5" class="py-4 text-center text-gray-500">{{t .Lang "website.no_backups"}}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -182,41 +182,41 @@
     <!-- Row 2: SSL + Nginx | WordPress优化 -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">SSL 证书管理</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "website.ssl_management"}}</h3>
             <div class="mb-3">
                 <span :class="site.ssl_enabled ? 'badge-success' : site.ssl_last_error ? 'badge-warning' : 'badge-info'" class="text-sm" x-text="site.ssl_enabled ? '已启用' : site.ssl_last_error ? '待处理' : '未启用'"></span>
             </div>
             <div x-show="!site.ssl_enabled && site.ssl_last_error" class="mb-4 p-3 bg-yellow-900/40 border border-yellow-700 rounded-lg text-yellow-200 text-sm">
-                <p class="font-medium mb-1">上次 SSL 申请失败</p>
+                <p class="font-medium mb-1">{{t .Lang "website.last_ssl_failed"}}</p>
                 <p x-text="site.ssl_last_error"></p>
             </div>
             <div x-show="site.ssl_enabled">
                 <dl class="space-y-3 mb-4">
-                    <div><dt class="text-sm text-gray-400">证书路径</dt><dd class="text-white font-mono text-sm break-all" x-text="site.ssl_cert_path"></dd></div>
-                    <div><dt class="text-sm text-gray-400">私钥路径</dt><dd class="text-white font-mono text-sm break-all" x-text="site.ssl_key_path"></dd></div>
-                    <div><dt class="text-sm text-gray-400">到期时间</dt><dd class="text-white" x-text="site.ssl_expires_at ? new Date(site.ssl_expires_at).toLocaleDateString('zh-CN') : '未知'"></dd></div>
+                    <div><dt class="text-sm text-gray-400">{{t .Lang "website.cert_path"}}</dt><dd class="text-white font-mono text-sm break-all" x-text="site.ssl_cert_path"></dd></div>
+                    <div><dt class="text-sm text-gray-400">{{t .Lang "website.private_key_path"}}</dt><dd class="text-white font-mono text-sm break-all" x-text="site.ssl_key_path"></dd></div>
+                    <div><dt class="text-sm text-gray-400">{{t .Lang "website.expiry_time"}}</dt><dd class="text-white" x-text="site.ssl_expires_at ? new Date(site.ssl_expires_at).toLocaleDateString('zh-CN') : '未知'"></dd></div>
                 </dl>
                 <div class="flex flex-wrap gap-3">
-                    <button @click="downloadSSLPackage()" class="text-sm py-1.5 px-3 rounded" style="background-color: #374151; color: #e5e7eb;">下载证书包</button>
-                    <button @click="sslMode='auto'; sslModalOpen=true" class="text-sm py-1.5 px-3 rounded" style="background-color: #166534; color: #bbf7d0;">重新申请</button>
-                    <button @click="sslMode='manual'; sslCert=''; sslKey=''; sslModalOpen=true" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">替换证书</button>
-                    <button @click="removeSSL()" class="text-sm py-1.5 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;">删除证书</button>
+                    <button @click="downloadSSLPackage()" class="text-sm py-1.5 px-3 rounded" style="background-color: #374151; color: #e5e7eb;">{{t .Lang "website.download_cert_package"}}</button>
+                    <button @click="sslMode='auto'; sslModalOpen=true" class="text-sm py-1.5 px-3 rounded" style="background-color: #166534; color: #bbf7d0;">{{t .Lang "website.reissue"}}</button>
+                    <button @click="sslMode='manual'; sslCert=''; sslKey=''; sslModalOpen=true" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.replace_cert"}}</button>
+                    <button @click="removeSSL()" class="text-sm py-1.5 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;">{{t .Lang "website.delete_cert"}}</button>
                 </div>
                 <label class="mt-4 flex items-start space-x-2 cursor-pointer text-sm text-gray-300">
                     <input type="checkbox" x-model="sslExportEnabled" @change="saveSSLExport()" :disabled="sslExportSaving" class="mt-0.5 w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500">
-                    <span>允许配套插件读取 SSL 证书</span>
+                    <span>{{t .Lang "website.allow_plugin_read_ssl"}}</span>
                 </label>
             </div>
             <div x-show="!site.ssl_enabled">
-                <p class="text-gray-400 mb-4">该网站尚未启用 SSL 证书</p>
-                <button @click="sslMode='auto'; sslModalOpen=true" class="btn-primary">启用 SSL</button>
+                <p class="text-gray-400 mb-4">{{t .Lang "website.ssl_not_enabled"}}</p>
+                <button @click="sslMode='auto'; sslModalOpen=true" class="btn-primary">{{t .Lang "website.enable_ssl"}}</button>
             </div>
 
             <hr class="my-5 border-gray-700">
 
-            <h3 class="text-lg font-semibold text-white mb-2">Nginx 自定义配置</h3>
+            <h3 class="text-lg font-semibold text-white mb-2">{{t .Lang "website.nginx_custom_config"}}</h3>
             <details class="mb-4">
-                <summary class="cursor-pointer text-blue-400 hover:text-blue-300 text-xs">配置说明与示例</summary>
+                <summary class="cursor-pointer text-blue-400 hover:text-blue-300 text-xs">{{t .Lang "website.config_examples"}}</summary>
                 <div class="mt-2 ml-2 space-y-2 text-gray-500 text-xs">
                     <p><strong class="text-gray-400">pre.conf</strong> — 位于 <code class="text-gray-400">root</code> 指令之前，适合设置上传大小限制、早期 rewrite 等需要在请求处理最前端生效的指令。</p>
                     <pre class="bg-gray-900 p-2 rounded leading-relaxed"># 上传文件大小限制
@@ -243,29 +243,29 @@ location ^~ /api/ {
                 </div>
             </details>
             <div class="mb-3">
-                <label class="block text-sm text-gray-300 mb-1">Server 级配置（pre.conf — root 指令之前）</label>
+                <label class="block text-sm text-gray-300 mb-1">{{t .Lang "website.server_level_config"}}</label>
                 <textarea x-model="nginxPreContent" rows="3" class="w-full rounded p-2 text-xs font-mono" style="background-color: #0f172a; border: 1px solid #334155; color: #e2e8f0; resize: vertical;" placeholder="client_max_body_size 128m;"></textarea>
             </div>
             <div class="mb-4">
-                <label class="block text-sm text-gray-300 mb-1">Location 级配置（.conf — location 块之前，缓存绕过规则写这里）</label>
+                <label class="block text-sm text-gray-300 mb-1">{{t .Lang "website.location_level_config"}}</label>
                 <textarea x-model="nginxContent" rows="6" class="w-full rounded p-2 text-xs font-mono" style="background-color: #0f172a; border: 1px solid #334155; color: #e2e8f0; resize: vertical;" placeholder="if ($request_uri ~* &quot;/ai-assistant&quot;) { set $wp_skip_cache 1; }"></textarea>
             </div>
             <div class="flex space-x-3">
                 <button @click="saveNginxCustom()" :disabled="nginxSubmitting" class="btn-primary text-sm" x-text="nginxSubmitting ? '校验中...' : '保存并生效'"></button>
-                <button @click="fetchNginxCustom()" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e293b; border: 1px solid #334155; color: #e2e8f0;">刷新</button>
+                <button @click="fetchNginxCustom()" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e293b; border: 1px solid #334155; color: #e2e8f0;">{{t .Lang "website.refresh"}}</button>
             </div>
         </div>
 
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">WordPress优化</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "website.wp_optimization"}}</h3>
             <div x-show="site.site_type === 'wordpress'" class="pb-4 mb-4 border-b border-gray-700">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                         <div class="flex items-center gap-2 mb-1">
-                            <span class="text-sm font-medium text-white">文件锁定</span>
+                            <span class="text-sm font-medium text-white">{{t .Lang "website.file_lock"}}</span>
                             <span class="text-xs px-2 py-0.5 rounded" :class="site.file_lock_enabled ? 'bg-yellow-900/50 text-yellow-200 border border-yellow-700' : 'bg-green-900/40 text-green-200 border border-green-800'" x-text="site.file_lock_enabled ? '已开启' : '未开启'"></span>
                         </div>
-                        <p class="text-xs text-gray-500">开启后 WordPress 正常发文章和上传媒体不受影响，插件、主题、核心文件和代码目录修改会被阻止。</p>
+                        <p class="text-xs text-gray-500">{{t .Lang "website.file_lock_help"}}</p>
                     </div>
                     <button @click="toggleFileLock(!site.file_lock_enabled)" :disabled="fileLockSaving" class="text-sm py-1.5 px-3 rounded" :style="site.file_lock_enabled ? 'background-color: #1e3a5f; color: #93c5fd;' : 'background-color: #7f1d1d; color: #fca5a5;'" x-text="fileLockSaving ? '处理中...' : (site.file_lock_enabled ? '解除锁定' : '开启锁定')"></button>
                 </div>
@@ -273,74 +273,74 @@ location ^~ /api/ {
             <div class="flex items-center space-x-3 mb-3">
                 <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" x-model="fcacheEnabled">
-                    <span>开启 FastCGI 缓存</span>
+                    <span>{{t .Lang "website.enable_fastcgi_cache"}}</span>
                 </label>
             </div>
             <div x-show="fcacheEnabled" class="mb-3 ml-6">
-                <label class="text-sm text-gray-300 mb-1 block">缓存有效期（秒）</label>
+                <label class="text-sm text-gray-300 mb-1 block">{{t .Lang "website.cache_ttl_seconds"}}</label>
                 <input type="number" x-model="fcacheTTL" class="input-field w-32 text-sm py-1" min="10" max="86400">
             </div>
             <div class="flex items-center space-x-3 mb-3">
                 <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" x-model="disableWPUpdates">
-                    <span>禁止检测更新（核心/插件/主题）</span>
+                    <span>{{t .Lang "website.disable_wp_updates"}}</span>
                 </label>
             </div>
             <div class="flex items-center space-x-3 mb-4">
                 <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" x-model="disableFileEditing">
-                    <span>禁止后台文件编辑</span>
+                    <span>{{t .Lang "website.disable_file_editing"}}</span>
                 </label>
             </div>
             <div class="flex items-center space-x-3 mb-3" x-show="site.site_type === 'wordpress'">
                 <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" x-model="wpDebug">
-                    <span>启用调试模式（WP_DEBUG）</span>
+                    <span>{{t .Lang "website.enable_debug_mode"}}</span>
                 </label>
             </div>
             <div x-show="wpDebug" class="mb-3 ml-6">
-                <p class="text-xs text-gray-400">开启后 PHP 错误和警告写入 wp-content/debug.log，排查网站问题时临时开启，正常使用请关闭。</p>
+                <p class="text-xs text-gray-400">{{t .Lang "website.debug_mode_help"}}</p>
             </div>
             <div class="flex items-center space-x-3 mb-3" x-show="site.site_type === 'wordpress'">
                 <label class="text-sm text-gray-300">
-                    <span>文章修订版本数</span>
-                    <input type="number" :value="wpPostRevisions >= 0 ? wpPostRevisions : ''" @input="wpPostRevisions = $event.target.value === '' ? -1 : parseInt($event.target.value)" class="input-field w-24 text-sm py-1 ml-2" placeholder="默认">
+                    <span>{{t .Lang "website.post_revisions"}}</span>
+                    <input type="number" :value="wpPostRevisions >= 0 ? wpPostRevisions : ''" @input="wpPostRevisions = $event.target.value === '' ? -1 : parseInt($event.target.value)" class="input-field w-24 text-sm py-1 ml-2" placeholder="{{t .Lang "website.default_placeholder"}}">
                 </label>
-                <span class="text-xs text-gray-500">留空=WordPress默认（无限制），0=不保留修订，建议设3~5减少数据库占用</span>
+                <span class="text-xs text-gray-500">{{t .Lang "website.post_revisions_help"}}</span>
             </div>
             <div class="flex items-center space-x-3 mb-3" x-show="site.site_type === 'wordpress'">
                 <label class="text-sm text-gray-300">
-                    <span>PHP 内存限制</span>
-                    <input type="text" x-model="wpMemoryLimit" class="input-field w-24 text-sm py-1 ml-2" placeholder="默认 40M">
+                    <span>{{t .Lang "website.memory_limit"}}</span>
+                    <input type="text" x-model="wpMemoryLimit" class="input-field w-24 text-sm py-1 ml-2" placeholder="{{t .Lang "website.default_placeholder"}} 40M">
                 </label>
-                <span class="text-xs text-gray-500">如 128M、256M，遇到内存不足错误（白屏/500）时调高</span>
+                <span class="text-xs text-gray-500">{{t .Lang "website.memory_limit_help"}}</span>
             </div>
             <div class="flex items-center space-x-3 mb-4" x-show="site.site_type === 'wordpress'">
                 <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" x-model="xmlrpcEnabled">
-                    <span>允许 XML-RPC 接口</span>
+                    <span>{{t .Lang "website.allow_xmlrpc"}}</span>
                 </label>
-                <span class="text-xs text-gray-500">默认关闭，开启后 /xmlrpc.php 可被访问</span>
+                <span class="text-xs text-gray-500">{{t .Lang "website.xmlrpc_help"}}</span>
             </div>
             <div class="flex items-center space-x-3 mb-3">
                 <button @click="saveWPOptimizations()" :disabled="optimizationSaving || site.file_lock_enabled" class="btn-primary text-sm" x-text="optimizationSaving ? '保存中...' : '保存设置'"></button>
-                <button x-show="fcacheEnabled" @click="clearFCache()" class="text-sm py-1.5 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;">清除缓存</button>
+                <button x-show="fcacheEnabled" @click="clearFCache()" class="text-sm py-1.5 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;">{{t .Lang "website.clear_cache"}}</button>
             </div>
             <div x-show="(fcacheEnabled || disableWPUpdates || disableFileEditing || wpDebug) && site.site_type === 'wordpress'" class="flex items-center space-x-3 mb-3">
                 <button x-show="pluginStatus === 'not_installed'" @click="installPlugin()" :disabled="pluginInstalling || site.file_lock_enabled" class="btn-primary text-sm py-1.5" x-text="pluginInstalling ? '安装中...' : '安装配套插件'"></button>
                 <button x-show="pluginStatus === 'update_available'" @click="installPlugin()" :disabled="pluginInstalling || site.file_lock_enabled" class="text-sm py-1.5 px-3 rounded" style="background-color: #166534; color: #bbf7d0;" x-text="pluginInstalling ? '更新中...' : '更新配套插件'"></button>
-                <span x-show="pluginStatus === 'installed'" class="text-xs text-green-400">✓ 插件已安装</span>
+                <span x-show="pluginStatus === 'installed'" class="text-xs text-green-400">{{t .Lang "website.plugin_installed"}}</span>
             </div>
-            <p x-show="site.file_lock_enabled" class="text-xs text-yellow-300 mb-3">当前站点已锁定。如需保存会修改 wp-config.php 的优化项或安装/更新配套插件，请先解除锁定。</p>
+            <p x-show="site.file_lock_enabled" class="text-xs text-yellow-300 mb-3">{{t .Lang "website.file_lock_enabled_notice"}}</p>
             <div class="mt-3 p-3 rounded text-xs" style="background-color: #0f172a;">
-                <p class="text-gray-300 font-medium mb-2">FastCGI 缓存工作原理</p>
+                <p class="text-gray-300 font-medium mb-2">{{t .Lang "website.fastcgi_cache_how_it_works"}}</p>
                 <ul class="text-gray-400 space-y-1 list-disc list-inside">
-                    <li>Nginx 将 PHP 页面输出为静态 HTML 缓存在磁盘，访客直接拿到 HTML 无需经过 PHP/MariaDB</li>
-                    <li>每站点独立缓存版本密钥，点击「清除缓存」更换密钥，旧缓存文件 60 分钟后自动删除</li>
-                    <li x-show="site.site_type === 'wordpress'">已登录用户、POST 请求、wp-admin 后台自动跳过缓存</li>
-                    <li x-show="site.site_type === 'php'">POST 请求和带查询参数的请求自动跳过缓存</li>
+                    <li>{{t .Lang "website.fastcgi_cache_point_static"}}</li>
+                    <li>{{t .Lang "website.fastcgi_cache_point_key"}}</li>
+                    <li x-show="site.site_type === 'wordpress'">{{t .Lang "website.fastcgi_cache_point_wp_skip"}}</li>
+                    <li x-show="site.site_type === 'php'">{{t .Lang "website.fastcgi_cache_point_php_skip"}}</li>
                 </ul>
-                <p class="text-gray-500 mt-2" x-show="site.site_type === 'wordpress'">配套插件（WP Panel Optimizer）安装到网站后，网站管理员可在 WordPress 后台管理缓存、禁止检测更新和文件编辑等优化项，与面板设置实时同步。不要安装第三方缓存插件（WP Rocket / W3 Total Cache 等的 Nginx 模式），会与本卡片冲突。</p>
+                <p class="text-gray-500 mt-2" x-show="site.site_type === 'wordpress'">{{t .Lang "website.wp_optimizer_plugin_help"}}</p>
             </div>
         </div>
     </div>
@@ -348,47 +348,47 @@ location ^~ /api/ {
     <!-- Row 3: 网站日志 -->
     <div class="mt-6">
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">网站日志</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "website.site_logs"}}</h3>
             <div class="flex flex-wrap items-center gap-2 mb-3">
-                <button @click="selectLogType('access')" :class="logType === 'access' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">访问日志</button>
-                <button @click="selectLogType('error')" :class="logType === 'error' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">错误日志</button>
-                <button x-show="site.site_type === 'wordpress'" @click="selectLogType('security')" :class="logType === 'security' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">安全日志</button>
-                <button @click="fetchLogs()" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">刷新</button>
-                <button @click="clearLogs()" class="text-sm py-1 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;">清空</button>
-                <button @click="logFullscreen = true" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">全屏查看</button>
-                <button @click="downloadLogFile(currentLogFilename())" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">下载当前完整日志</button>
+                <button @click="selectLogType('access')" :class="logType === 'access' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">{{t .Lang "website.access_log"}}</button>
+                <button @click="selectLogType('error')" :class="logType === 'error' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">{{t .Lang "website.error_log"}}</button>
+                <button x-show="site.site_type === 'wordpress'" @click="selectLogType('security')" :class="logType === 'security' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'" class="px-3 py-1 text-sm font-medium">{{t .Lang "website.security_log"}}</button>
+                <button @click="fetchLogs()" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">{{t .Lang "website.refresh"}}</button>
+                <button @click="clearLogs()" class="text-sm py-1 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;">{{t .Lang "website.clear"}}</button>
+                <button @click="logFullscreen = true" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">{{t .Lang "website.fullscreen"}}</button>
+                <button @click="downloadLogFile(currentLogFilename())" class="text-sm py-1 px-3 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">{{t .Lang "website.download_current_full_log"}}</button>
                 <select @change="setAccessLogMode($event.target.value)" x-model="accessLogMode" x-show="logType === 'access'" class="input-field w-28 text-sm py-1">
-                    <option value="off">关闭日志</option>
-                    <option value="error_only">仅异常</option>
-                    <option value="full">全部记录</option>
+                    <option value="off">{{t .Lang "website.access_log_off"}}</option>
+                    <option value="error_only">{{t .Lang "website.access_log_error_only"}}</option>
+                    <option value="full">{{t .Lang "website.access_log_full"}}</option>
                 </select>
                 <select x-model.number="logLineLimit" @change="fetchLogs()" class="input-field w-28 text-sm py-1">
-                    <option value="200">最近 200 行</option>
-                    <option value="1000">最近 1000 行</option>
-                    <option value="5000">最近 5000 行</option>
+                    <option value="200">{{t .Lang "website.recent_200_lines"}}</option>
+                    <option value="1000">{{t .Lang "website.recent_1000_lines"}}</option>
+                    <option value="5000">{{t .Lang "website.recent_5000_lines"}}</option>
                 </select>
                 <div class="flex items-center gap-1 text-sm text-gray-400 whitespace-nowrap">
-                    <span>保留</span>
+                    <span>{{t .Lang "website.keep"}}</span>
                     <input type="number" x-model.number="logRetentionDays" @change="saveLogRetention()" class="input-field w-16 text-sm py-1 text-center" min="0" max="365">
-                    <span>天</span>
+                    <span>{{t .Lang "website.days"}}</span>
                 </div>
             </div>
-            <p class="text-xs text-gray-500 mb-3">当前区域仅预览当前日志文件的最近行数，默认最近 200 行；完整当天日志和历史轮转日志请下载分析。</p>
+            <p class="text-xs text-gray-500 mb-3">{{t .Lang "website.log_preview_help"}}</p>
             <pre x-text="logContent" class="w-full rounded p-3 text-xs font-mono overflow-auto" style="background-color: #0f172a; border: 1px solid #334155; color: #94a3b8; max-height: 400px; white-space: pre-wrap; word-break: break-all;"></pre>
             <div class="mt-4">
                 <div class="flex items-center justify-between mb-2">
-                    <h4 class="text-sm font-medium text-white">历史日志下载</h4>
-                    <button @click="fetchLogFiles()" class="text-xs py-1 px-2 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">刷新列表</button>
+                    <h4 class="text-sm font-medium text-white">{{t .Lang "website.history_log_download"}}</h4>
+                    <button @click="fetchLogFiles()" class="text-xs py-1 px-2 rounded text-gray-400 hover:text-white" style="background-color: #1e293b; border: 1px solid #334155;">{{t .Lang "website.refresh_list"}}</button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
                             <tr>
-                                <th class="table-header">文件</th>
-                                <th class="table-header">大小</th>
-                                <th class="table-header">修改时间</th>
-                                <th class="table-header">状态</th>
-                                <th class="table-header text-right">操作</th>
+                                <th class="table-header">{{t .Lang "website.file"}}</th>
+                                <th class="table-header">{{t .Lang "website.size"}}</th>
+                                <th class="table-header">{{t .Lang "website.modified_at"}}</th>
+                                <th class="table-header">{{t .Lang "website.status"}}</th>
+                                <th class="table-header text-right">{{t .Lang "website.actions"}}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -398,17 +398,17 @@ location ^~ /api/ {
                                     <td class="table-cell" x-text="formatBytes(file.size || 0)"></td>
                                     <td class="table-cell" x-text="fmtTime(file.modified_at)"></td>
                                     <td class="table-cell">
-                                        <span x-show="file.current" class="badge-success">当前</span>
-                                        <span x-show="!file.current && file.compressed" class="badge-info">压缩</span>
-                                        <span x-show="!file.current && !file.compressed" class="badge-warning">轮转</span>
+                                        <span x-show="file.current" class="badge-success">{{t .Lang "website.current"}}</span>
+                                        <span x-show="!file.current && file.compressed" class="badge-info">{{t .Lang "website.compressed"}}</span>
+                                        <span x-show="!file.current && !file.compressed" class="badge-warning">{{t .Lang "website.rotated"}}</span>
                                     </td>
                                     <td class="table-cell text-right">
-                                        <button @click="downloadLogFile(file.name)" class="btn-primary text-xs py-1 px-2">下载</button>
+                                        <button @click="downloadLogFile(file.name)" class="btn-primary text-xs py-1 px-2">{{t .Lang "website.download"}}</button>
                                     </td>
                                 </tr>
                             </template>
                             <tr x-show="logFiles.length === 0">
-                                <td colspan="5" class="table-cell text-center text-gray-500 py-4">暂无可下载日志文件</td>
+                                <td colspan="5" class="table-cell text-center text-gray-500 py-4">{{t .Lang "website.no_downloadable_logs"}}</td>
                             </tr>
                         </tbody>
                     </table>

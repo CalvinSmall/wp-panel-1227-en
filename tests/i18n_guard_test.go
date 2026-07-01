@@ -26,9 +26,6 @@ func TestEnglishLocaleContainsNoUnexpectedChinese(t *testing.T) {
 	_, en := loadLocales(t)
 	hanPattern := regexp.MustCompile(`\p{Han}`)
 	for _, key := range flattenedKeys(en) {
-		if key == "settings.zh-CN" {
-			continue
-		}
 		value, ok := lookup(en, key).(string)
 		if ok && hanPattern.MatchString(value) {
 			t.Errorf("en-US translation %q contains Chinese text: %q", key, value)
@@ -184,13 +181,10 @@ func collectScriptTranslationKeys(t *testing.T) map[string][]string {
 	t.Helper()
 	keys := map[string][]string{}
 	keyPattern := regexp.MustCompile(`(?:^|[^A-Za-z0-9_$])t\('([a-z][a-z0-9_.-]+)'`)
-	scriptPattern := regexp.MustCompile(`(?s)<script>(.*?)</script>`)
 
 	walkFiles(t, "../templates", func(path string, content []byte) {
-		for _, script := range scriptPattern.FindAllSubmatch(content, -1) {
-			for _, match := range keyPattern.FindAllSubmatch(script[1], -1) {
-				keys[path] = appendUnique(keys[path], string(match[1]))
-			}
+		for _, match := range keyPattern.FindAllSubmatch(content, -1) {
+			keys[path] = appendUnique(keys[path], string(match[1]))
 		}
 	})
 	content, err := os.ReadFile("../static/js/app.js")

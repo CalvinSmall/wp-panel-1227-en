@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+
+	"github.com/naibabiji/wp-panel/i18n"
 )
 
 var pageTemplates = map[string]string{
@@ -49,7 +51,7 @@ func TestContentTemplatesRender(t *testing.T) {
 		t.Run(content, func(t *testing.T) {
 			tmpl := parseTemplates(t)
 			var output bytes.Buffer
-			if err := tmpl.ExecuteTemplate(&output, content, map[string]any{}); err != nil {
+			if err := tmpl.ExecuteTemplate(&output, content, testPageData("")); err != nil {
 				t.Fatalf("render %s: %v", content, err)
 			}
 		})
@@ -97,9 +99,31 @@ func TestWebsiteLogRoutesRegistered(t *testing.T) {
 	}
 }
 
+func TestPageTitleKeysExist(t *testing.T) {
+	for active, key := range pageTitleKeys {
+		t.Run(active, func(t *testing.T) {
+			if got := i18n.T(i18n.DefaultLang, key); got == key {
+				t.Fatalf("missing zh-CN page title key %q", key)
+			}
+			if got := i18n.T(i18n.English, key); got == key {
+				t.Fatalf("missing en-US page title key %q", key)
+			}
+		})
+	}
+}
+
 func renderPage(t *testing.T, page, content string) []byte {
 	t.Helper()
-	data := map[string]any{
+	data := testPageData(content)
+	var output bytes.Buffer
+	if err := parseTemplates(t).ExecuteTemplate(&output, page, data); err != nil {
+		t.Fatalf("render %s: %v", page, err)
+	}
+	return output.Bytes()
+}
+
+func testPageData(content string) map[string]any {
+	return map[string]any{
 		"Title":           "Test",
 		"PanelTitle":      "WP Panel",
 		"PanelVersion":    "test",
@@ -109,15 +133,12 @@ func renderPage(t *testing.T, page, content string) []byte {
 		"Active":          "dashboard",
 		"AssetPrefix":     "/test/assets",
 		"CSRFToken":       "test",
+		"Lang":            i18n.DefaultLang,
+		"MessagesJSON":    i18n.MessagesJSON(i18n.DefaultLang, i18nKeys),
 	}
-	var output bytes.Buffer
-	if err := parseTemplates(t).ExecuteTemplate(&output, page, data); err != nil {
-		t.Fatalf("render %s: %v", page, err)
-	}
-	return output.Bytes()
 }
 
 func parseTemplates(t *testing.T) *template.Template {
 	t.Helper()
-	return template.Must(template.New("").ParseFS(os.DirFS(".."), "templates/*.html"))
+	return template.Must(template.New("").Funcs(i18n.FuncMap()).ParseFS(os.DirFS(".."), "templates/*.html"))
 }

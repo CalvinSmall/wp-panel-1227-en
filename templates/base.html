@@ -1,5 +1,5 @@
 {{define "base"}}<!DOCTYPE html>
-<html lang="zh-CN" class="dark">
+<html lang="{{.Lang}}" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,12 +9,15 @@
     <link rel="stylesheet" href="{{.AssetPrefix}}/css/main.css?v={{.AssetVersion}}">
     <script defer src="{{.AssetPrefix}}/js/alpine.min.js?v={{.AssetVersion}}"></script>
     <script src="{{.AssetPrefix}}/js/chart.min.js?v={{.AssetVersion}}"></script>
+    <script>
+        window.WP_PANEL_I18N = { lang: "{{.Lang}}", messages: {{.MessagesJSON}} };
+    </script>
     <script src="{{.AssetPrefix}}/js/app.js?v={{.AssetVersion}}"></script>
     <style>
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen" data-panel-prefix="/{{.RandomSuffix}}">
+<body class="bg-gray-900 text-gray-100 min-h-screen" data-panel-prefix="/{{.RandomSuffix}}" data-lang="{{.Lang}}">
     <div x-data="{
              sidebarOpen: window.innerWidth >= 1024,
              async logout() {
@@ -27,7 +30,7 @@
         <!-- Hamburger button — toggles icon -->
         <button @click="sidebarOpen = !sidebarOpen"
                 class="lg:hidden fixed top-3 right-3 z-50 p-2 rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:text-white"
-                aria-label="菜单">
+                aria-label="{{t .Lang "nav.menu"}}">
             <svg x-show="!sidebarOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
             </svg>
@@ -50,7 +53,7 @@
                         <img src="{{.AssetPrefix}}/logo.png" alt="WP Panel" class="w-10 h-10 rounded-lg flex-shrink-0">
                         <div class="min-w-0">
                             <h1 class="text-base font-bold text-white truncate">{{.PanelTitle}}</h1>
-                            <p class="text-xs text-gray-500">WordPress 服务器管理</p>
+                            <p class="text-xs text-gray-500">{{t .Lang "app.tagline"}}</p>
                         </div>
                     </div>
                 </div>
@@ -59,78 +62,86 @@
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                         </svg>
-                        控制台
+                        {{t .Lang "nav.dashboard"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/websites" class="sidebar-link {{if eq .Active "websites"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
                         </svg>
-                        网站管理
+                        {{t .Lang "nav.websites"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/ai-diagnostics" class="sidebar-link {{if eq .Active "ai-diagnostics"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                         </svg>
-                        AI 诊断
+                        {{t .Lang "nav.ai_diagnostics"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/cron" class="sidebar-link {{if eq .Active "cron"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        计划任务
+                        {{t .Lang "nav.cron"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/firewall" class="sidebar-link {{if eq .Active "firewall"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                         </svg>
-                        安全防御
+                        {{t .Lang "nav.firewall"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/security" class="sidebar-link {{if eq .Active "security"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        安全设置
+                        {{t .Lang "nav.security"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/files" class="sidebar-link {{if eq .Active "files"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                         </svg>
-                        文件管理
+                        {{t .Lang "nav.files"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/software" class="sidebar-link {{if eq .Active "software"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
                         </svg>
-                        软件管理
+                        {{t .Lang "nav.software"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/alert" class="sidebar-link {{if eq .Active "alert"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                         </svg>
-                        告警通知
+                        {{t .Lang "nav.alert"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/extensions" class="sidebar-link {{if eq .Active "extensions"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                         </svg>
-                        扩展配置
+                        {{t .Lang "nav.extensions"}}
                     </a>
                     <a href="/{{$.RandomSuffix}}/settings" class="sidebar-link {{if eq .Active "settings"}}active{{end}}">
                         <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        面板设置
+                        {{t .Lang "nav.settings"}}
                     </a>
 
                     <div class="border-t border-gray-800 pt-2 mt-2">
+                        <div class="px-3 py-2 text-xs text-gray-500">
+                            <div class="mb-2">{{t .Lang "language.label"}}</div>
+                            <div class="flex items-center gap-2">
+                                <a href="?lang=zh-CN" class="{{if eq .Lang "zh-CN"}}text-blue-400{{else}}text-gray-400{{end}}">{{t .Lang "language.chinese"}}</a>
+                                <span>/</span>
+                                <a href="?lang=en-US" class="{{if eq .Lang "en-US"}}text-blue-400{{else}}text-gray-400{{end}}">{{t .Lang "language.english"}}</a>
+                            </div>
+                        </div>
                         <a href="#" @click.prevent="logout()"
                            class="sidebar-link text-red-400 hover:text-red-300 hover:bg-red-900/20">
                             <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                             </svg>
-                            退出登录
+                            {{t .Lang "nav.logout"}}
                         </a>
                     </div>
                 </nav>

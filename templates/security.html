@@ -2,8 +2,8 @@
 {{define "security_content"}}
 <div x-data="securitySettings()" x-init="fetchSettings(); fetchCDNGroups()">
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-white">安全设置</h2>
-        <button @click="showHelp = true" class="btn-secondary text-sm">帮助说明</button>
+        <h2 class="text-xl font-bold text-white">{{t .Lang "nav.security"}}</h2>
+        <button @click="showHelp = true" class="btn-secondary text-sm">{{t .Lang "security.help"}}</button>
     </div>
 
     <div x-show="showHelp" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showHelp = false">
@@ -110,110 +110,110 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">Fail2ban 配置</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "security.fail2ban_config"}}</h3>
             <form @submit.prevent="save">
                 <div class="mb-4">
-                    <label class="label">触发阈值 (次)</label>
+                    <label class="label">{{t .Lang "security.max_retry"}}</label>
                     <input type="number" x-model="settings.fail2ban_maxretry" class="input-field" min="1" max="20">
                 </div>
                 <div class="mb-4">
-                    <label class="label">统计窗口 (秒)</label>
+                    <label class="label">{{t .Lang "security.find_time"}}</label>
                     <input type="number" x-model="settings.fail2ban_findtime" class="input-field" min="10" max="3600">
                 </div>
                 <div class="mb-4">
-                    <label class="label">封禁时长 (秒)</label>
+                    <label class="label">{{t .Lang "security.ban_time"}}</label>
                     <input type="number" x-model="settings.fail2ban_bantime" class="input-field" min="60" max="86400">
                 </div>
                 <div class="mb-6">
                     <label class="flex items-center space-x-2 cursor-pointer">
                         <input type="checkbox" x-model="settings.auto_whitelist_enabled" class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600">
-                        <span class="text-gray-300">每周自动更新官方白名单</span>
+                        <span class="text-gray-300">{{t .Lang "security.auto_update_official_whitelist"}}</span>
                     </label>
                 </div>
-                <button type="submit" class="btn-primary">保存设置</button>
+                <button type="submit" class="btn-primary">{{t .Lang "security.save_settings"}}</button>
             </form>
         </div>
 
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">请求频率限制</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "security.rate_limit"}}</h3>
             <form @submit.prevent="saveRateLimit">
                 <div class="mb-4">
                     <label class="flex items-center space-x-2 cursor-pointer">
                         <input type="checkbox" x-model="settings.rate_limit_enabled" class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600">
-                        <span class="text-gray-300">开启全局限速</span>
+                        <span class="text-gray-300">{{t .Lang "security.enable_global_rate_limit"}}</span>
                     </label>
-                    <p class="text-xs text-gray-500 mt-1">开启后未登录访客受频率限制，已登录 WordPress 用户自动豁免。触发多次 429 将被 Fail2ban 封禁</p>
+                    <p class="text-xs text-gray-500 mt-1">{{t .Lang "security.rate_limit_help"}}</p>
                 </div>
                 <div class="mb-4">
-                    <label class="label">请求频率限制 (次/分钟)</label>
+                    <label class="label">{{t .Lang "security.requests_per_minute"}}</label>
                     <input type="number" x-model="settings.rate_limit_rpm" class="input-field" min="10" max="600">
-                    <p class="text-xs text-gray-500 mt-1">非 Elementor 等重型页面建议 30-60。Elementor / 多插件站点建议 60-120。调整建议和测试方法详见右上角「帮助说明」</p>
+                    <p class="text-xs text-gray-500 mt-1">{{t .Lang "security.requests_per_minute_help"}}</p>
                 </div>
                 <div class="mb-4">
-                    <label class="label">突发缓冲 (次)</label>
+                    <label class="label">{{t .Lang "security.burst"}}</label>
                     <input type="number" x-model="settings.rate_limit_burst" class="input-field" min="5" max="600">
-                    <p class="text-xs text-gray-500 mt-1">页面首屏瞬间并发请求缓冲量。Elementor / 多插件站点建议 150-300，非 Elementor 建议 30-120。调整建议和测试方法详见右上角「帮助说明」</p>
-                    <p class="text-xs text-red-400 mt-1">注意：多次触发 429 的 IP 将被 Fail2ban 自动封禁，请确保预留足够缓冲</p>
+                    <p class="text-xs text-gray-500 mt-1">{{t .Lang "security.burst_help"}}</p>
+                    <p class="text-xs text-red-400 mt-1">{{t .Lang "security.burst_warning"}}</p>
                 </div>
-                <button type="submit" class="btn-primary">保存限速设置</button>
+                <button type="submit" class="btn-primary">{{t .Lang "security.save_rate_limit"}}</button>
             </form>
         </div>
 
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">爬虫限速</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "security.bot_limit"}}</h3>
             <form @submit.prevent="saveBotLimit">
                 <div class="mb-4">
                     <label class="flex items-center space-x-2 cursor-pointer">
                         <input type="checkbox" x-model="settings.bot_limit_enabled" class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600">
-                        <span class="text-gray-300">开启 Bot UA 统一限速</span>
+                        <span class="text-gray-300">{{t .Lang "security.enable_bot_limit"}}</span>
                     </label>
-                    <p class="text-xs text-gray-500 mt-1">默认关闭。开启后，每个站点独立限速；同一站点内常见 Bot UA 共享该站点的限速桶，普通浏览器不受此层影响。</p>
+                    <p class="text-xs text-gray-500 mt-1">{{t .Lang "security.bot_limit_help"}}</p>
                 </div>
                 <div class="mb-4">
-                    <label class="label">Bot 请求频率 (次/分钟)</label>
+                    <label class="label">{{t .Lang "security.bot_requests_per_minute"}}</label>
                     <input type="number" x-model="settings.bot_limit_rpm" class="input-field" min="5" max="300">
-                    <p class="text-xs text-gray-500 mt-1">默认 30。用于压制多 IP 假爬虫持续扫站，避免打满 WordPress 动态 404。</p>
+                    <p class="text-xs text-gray-500 mt-1">{{t .Lang "security.bot_requests_help"}}</p>
                 </div>
                 <div class="mb-4">
-                    <label class="label">Bot 突发缓冲 (次)</label>
+                    <label class="label">{{t .Lang "security.bot_burst"}}</label>
                     <input type="number" x-model="settings.bot_limit_burst" class="input-field" min="5" max="300">
-                    <p class="text-xs text-gray-500 mt-1">默认 20。Googlebot/Bingbot 仅在来源 IP 属于官方段时豁免；假冒搜索爬虫会进入限速桶。</p>
+                    <p class="text-xs text-gray-500 mt-1">{{t .Lang "security.bot_burst_help"}}</p>
                 </div>
-                <button type="submit" class="btn-primary">保存爬虫限速</button>
+                <button type="submit" class="btn-primary">{{t .Lang "security.save_bot_limit"}}</button>
             </form>
         </div>
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">白名单管理</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "security.whitelist_management"}}</h3>
         <div class="mb-4">
             <div class="flex items-center justify-between mb-2">
-                <label class="label">官方白名单（由面板自动拉取）</label>
-                <button @click="refreshWhitelist" class="text-sm py-1 px-3 rounded" style="background-color: #166534; color: #bbf7d0;">立即拉取</button>
+                <label class="label">{{t .Lang "security.official_whitelist"}}</label>
+                <button @click="refreshWhitelist" class="text-sm py-1 px-3 rounded" style="background-color: #166534; color: #bbf7d0;">{{t .Lang "security.fetch_now"}}</button>
             </div>
             <textarea x-model="settings.official_whitelist_ips" class="input-field font-mono text-sm" rows="5" readonly disabled style="opacity: 0.6;"></textarea>
             <p class="text-gray-500 text-xs mt-1" x-text="'上次更新: ' + (settings.last_whitelist_update || '从未')"></p>
         </div>
         <div class="mb-4">
-            <label class="label">自定义白名单（不会被官方拉取覆盖）</label>
+            <label class="label">{{t .Lang "security.custom_whitelist"}}</label>
             <textarea x-model="settings.whitelist_ips" class="input-field font-mono text-sm" rows="4" placeholder="1.2.3.4&#10;10.0.0.0/8"></textarea>
         </div>
-        <button @click="saveWhitelist" class="btn-primary">保存自定义白名单</button>
+        <button @click="saveWhitelist" class="btn-primary">{{t .Lang "security.save_custom_whitelist"}}</button>
         <div class="mt-6 pt-4 border-t border-gray-700/50">
-            <label class="label">WordPress 安全日志路径白名单</label>
+            <label class="label">{{t .Lang "security.wp_security_path_whitelist"}}</label>
             <textarea x-model="settings.wp_security_log_whitelist" class="input-field font-mono text-sm" rows="5" placeholder="/google*.html&#10;/BingSiteAuth.xml&#10;/custom-verify-*.txt"></textarea>
-            <p class="text-xs text-gray-500 mt-1">一行一个路径，可使用 * 通配符；必须以 / 开头。不支持正则，不允许空格、分号、引号或 ..。</p>
-            <button @click="saveWPSecurityLogWhitelist" class="btn-primary mt-3">保存路径白名单</button>
+            <p class="text-xs text-gray-500 mt-1">{{t .Lang "security.wp_security_path_help"}}</p>
+            <button @click="saveWPSecurityLogWhitelist" class="btn-primary mt-3">{{t .Lang "security.save_path_whitelist"}}</button>
         </div>
     </div>
 
     <div class="card">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-white">CDN 真实 IP 配置组</h3>
-            <span class="text-xs text-gray-500">一处填写，多处调用</span>
+            <h3 class="text-lg font-semibold text-white">{{t .Lang "security.cdn_realip_groups"}}</h3>
+            <span class="text-xs text-gray-500">{{t .Lang "security.cdn_realip_subtitle"}}</span>
         </div>
         <div class="rounded border border-blue-900/60 bg-blue-950/30 p-3 mb-4 text-sm text-blue-100">
-            <p class="font-medium text-blue-200">结论：网站启用 CDN Real IP 后，日志分析、异常访问识别和自动封禁会按真实访客 IP 工作。</p>
-            <p class="text-xs text-blue-200/80 mt-1">不会填写 CDN 回源 IP 段时，选择“通用 CDN（兼容模式）”即可。正常 CDN 场景下不会误封 CDN 节点。</p>
-            <p class="text-xs text-blue-200/80 mt-1">能拿到 CDN 回源 IP 段时，再新增配置组并填写，可降低 Header 被伪造的风险。Cloudflare 由系统自动处理。</p>
+            <p class="font-medium text-blue-200">{{t .Lang "security.cdn_realip_conclusion"}}</p>
+            <p class="text-xs text-blue-200/80 mt-1">{{t .Lang "security.cdn_realip_compatible_help"}}</p>
+            <p class="text-xs text-blue-200/80 mt-1">{{t .Lang "security.cdn_realip_strict_help"}}</p>
         </div>
         <div class="space-y-2 mb-4">
             <template x-for="g in cdnGroups" :key="g.id">
@@ -222,20 +222,20 @@
                         <div>
                             <div class="text-white font-medium">
                                 <span x-text="g.name"></span>
-                                <span x-show="g.builtin" class="badge-info ml-2">内置</span>
-                                <span x-show="!g.enabled" class="badge-warning ml-2">已禁用</span>
+                                <span x-show="g.builtin" class="badge-info ml-2">{{t .Lang "security.builtin"}}</span>
+                                <span x-show="!g.enabled" class="badge-warning ml-2">{{t .Lang "security.disabled"}}</span>
                             </div>
                             <div class="text-xs text-gray-400 mt-1">
                                 <span x-text="'Header: ' + g.header_name"></span>
                                 <span class="mx-2">|</span>
                                 <span x-text="cdnGroupModeLabel(g)"></span>
                             </div>
-                            <p x-show="g.provider === 'compatible'" class="text-xs text-gray-500 mt-1">不会填写 CDN 回源 IP 段时选择此模式，适合大多数普通 CDN 场景。</p>
-                            <p x-show="g.provider === 'cloudflare'" class="text-xs text-gray-500 mt-1">Cloudflare 真实 IP 已由系统全局自动处理，网站详情页无需选择此组。</p>
+                            <p x-show="g.provider === 'compatible'" class="text-xs text-gray-500 mt-1">{{t .Lang "security.compatible_group_help"}}</p>
+                            <p x-show="g.provider === 'cloudflare'" class="text-xs text-gray-500 mt-1">{{t .Lang "security.cloudflare_group_help"}}</p>
                         </div>
                         <div x-show="!g.builtin" class="flex items-center space-x-2">
-                            <button @click="editCDNGroup(g)" class="btn-secondary text-xs py-1 px-2">编辑</button>
-                            <button @click="deleteCDNGroup(g)" class="btn-danger text-xs py-1 px-2">删除</button>
+                            <button @click="editCDNGroup(g)" class="btn-secondary text-xs py-1 px-2">{{t .Lang "security.edit"}}</button>
+                            <button @click="deleteCDNGroup(g)" class="btn-danger text-xs py-1 px-2">{{t .Lang "security.delete"}}</button>
                         </div>
                     </div>
                 </div>
@@ -244,43 +244,46 @@
         <div class="rounded border border-gray-700 p-3">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label class="label text-xs">名称</label>
-                    <input x-model="cdnGroupForm.name" class="input-field text-sm" placeholder="阿里云 ESA">
+                    <label class="label text-xs">{{t .Lang "security.name"}}</label>
+                    <input x-model="cdnGroupForm.name" class="input-field text-sm" placeholder="{{t .Lang "security.name_placeholder"}}">
                 </div>
                 <div>
-                    <label class="label text-xs">真实 IP Header</label>
+                    <label class="label text-xs">{{t .Lang "security.real_ip_header"}}</label>
                     <input x-model="cdnGroupForm.header_name" class="input-field text-sm font-mono" placeholder="X-Forwarded-For">
                 </div>
             </div>
             <div class="mt-3">
-                <label class="label text-xs">可信 CDN 回源 IP/CIDR</label>
-                <textarea x-model="cdnGroupForm.ip_ranges" class="input-field font-mono text-sm" rows="4" placeholder="一行一个，可留空进入兼容模式"></textarea>
-                <p class="text-xs text-gray-500 mt-1">不会填写 CDN 回源 IP 段时可以留空，网站将使用兼容模式；能拿到厂商回源 IP 段时填写在这里，日志和封禁会更严格、更可靠。</p>
+                <label class="label text-xs">{{t .Lang "security.trusted_cdn_origin_ips"}}</label>
+                <textarea x-model="cdnGroupForm.ip_ranges" class="input-field font-mono text-sm" rows="4" placeholder="{{t .Lang "security.trusted_cdn_origin_ips_placeholder"}}"></textarea>
+                <p class="text-xs text-gray-500 mt-1">{{t .Lang "security.trusted_cdn_origin_ips_help"}}</p>
             </div>
             <div class="mt-3">
-                <label class="label text-xs">备注</label>
-                <input x-model="cdnGroupForm.description" class="input-field text-sm" placeholder="用于说明 CDN 厂商或用途">
+                <label class="label text-xs">{{t .Lang "security.description"}}</label>
+                <input x-model="cdnGroupForm.description" class="input-field text-sm" placeholder="{{t .Lang "security.description_placeholder"}}">
             </div>
             <label class="flex items-center space-x-2 text-sm text-gray-300 mt-3">
                 <input type="checkbox" x-model="cdnGroupForm.enabled">
-                <span>启用配置组</span>
+                <span>{{t .Lang "security.enable_group"}}</span>
             </label>
             <div class="mt-3 flex items-center space-x-2">
-                <button @click="saveCDNGroup()" :disabled="cdnGroupSaving" class="btn-primary text-sm" x-text="cdnGroupForm.id ? '保存配置组' : '新增配置组'"></button>
-                <button x-show="cdnGroupForm.id" @click="resetCDNGroupForm()" class="btn-secondary text-sm">取消编辑</button>
+                <button @click="saveCDNGroup()" :disabled="cdnGroupSaving" class="btn-primary text-sm">
+                    <span x-show="cdnGroupForm.id">{{t .Lang "security.save_group"}}</span>
+                    <span x-show="!cdnGroupForm.id">{{t .Lang "security.add_group"}}</span>
+                </button>
+                <button x-show="cdnGroupForm.id" @click="resetCDNGroupForm()" class="btn-secondary text-sm">{{t .Lang "security.cancel_edit"}}</button>
             </div>
-            <p class="text-xs text-gray-500 mt-2">常见国内 CDN 通常使用 X-Forwarded-For；Header 名只允许英文字母、数字和短横线。</p>
+            <p class="text-xs text-gray-500 mt-2">{{t .Lang "security.header_name_help"}}</p>
         </div>
     </div>
 
     <div class="card">
-        <h3 class="text-lg font-semibold text-white mb-4">匿名安装统计</h3>
+        <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "security.telemetry"}}</h3>
         <div class="mb-4">
             <label class="flex items-center space-x-2 cursor-pointer">
                 <input type="checkbox" x-model="settings.telemetry_enabled" @change="saveTelemetry" class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600">
-                <span class="text-gray-300">开启匿名安装统计</span>
+                <span class="text-gray-300">{{t .Lang "security.enable_telemetry"}}</span>
             </label>
-            <p class="text-xs text-gray-500 mt-2">每天上报一次匿名心跳到 stats.wp-panel.org，内容仅包含机器匿名标识（/etc/machine-id 的 SHA256 哈希）和面板版本号。<strong>不含</strong> IP、域名、网站信息等任何敏感数据。这可以让我们知道 WP Panel 受到了多少用户的支持。</p>
+            <p class="text-xs text-gray-500 mt-2">{{t .Lang "security.telemetry_help"}}</p>
         </div>
     </div>
 </div>
@@ -318,10 +321,10 @@ function securitySettings() {
             } catch(e) { showToast('读取 CDN 配置组失败: ' + e.message, 'error'); }
         },
         cdnGroupModeLabel(group) {
-            if ((group.ip_ranges || '').trim()) return '严格模式：已填写可信回源 IP 段';
-            if (group.provider === 'cloudflare') return '系统自动处理：自动拉取 Cloudflare IP';
-            if (group.provider === 'compatible') return '兼容模式：不会填写回源 IP 段时使用';
-            return '兼容模式：未填写可信回源 IP 段';
+            if ((group.ip_ranges || '').trim()) return t('security.cdn_mode_strict_trusted_ips');
+            if (group.provider === 'cloudflare') return t('security.cdn_mode_cloudflare_auto');
+            if (group.provider === 'compatible') return t('security.cdn_mode_compatible_no_origin_ips');
+            return t('security.cdn_mode_compatible_missing_origin_ips');
         },
         resetCDNGroupForm() {
             this.cdnGroupForm = { id: null, name: '', header_name: 'X-Forwarded-For', ip_ranges: '', enabled: true, description: '' };

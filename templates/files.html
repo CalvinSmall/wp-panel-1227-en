@@ -1,22 +1,22 @@
 {{template "base" .}}
 {{define "files_content"}}
 <div x-data="fileManager()" x-init="initSites()">
-    <h2 class="text-xl font-bold text-white mb-6">文件管理</h2>
+    <h2 class="text-xl font-bold text-white mb-6">{{t .Lang "nav.files"}}</h2>
 
     <div x-show="selected.length > 0" class="flex flex-wrap items-center gap-2 mb-3 p-3 bg-blue-900/30 rounded border border-blue-800">
         <span class="text-sm text-gray-300" x-text="'当前页已选 ' + selected.length + ' 项'"></span>
-        <button @click="batchCompress()" :disabled="archiveBusy" class="btn-secondary text-sm py-1">批量压缩</button>
-        <button @click="cutItems()" class="btn-secondary text-sm py-1">剪切</button>
-        <button @click="copyItems()" class="btn-secondary text-sm py-1">复制</button>
-        <button @click="batchDelete()" class="btn-danger text-sm py-1">批量删除</button>
-        <button @click="selected = []" class="text-sm text-gray-400 hover:text-white py-1">取消选择</button>
+        <button @click="batchCompress()" :disabled="archiveBusy" class="btn-secondary text-sm py-1">{{t .Lang "files.batch_compress"}}</button>
+        <button @click="cutItems()" class="btn-secondary text-sm py-1">{{t .Lang "files.cut"}}</button>
+        <button @click="copyItems()" class="btn-secondary text-sm py-1">{{t .Lang "files.copy"}}</button>
+        <button @click="batchDelete()" class="btn-danger text-sm py-1">{{t .Lang "files.batch_delete"}}</button>
+        <button @click="selected = []" class="text-sm text-gray-400 hover:text-white py-1">{{t .Lang "files.cancel_selection"}}</button>
     </div>
 
     <template x-if="clipboard">
     <div class="flex flex-wrap items-center gap-2 mb-3 p-3 bg-green-900/30 rounded border border-green-800">
         <span class="text-sm text-gray-300" x-text="'剪贴板: ' + clipboard.names.length + ' 个项目 (' + (clipboard.action === 'cut' ? '剪切' : '复制') + ')'"></span>
-        <button @click="pasteItems()" class="btn-primary text-sm py-1">粘贴</button>
-        <button @click="clipboard = null" class="text-sm text-gray-400 hover:text-white py-1">清空</button>
+        <button @click="pasteItems()" class="btn-primary text-sm py-1">{{t .Lang "files.paste"}}</button>
+        <button @click="clipboard = null" class="text-sm text-gray-400 hover:text-white py-1">{{t .Lang "files.clear"}}</button>
     </div>
     </template>
 
@@ -58,15 +58,15 @@
     <div class="card mb-4">
         <div class="flex items-center space-x-4 mb-4">
             <select x-model="selectedSite" @change="switchRoot()" class="input-field w-64" x-ref="siteSelect">
-                <option value="">选择网站...</option>
+                <option value="">{{t .Lang "files.select_website"}}</option>
                 <template x-for="s in sites" :key="s.id">
                     <option :value="s.id" x-text="s.domain"></option>
                 </template>
-                <option value="0">📦 备份目录</option>
+                <option value="0">{{t .Lang "files.backup_dir"}}</option>
             </select>
         </div>
         <div x-show="selectedSiteLocked()" class="mb-4 p-3 bg-yellow-900/30 border border-yellow-700 text-yellow-100 rounded text-sm">
-            当前 WordPress 站点已开启文件锁定。媒体上传、缓存、翻译和安全插件日志等运行数据可继续写入；核心、插件、主题、站点配置和 PHP 可执行文件写入会被阻止。
+            {{t .Lang "files.file_lock_notice"}}
         </div>
 
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
@@ -80,9 +80,12 @@
                 </template>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <button @click="showMkdir = true" :disabled="!selectedSite" class="btn-secondary text-sm">新建目录</button>
-                <button @click="fixPermissions()" :disabled="!selectedSite || selectedSite == '0' || fixingPerms" class="btn-secondary text-sm" x-text="fixingPerms ? '修复中...' : '修复权限'"></button>
-                <button @click="openRemoteImport()" :disabled="!hasSelectedRoot() || remoteImporting" class="btn-secondary text-sm">远程导入</button>
+                <button @click="showMkdir = true" :disabled="!selectedSite" class="btn-secondary text-sm">{{t .Lang "files.new_directory"}}</button>
+                <button @click="fixPermissions()" :disabled="!selectedSite || selectedSite == '0' || fixingPerms" class="btn-secondary text-sm">
+                    <span x-show="fixingPerms">{{t .Lang "files.fixing_permissions"}}</span>
+                    <span x-show="!fixingPerms">{{t .Lang "files.fix_permissions"}}</span>
+                </button>
+                <button @click="openRemoteImport()" :disabled="!hasSelectedRoot() || remoteImporting" class="btn-secondary text-sm">{{t .Lang "files.remote_import"}}</button>
                 <form @submit.prevent="uploadFile" class="flex items-center gap-2">
                     <input type="file" @change="fileSelected($event)" :disabled="!hasSelectedRoot() || uploading" class="input-field w-32 sm:w-48 md:w-64 text-sm">
                     <button type="submit" class="btn-primary text-sm" :disabled="!hasSelectedRoot() || !uploadTarget || uploading" x-text="uploading ? '上传中 ' + uploadProgress + '%' : '上传'"></button>
@@ -91,17 +94,17 @@
         </div>
 
         <div x-show="showMkdir" class="flex items-center space-x-2 mb-4 p-3 bg-gray-700/50 rounded">
-            <span class="text-sm text-gray-300">目录名：</span>
-            <input type="text" x-model="mkdirName" @keyup.enter="createDir()" class="input-field w-48 text-sm" placeholder="新目录">
-            <button @click="createDir()" class="btn-primary text-sm">创建</button>
-            <button @click="showMkdir = false; mkdirName = ''" class="btn-secondary text-sm">取消</button>
+            <span class="text-sm text-gray-300">{{t .Lang "files.directory_name"}}</span>
+            <input type="text" x-model="mkdirName" @keyup.enter="createDir()" class="input-field w-48 text-sm" placeholder="{{t .Lang "files.new_directory_placeholder"}}">
+            <button @click="createDir()" class="btn-primary text-sm">{{t .Lang "files.create"}}</button>
+            <button @click="showMkdir = false; mkdirName = ''" class="btn-secondary text-sm">{{t .Lang "files.cancel"}}</button>
         </div>
 
         <div x-show="showRename" class="flex items-center space-x-2 mb-4 p-3 bg-gray-700/50 rounded">
-            <span class="text-sm text-gray-300">重命名 <span class="text-white" x-text="renameTarget"></span> 为：</span>
+            <span class="text-sm text-gray-300">{{t .Lang "files.rename_prefix"}} <span class="text-white" x-text="renameTarget"></span> {{t .Lang "files.rename_suffix"}}</span>
             <input type="text" x-model="renameName" @keyup.enter="doRename()" class="input-field w-48 text-sm">
-            <button @click="doRename()" class="btn-primary text-sm">确认</button>
-            <button @click="showRename = false" class="btn-secondary text-sm">取消</button>
+            <button @click="doRename()" class="btn-primary text-sm">{{t .Lang "files.confirm"}}</button>
+            <button @click="showRename = false" class="btn-secondary text-sm">{{t .Lang "files.cancel"}}</button>
         </div>
 
         <div class="overflow-x-auto">
@@ -109,12 +112,12 @@
                 <thead class="border-b border-gray-700">
                     <tr>
                         <th class="table-header w-10"><input type="checkbox" @change="selectAll($event.target.checked)" :disabled="files.length === 0"></th>
-                        <th class="table-header cursor-pointer hover:text-white select-none" @click="setSort('name')">名称<span class="ml-1 text-xs" x-text="sortMark('name')"></span></th>
-                        <th class="table-header cursor-pointer hover:text-white select-none" @click="setSort('type')">类型<span class="ml-1 text-xs" x-text="sortMark('type')"></span></th>
-                        <th class="table-header cursor-pointer hover:text-white select-none" @click="setSort('size')">大小<span class="ml-1 text-xs" x-text="sortMark('size')"></span></th>
-                        <th class="table-header">权限</th>
-                        <th class="table-header cursor-pointer hover:text-white select-none" @click="setSort('time')">修改时间<span class="ml-1 text-xs" x-text="sortMark('time')"></span></th>
-                        <th class="table-header">操作</th>
+                        <th class="table-header cursor-pointer hover:text-white select-none" @click="setSort('name')">{{t .Lang "files.name"}}<span class="ml-1 text-xs" x-text="sortMark('name')"></span></th>
+                        <th class="table-header cursor-pointer hover:text-white select-none" @click="setSort('type')">{{t .Lang "files.type"}}<span class="ml-1 text-xs" x-text="sortMark('type')"></span></th>
+                        <th class="table-header cursor-pointer hover:text-white select-none" @click="setSort('size')">{{t .Lang "files.size"}}<span class="ml-1 text-xs" x-text="sortMark('size')"></span></th>
+                        <th class="table-header">{{t .Lang "files.permissions"}}</th>
+                        <th class="table-header cursor-pointer hover:text-white select-none" @click="setSort('time')">{{t .Lang "files.modified_at"}}<span class="ml-1 text-xs" x-text="sortMark('time')"></span></th>
+                        <th class="table-header">{{t .Lang "files.actions"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -136,20 +139,20 @@
                             <td class="table-cell text-xs" x-text="f.mod_time"></td>
                             <td class="table-cell">
                                 <div class="flex flex-wrap gap-1">
-                                    <button x-show="!f.is_dir" @click="downloadFile(f.name)" class="btn-primary text-xs py-1 px-2">下载</button>
-                                    <button @click="startRename(f.name)" class="btn-secondary text-xs py-1 px-2">重命名</button>
-                                    <button @click="compressItems([f.name])" :disabled="archiveBusy" class="btn-secondary text-xs py-1 px-2" :title="f.is_dir ? '压缩目录' : '压缩文件'">压缩</button>
-                                    <button x-show="isArchive(f.name)" @click="decompressFile(f.name)" :disabled="archiveBusy" class="btn-secondary text-xs py-1 px-2">解压</button>
-                                    <button @click="deleteItems([f.name])" class="btn-danger text-xs py-1 px-2">删除</button>
+                                    <button x-show="!f.is_dir" @click="downloadFile(f.name)" class="btn-primary text-xs py-1 px-2">{{t .Lang "files.download"}}</button>
+                                    <button @click="startRename(f.name)" class="btn-secondary text-xs py-1 px-2">{{t .Lang "files.rename"}}</button>
+                                    <button @click="compressItems([f.name])" :disabled="archiveBusy" class="btn-secondary text-xs py-1 px-2" :title="f.is_dir ? '压缩目录' : '压缩文件'">{{t .Lang "files.compress"}}</button>
+                                    <button x-show="isArchive(f.name)" @click="decompressFile(f.name)" :disabled="archiveBusy" class="btn-secondary text-xs py-1 px-2">{{t .Lang "files.extract"}}</button>
+                                    <button @click="deleteItems([f.name])" class="btn-danger text-xs py-1 px-2">{{t .Lang "files.delete"}}</button>
                                 </div>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="files.length === 0 && selectedSite">
-                        <td colspan="7" class="table-cell text-center text-gray-500 py-8">空目录</td>
+                        <td colspan="7" class="table-cell text-center text-gray-500 py-8">{{t .Lang "files.empty_directory"}}</td>
                     </tr>
                     <tr x-show="!selectedSite">
-                        <td colspan="7" class="table-cell text-center text-gray-500 py-8">请先选择网站</td>
+                        <td colspan="7" class="table-cell text-center text-gray-500 py-8">{{t .Lang "files.select_website_first"}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -157,11 +160,11 @@
         <div x-show="selectedSite && totalPages > 1" class="flex items-center justify-between mt-4 pt-3 border-t border-gray-700/50">
             <span class="text-sm text-gray-400" x-text="'共 ' + total + ' 项，每页 ' + perPage + ' 项'"></span>
             <div class="flex items-center space-x-1">
-                <button @click="goPage(page - 1)" :disabled="page <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+                <button @click="goPage(page - 1)" :disabled="page <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">{{t .Lang "files.prev_page"}}</button>
                 <template x-for="p in pageNumbers" :key="p">
                     <button @click="goPage(p)" :class="p === page ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'" class="px-3 py-1 text-sm rounded" x-text="p"></button>
                 </template>
-                <button @click="goPage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+                <button @click="goPage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">{{t .Lang "files.next_page"}}</button>
             </div>
         </div>
     </div>
@@ -242,7 +245,7 @@ function fileManager() {
             this.loadFiles();
         },
         breadcrumbs() {
-            const parts = [{ label: '根目录', path: '/' }];
+            const parts = [{ label: t('files.root_directory'), path: '/' }];
             if (this.currentPath === '/') return parts;
             const segs = this.currentPath.split('/').filter(s => s);
             let p = '';

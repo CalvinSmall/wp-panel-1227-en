@@ -1,59 +1,59 @@
 {{template "base" .}}
 {{define "settings_content"}}
 <div x-data="panelSettings()" x-init="fetchSettings()">
-    <h2 class="text-xl font-bold text-white mb-6">面板设置</h2>
+    <h2 class="text-xl font-bold text-white mb-6">{{t .Lang "nav.settings"}}</h2>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">账户安全</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "settings.account_security"}}</h3>
 
             <div class="mb-4 p-3 rounded" style="background-color: #0f172a;">
-                <p class="text-xs text-blue-400 font-medium mb-2">BasicAuth 认证</p>
-                <p class="text-xs text-gray-500 mb-3">随机路径入口的第一层认证，浏览器弹窗式登录</p>
+                <p class="text-xs text-blue-400 font-medium mb-2">{{t .Lang "settings.basic_auth_title"}}</p>
+                <p class="text-xs text-gray-500 mb-3">{{t .Lang "settings.basic_auth_desc"}}</p>
                 <div class="mb-3">
-                    <label class="text-xs text-gray-400">用户名</label>
+                    <label class="text-xs text-gray-400">{{t .Lang "auth.username"}}</label>
                     <input type="text" x-model="basicAuthUser" class="input-field text-sm py-1.5 mt-1">
                 </div>
                 <div>
-                    <label class="text-xs text-gray-400">密码（至少8位，留空不修改）</label>
-                    <input type="password" x-model="pw.basic" class="input-field text-sm py-1.5 mt-1" placeholder="留空则不修改" autocomplete="new-password">
+                    <label class="text-xs text-gray-400">{{t .Lang "settings.password_keep"}}</label>
+                    <input type="password" x-model="pw.basic" class="input-field text-sm py-1.5 mt-1" placeholder="{{t .Lang "settings.leave_unchanged_placeholder"}}" autocomplete="new-password">
                 </div>
             </div>
 
             <div class="mb-4 p-3 rounded" style="background-color: #0f172a;">
-                <p class="text-xs text-green-400 font-medium mb-2">面板 Web 登录</p>
-                <p class="text-xs text-gray-500 mb-3">BasicAuth 通过后显示的 Web 表单登录</p>
+                <p class="text-xs text-green-400 font-medium mb-2">{{t .Lang "settings.web_login_title"}}</p>
+                <p class="text-xs text-gray-500 mb-3">{{t .Lang "settings.web_login_desc"}}</p>
                 <div class="mb-3">
-                    <label class="text-xs text-gray-400">用户名</label>
+                    <label class="text-xs text-gray-400">{{t .Lang "auth.username"}}</label>
                     <input type="text" x-model="username" class="input-field text-sm py-1.5 mt-1">
                 </div>
                 <div>
-                    <label class="text-xs text-gray-400">密码（至少8位，留空不修改）</label>
-                    <input type="password" x-model="pw.old" class="input-field text-sm py-1.5 mt-1" placeholder="当前密码（修改密码时必填）" autocomplete="current-password">
+                    <label class="text-xs text-gray-400">{{t .Lang "settings.password_keep"}}</label>
+                    <input type="password" x-model="pw.old" class="input-field text-sm py-1.5 mt-1" placeholder="{{t .Lang "settings.current_password_placeholder"}}" autocomplete="current-password">
                     <div class="flex space-x-2 mt-2">
-                        <input type="password" x-model="pw.new1" class="input-field flex-1 text-sm py-1.5" placeholder="新密码（至少8位）" autocomplete="new-password">
-                        <input type="password" x-model="pw.new2" class="input-field flex-1 text-sm py-1.5" placeholder="确认新密码">
+                        <input type="password" x-model="pw.new1" class="input-field flex-1 text-sm py-1.5" placeholder="{{t .Lang "settings.new_password_placeholder"}}" autocomplete="new-password">
+                        <input type="password" x-model="pw.new2" class="input-field flex-1 text-sm py-1.5" placeholder="{{t .Lang "settings.confirm_new_password_placeholder"}}">
                     </div>
                 </div>
             </div>
 
             <button @click="saveAccount" :disabled="accountSaving" class="btn-primary w-full" x-text="accountSaving ? '保存中...' : '保存账户设置'"></button>
-            <p class="text-xs text-yellow-400 mt-2" x-show="accountSaved">已保存，正在退出登录...</p>
+            <p class="text-xs text-yellow-400 mt-2" x-show="accountSaved">{{t .Lang "settings.account_saved_logout"}}</p>
         </div>
 
         <div class="card">
-            <h3 class="text-lg font-semibold text-white mb-4">服务器设置</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "settings.server_settings"}}</h3>
 
             <div class="mb-4">
-                <label class="label">面板标题</label>
+                <label class="label">{{t .Lang "settings.panel_title"}}</label>
                 <div class="flex space-x-2">
                     <input type="text" x-model="panelTitle" class="input-field flex-1">
-                    <button @click="saveBasic" class="btn-primary text-sm">保存</button>
+                    <button @click="saveBasic" class="btn-primary text-sm">{{t .Lang "settings.save"}}</button>
                 </div>
             </div>
 
             <div class="mb-4">
-                <label class="label">时区</label>
+                <label class="label">{{t .Lang "settings.timezone"}}</label>
                 <select x-model="timezone" @change="saveServerSetting('timezone', timezone)" class="input-field">
                     <option value="Asia/Shanghai">Asia/Shanghai (UTC+8)</option>
                     <option value="Asia/Tokyo">Asia/Tokyo (UTC+9)</option>
@@ -69,29 +69,29 @@
                     <option value="UTC">UTC</option>
                 </select>
                 <div class="flex items-center justify-between mt-1">
-                    <p class="text-xs text-gray-400">服务器时间：<span x-text="serverTime" class="text-white font-mono"></span></p>
+                    <p class="text-xs text-gray-400">{{t .Lang "settings.server_time"}}<span x-text="serverTime" class="text-white font-mono"></span></p>
                     <div class="flex items-center space-x-2">
                         <span class="text-xs" :class="ntpSynced ? 'text-green-400' : 'text-yellow-400'" x-text="ntpSynced ? 'NTP 已同步' : 'NTP 未同步'"></span>
-                        <button @click="syncNTP()" class="text-xs py-0.5 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">同步</button>
+                        <button @click="syncNTP()" class="text-xs py-0.5 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "settings.sync"}}</button>
                     </div>
                 </div>
             </div>
 
             <div class="mb-4">
-                <label class="label">主机名</label>
+                <label class="label">{{t .Lang "settings.hostname"}}</label>
                 <div class="flex space-x-2">
                     <input type="text" x-model="hostname" class="input-field flex-1">
-                    <button @click="saveServerSetting('hostname', hostname)" :disabled="!hostname" class="btn-primary text-sm">保存</button>
+                    <button @click="saveServerSetting('hostname', hostname)" :disabled="!hostname" class="btn-primary text-sm">{{t .Lang "settings.save"}}</button>
                 </div>
             </div>
 
             <div class="mb-4">
-                <label class="label">GitHub 反代地址</label>
-                <p class="text-xs text-gray-500 mb-2">国内服务器无法访问 GitHub 时填写。留空则直连 GitHub。</p>
+                <label class="label">{{t .Lang "settings.github_proxy"}}</label>
+                <p class="text-xs text-gray-500 mb-2">{{t .Lang "settings.github_proxy_help"}}</p>
                 <div class="flex space-x-2">
                     <input type="text" x-model="githubProxy" placeholder="https://gh.wp-panel.org" class="input-field flex-1">
                     <button @click="testProxy()" :disabled="proxyTesting" class="btn-secondary text-sm" x-text="proxyTesting ? '测试中...' : '测试'"></button>
-                    <button @click="saveServerSetting('github_proxy', githubProxy)" class="btn-primary text-sm">保存</button>
+                    <button @click="saveServerSetting('github_proxy', githubProxy)" class="btn-primary text-sm">{{t .Lang "settings.save"}}</button>
                 </div>
                 <p x-show="proxyResult" class="text-xs mt-2" :class="proxyOk ? 'text-green-400' : 'text-red-400'" x-text="proxyResult"></p>
             </div>
@@ -100,11 +100,11 @@
 
             <div x-data="versionCheck()" x-init="fetchVersion()">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm text-gray-400">面板版本</span>
+                    <span class="text-sm text-gray-400">{{t .Lang "settings.panel_version"}}</span>
                     <span class="text-sm text-white font-mono" x-text="currentVersion"></span>
                 </div>
                 <div x-show="hasUpdate" class="mb-3 p-3 rounded" style="background-color: #064e3b; border: 1px solid #059669;">
-                    <p class="text-sm text-green-300">新版本 <span x-text="latestVersion" class="font-bold"></span> 可用</p>
+                    <p class="text-sm text-green-300">{{t .Lang "settings.new_version_prefix"}} <span x-text="latestVersion" class="font-bold"></span> {{t .Lang "settings.new_version_suffix"}}</p>
                     <pre x-text="releaseNotes" class="text-xs text-gray-400 mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap"></pre>
                 </div>
                 <div class="flex items-center space-x-3">
@@ -123,7 +123,7 @@
                         <span x-text="formatBytes(updateStatus.downloaded_bytes || 0)"></span>
                         <span x-text="formatBytes(updateStatus.total_bytes || 0)"></span>
                     </div>
-                    <p x-show="updating && !updateStatus.error && !updateStatus.completed" class="text-xs text-yellow-500 mt-2">更新期间请勿关闭或刷新页面。</p>
+                    <p x-show="updating && !updateStatus.error && !updateStatus.completed" class="text-xs text-yellow-500 mt-2">{{t .Lang "settings.update_do_not_close"}}</p>
                 </div>
                 <p x-show="updateError" class="text-xs text-red-400 mt-2" x-text="updateError"></p>
             </div>
@@ -131,8 +131,8 @@
             <div class="mt-4 p-3 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
                 <div class="flex items-center justify-between mb-3">
                     <div>
-                        <p class="text-sm text-gray-300">自动更新</p>
-                        <p class="text-xs text-gray-500">默认关闭；开启后按窗口、发布延迟和签名校验执行</p>
+                        <p class="text-sm text-gray-300">{{t .Lang "settings.auto_update"}}</p>
+                        <p class="text-xs text-gray-500">{{t .Lang "settings.auto_update_help"}}</p>
                     </div>
                     <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                         <input type="checkbox" x-model="autoUpdate.enabled" @change="saveAutoUpdate">
@@ -141,30 +141,30 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                        <label class="label">更新模式</label>
+                        <label class="label">{{t .Lang "settings.update_mode"}}</label>
                         <select x-model="autoUpdate.mode" @change="saveAutoUpdate" class="input-field text-sm">
-                            <option value="patch_only">仅 patch 版本</option>
-                            <option value="all_stable">所有正式版</option>
+                            <option value="patch_only">{{t .Lang "settings.patch_only"}}</option>
+                            <option value="all_stable">{{t .Lang "settings.all_stable"}}</option>
                         </select>
                     </div>
                     <div>
-                        <label class="label">更新时间窗口</label>
+                        <label class="label">{{t .Lang "settings.update_window"}}</label>
                         <input type="text" x-model="autoUpdate.window" @change="saveAutoUpdate" class="input-field text-sm" placeholder="03:00-05:00">
                     </div>
                     <div>
-                        <label class="label">发布延迟（分钟）</label>
+                        <label class="label">{{t .Lang "settings.release_delay_minutes"}}</label>
                         <input type="number" x-model="autoUpdate.delay" @change="saveAutoUpdate" min="1" max="1440" class="input-field text-sm">
                     </div>
                     <div>
-                        <label class="label">等待签名超时（分钟）</label>
+                        <label class="label">{{t .Lang "settings.signature_timeout_minutes"}}</label>
                         <input type="number" x-model="autoUpdate.signatureTimeout" @change="saveAutoUpdate" min="5" max="1440" class="input-field text-sm">
                     </div>
                 </div>
                 <div class="mt-3 text-xs text-gray-500 space-y-1">
-                    <p>最近状态：<span class="text-gray-300" x-text="autoUpdate.lastStatus || '暂无'"></span> <span x-text="autoUpdate.lastStage ? '(' + autoUpdate.lastStage + ')' : ''"></span></p>
-                    <p x-show="autoUpdate.lastTarget">目标版本：<span class="text-gray-300" x-text="autoUpdate.lastTarget"></span></p>
+                    <p>{{t .Lang "settings.last_status"}}<span class="text-gray-300" x-text="autoUpdate.lastStatus || '暂无'"></span> <span x-text="autoUpdate.lastStage ? '(' + autoUpdate.lastStage + ')' : ''"></span></p>
+                    <p x-show="autoUpdate.lastTarget">{{t .Lang "settings.target_version"}}<span class="text-gray-300" x-text="autoUpdate.lastTarget"></span></p>
                     <p x-show="autoUpdate.lastError" class="text-red-400" x-text="autoUpdate.lastError"></p>
-                    <p x-show="autoUpdate.lastSuccess">最近成功：<span x-text="autoUpdate.lastSuccess"></span> <span x-text="autoUpdate.lastSuccessVersion"></span></p>
+                    <p x-show="autoUpdate.lastSuccess">{{t .Lang "settings.last_success"}}<span x-text="autoUpdate.lastSuccess"></span> <span x-text="autoUpdate.lastSuccessVersion"></span></p>
                 </div>
             </div>
 
@@ -172,9 +172,9 @@
 
             <div x-data="systemUpdate()" x-init="check()">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm text-gray-400">系统更新</span>
+                    <span class="text-sm text-gray-400">{{t .Lang "settings.system_updates"}}</span>
                     <span class="text-sm text-white font-mono" x-show="count > 0" x-text="count + ' 个可用'"></span>
-                    <span class="text-xs text-gray-500" x-show="count === 0">已是最新</span>
+                    <span class="text-xs text-gray-500" x-show="count === 0">{{t .Lang "settings.up_to_date"}}</span>
                 </div>
                 <div x-show="count > 0" class="mb-3 space-y-2">
                     <template x-for="pkg in packages" :key="pkg.name">
@@ -185,17 +185,17 @@
                             </div>
                             <div class="flex items-center space-x-3">
                                 <span class="text-xs text-gray-400" x-text="pkg.version"></span>
-                                <a :href="'https://packages.debian.org/trixie/' + pkg.name" target="_blank" class="text-xs text-blue-400 hover:text-blue-300" title="在 packages.debian.org 查看包详情">查询</a>
+                                <a :href="'https://packages.debian.org/trixie/' + pkg.name" target="_blank" class="text-xs text-blue-400 hover:text-blue-300" title="{{t .Lang "settings.package_detail_title"}}">{{t .Lang "settings.query"}}</a>
                             </div>
                         </div>
                     </template>
-                    <p class="text-xs text-gray-500 mt-2">不了解某个包的作用？点击「查询」链接可查看 Debian 官方包说明，或复制包名通过搜索引擎/AI 工具了解详情。</p>
+                    <p class="text-xs text-gray-500 mt-2">{{t .Lang "settings.system_update_help"}}</p>
                 </div>
                 <div class="flex items-center space-x-3">
                     <button @click="check()" :disabled="checking" class="btn-secondary text-xs" x-text="checking ? '检查中...' : '刷新'"></button>
                     <button @click="doUpdate()" x-show="count > 0" :disabled="updating" class="btn-primary text-xs" x-text="updating ? '更新中...' : '一键更新'"></button>
                 </div>
-                <p x-show="count > 0" class="text-xs text-yellow-500 mt-2">更新过程可能持续数分钟，期间请勿关闭或刷新页面。</p>
+                <p x-show="count > 0" class="text-xs text-yellow-500 mt-2">{{t .Lang "settings.system_update_warning"}}</p>
                 <pre x-show="output" class="text-xs text-gray-400 mt-3 p-3 rounded max-h-48 overflow-y-auto" style="background-color: #020617;" x-text="output"></pre>
                 <p x-show="msg" class="text-sm mt-2" :class="ok ? 'text-green-400' : 'text-red-400'" x-text="msg"></p>
             </div>
@@ -205,11 +205,11 @@
     <div class="card mb-6">
         <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
             <div>
-                <h3 class="text-lg font-semibold text-white">AI 诊断设置</h3>
-                <p class="text-xs text-gray-500 mt-1">配置网站故障和性能诊断使用的 AI 服务商；诊断操作在「AI 诊断」页面进行。</p>
+                <h3 class="text-lg font-semibold text-white">{{t .Lang "settings.ai_settings"}}</h3>
+                <p class="text-xs text-gray-500 mt-1">{{t .Lang "settings.ai_settings_help"}}</p>
             </div>
             <div class="flex items-center gap-3">
-                <a href="/{{.RandomSuffix}}/ai-diagnostics" class="btn-secondary text-sm">前往 AI 诊断</a>
+                <a href="/{{.RandomSuffix}}/ai-diagnostics" class="btn-secondary text-sm">{{t .Lang "settings.go_ai_diagnostics"}}</a>
                 <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" x-model="ai.enabled">
                     <span x-text="ai.enabled ? '已启用' : '已关闭'"></span>
@@ -219,7 +219,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label class="label">服务商</label>
+                <label class="label">{{t .Lang "settings.provider"}}</label>
                 <select x-model="ai.provider" @change="applyAIProviderDefaults()" class="input-field text-sm">
                     <option value="deepseek">DeepSeek</option>
                     <option value="openai">OpenAI</option>
@@ -227,7 +227,7 @@
                 </select>
             </div>
             <div>
-                <label class="label">模型</label>
+                <label class="label">{{t .Lang "settings.model"}}</label>
                 <input type="text" x-model="ai.model" class="input-field text-sm" placeholder="deepseek-v4-pro">
             </div>
             <div>
@@ -239,14 +239,14 @@
                 <input type="password" x-model="ai.api_key" class="input-field text-sm" :placeholder="ai.api_key_masked || '输入 API Key'">
             </div>
             <div>
-                <label class="label">超时（秒）</label>
+                <label class="label">{{t .Lang "settings.timeout_seconds"}}</label>
                 <input type="number" x-model.number="ai.timeout_seconds" min="15" max="180" class="input-field text-sm">
-                <p class="text-xs text-gray-500 mt-1">建议 60-120 秒；较慢模型可临时调高到 180 秒。</p>
+                <p class="text-xs text-gray-500 mt-1">{{t .Lang "settings.ai_timeout_help"}}</p>
             </div>
         </div>
 
         <div class="mt-4 p-3 rounded text-xs text-yellow-200" style="background-color: #422006; border: 1px solid #854d0e;">
-            AI 诊断会把站点域名、日志摘要、配置摘要和检查结果发送给所选服务商；不会发送数据库密码、AI Key、SSL 私钥、面板密码或面板数据库内容。
+            {{t .Lang "settings.ai_privacy_notice"}}
         </div>
         <div class="flex items-center space-x-3 mt-4">
             <button @click="testAI()" :disabled="aiTesting" class="btn-secondary text-sm" x-text="aiTesting ? '测试中...' : '测试连接'"></button>
@@ -257,29 +257,29 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
         <div class="card" x-data="wpPackage()" x-init="fetchStatus()">
-            <h3 class="text-lg font-semibold text-white mb-4">WordPress 安装包</h3>
-            <p class="text-xs text-gray-500 mb-4">创建 WordPress 网站时优先使用本地安装包。国内服务器如果无法在线下载，可在此手动上传。</p>
+            <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "settings.wp_package"}}</h3>
+            <p class="text-xs text-gray-500 mb-4">{{t .Lang "settings.wp_package_help"}}</p>
 
             <div>
                 <div class="p-3 rounded mb-4" style="background-color: #0f172a;">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs text-gray-400">本地安装包状态</span>
+                        <span class="text-xs text-gray-400">{{t .Lang "settings.local_package_status"}}</span>
                         <span class="text-xs font-medium" :class="pkg.available ? 'text-green-400' : 'text-yellow-400'" x-text="pkg.available ? '已就绪' : '未安装'"></span>
                     </div>
                     <template x-if="pkg.available">
                         <div class="space-y-1">
                             <div class="flex items-center justify-between">
-                                <span class="text-xs text-gray-500">文件大小</span>
+                                <span class="text-xs text-gray-500">{{t .Lang "settings.file_size"}}</span>
                                 <span class="text-xs text-white" x-text="pkg.size_text"></span>
                             </div>
                             <div class="flex items-center justify-between">
-                                <span class="text-xs text-gray-500">更新时间</span>
+                                <span class="text-xs text-gray-500">{{t .Lang "settings.updated_at"}}</span>
                                 <span class="text-xs text-white" x-text="pkg.updated_at"></span>
                             </div>
                         </div>
                     </template>
                     <template x-if="!pkg.available">
-                        <p class="text-xs text-yellow-400">本地无安装包，建站时将尝试在线下载（可能因网络问题失败）</p>
+                        <p class="text-xs text-yellow-400">{{t .Lang "settings.local_package_missing"}}</p>
                     </template>
                 </div>
 
@@ -290,14 +290,14 @@
                         <input type="file" accept=".zip" class="hidden" @change="uploadPkg($event)" :disabled="uploading">
                     </label>
                     <button x-show="pkg.available" @click="deletePkg()" :disabled="deleting" class="text-sm py-1.5 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;" x-text="deleting ? '删除中...' : '删除'"></button>
-                    <button @click="fetchStatus()" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">刷新</button>
+                    <button @click="fetchStatus()" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "settings.refresh"}}</button>
                 </div>
                 <p x-show="msg" class="text-xs mt-2" :class="msgOk ? 'text-green-400' : 'text-red-400'" x-text="msg"></p>
             </div>
         </div>
 
         <div class="card" x-data="remoteBackup()" x-init="fetchRemote()">
-            <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-semibold text-white">远程备份</h3><button @click="showHelp = true" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">使用说明</button></div>
+            <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-semibold text-white">{{t .Lang "settings.remote_backup"}}</h3><button @click="showHelp = true" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "settings.help"}}</button></div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- 左侧：备份设置 -->
@@ -305,53 +305,53 @@
                 <div class="flex items-center space-x-3 mb-4">
                     <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                         <input type="checkbox" x-model="cfg.enabled">
-                        <span>启用远程备份</span>
+                        <span>{{t .Lang "settings.enable_remote_backup"}}</span>
                     </label>
                 </div>
 
                 <div x-show="cfg.enabled" class="space-y-3">
                     <div>
-                        <label class="label">备份目标</label>
+                        <label class="label">{{t .Lang "settings.backup_target"}}</label>
                         <select x-model="cfg.backup_type" class="input-field text-sm">
-                            <option value="rsync">SSH / rsync 远程服务器</option>
-                            <option value="s3">S3 兼容对象存储</option>
+                            <option value="rsync">{{t .Lang "settings.backup_target_rsync"}}</option>
+                            <option value="s3">{{t .Lang "settings.backup_target_s3"}}</option>
                         </select>
                     </div>
 
                     <div x-show="cfg.backup_type === 'rsync'" class="space-y-3">
                     <div>
-                        <label class="label">远程服务器地址</label>
-                        <input type="text" x-model="cfg.host" class="input-field text-sm" placeholder="192.168.1.100 或域名">
+                        <label class="label">{{t .Lang "settings.remote_host"}}</label>
+                        <input type="text" x-model="cfg.host" class="input-field text-sm" placeholder="{{t .Lang "settings.remote_host_placeholder"}}">
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="label">SSH 端口</label>
+                            <label class="label">{{t .Lang "settings.ssh_port"}}</label>
                             <input type="number" x-model="cfg.port" class="input-field text-sm" placeholder="22">
                         </div>
                         <div>
-                            <label class="label">用户名</label>
+                            <label class="label">{{t .Lang "auth.username"}}</label>
                             <input type="text" x-model="cfg.username" class="input-field text-sm" placeholder="wpbackup">
                         </div>
                     </div>
                     <div>
-                        <label class="label">认证方式</label>
+                        <label class="label">{{t .Lang "settings.auth_method"}}</label>
                         <select x-model="cfg.auth_type" class="input-field text-sm">
-                            <option value="key">SSH 密钥（推荐）</option>
-                            <option value="password">密码</option>
+                            <option value="key">{{t .Lang "settings.ssh_key_recommended"}}</option>
+                            <option value="password">{{t .Lang "auth.password"}}</option>
                         </select>
                     </div>
                     <div x-show="cfg.auth_type === 'password'">
-                        <label class="label">SSH 密码</label>
+                        <label class="label">{{t .Lang "settings.ssh_password"}}</label>
                         <div class="flex space-x-1">
-                            <input type="password" x-model="cfg.password" class="input-field text-sm flex-1" placeholder="远程服务器密码">
-                            <button @click="genPassword()" class="text-xs py-1 px-2 rounded flex-shrink-0" style="background-color: #1e3a5f; color: #93c5fd;" title="随机生成备份账号密码">随机</button>
+                            <input type="password" x-model="cfg.password" class="input-field text-sm flex-1" placeholder="{{t .Lang "settings.ssh_password_placeholder"}}">
+                            <button @click="genPassword()" class="text-xs py-1 px-2 rounded flex-shrink-0" style="background-color: #1e3a5f; color: #93c5fd;" title="{{t .Lang "settings.generate_password_title"}}">{{t .Lang "settings.generate_random"}}</button>
                         </div>
                     </div>
                     <div x-show="cfg.auth_type === 'key'" class="text-xs text-gray-400">
-                        <p>面板已自动生成 ed25519 密钥对，公钥将嵌入下方的一键命令中。</p>
+                        <p>{{t .Lang "settings.ssh_key_generated_help"}}</p>
                     </div>
                     <div>
-                        <label class="label">远程备份路径</label>
+                        <label class="label">{{t .Lang "settings.remote_backup_path"}}</label>
                         <input type="text" x-model="cfg.remote_path" class="input-field text-sm" :placeholder="'/home/' + cfg.username + '/backup'">
                     </div>
                     </div>
@@ -359,7 +359,7 @@
                     <div x-show="cfg.backup_type === 's3'" class="space-y-3">
                     <div>
                         <label class="label">S3 Endpoint</label>
-                        <input type="text" x-model="cfg.s3_endpoint" class="input-field text-sm" placeholder="https://账号ID.r2.cloudflarestorage.com">
+                        <input type="text" x-model="cfg.s3_endpoint" class="input-field text-sm" placeholder="{{t .Lang "settings.s3_endpoint_placeholder"}}">
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -380,14 +380,14 @@
                         <input type="password" x-model="cfg.s3_secret_key" class="input-field text-sm" placeholder="Secret Access Key">
                     </div>
                     <div>
-                        <label class="label">备份路径前缀</label>
+                        <label class="label">{{t .Lang "settings.backup_path_prefix"}}</label>
                         <input type="text" x-model="cfg.s3_path_prefix" class="input-field text-sm" placeholder="wp-panel">
                     </div>
                     </div>
 
                     <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                         <input type="checkbox" x-model="cfg.keep_local">
-                        <span>保留本地备份</span>
+                        <span>{{t .Lang "settings.keep_local_backup"}}</span>
                     </label>
 
                 </div>
@@ -400,46 +400,46 @@
                 <p x-show="testResult" class="text-sm" :class="testOK ? 'text-green-400' : 'text-red-400'" x-text="testResult"></p>
 
                 <div x-show="!cfg.enabled" class="text-xs text-gray-600 py-4 text-center">
-                    开启后，每次备份完成自动同步到远程位置
+                    {{t .Lang "settings.remote_disabled_help"}}
                 </div>
             </div>
 
             <!-- 右侧：设置助手 -->
             <div x-show="cfg.backup_type === 'rsync'" class="p-4 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
                 <div class="flex items-center justify-between mb-3">
-                    <h4 class="text-sm font-medium text-gray-300">远程服务器一键设置</h4>
+                    <h4 class="text-sm font-medium text-gray-300">{{t .Lang "settings.remote_helper_title"}}</h4>
                     <div class="flex rounded overflow-hidden" style="border: 1px solid #334155;">
-                        <button @click="helperMode = 'create'" :class="helperMode === 'create' ? 'text-white' : 'text-gray-500'" class="text-xs py-1 px-2" :style="helperMode === 'create' ? 'backgroundColor: #1e3a5f' : 'backgroundColor: #0f172a'">创建</button>
-                        <button @click="helperMode = 'delete'" :class="helperMode === 'delete' ? 'text-white' : 'text-gray-500'" class="text-xs py-1 px-2" :style="helperMode === 'delete' ? 'backgroundColor: #b91c1c' : 'backgroundColor: #0f172a'">删除</button>
+                        <button @click="helperMode = 'create'" :class="helperMode === 'create' ? 'text-white' : 'text-gray-500'" class="text-xs py-1 px-2" :style="helperMode === 'create' ? 'backgroundColor: #1e3a5f' : 'backgroundColor: #0f172a'">{{t .Lang "settings.create"}}</button>
+                        <button @click="helperMode = 'delete'" :class="helperMode === 'delete' ? 'text-white' : 'text-gray-500'" class="text-xs py-1 px-2" :style="helperMode === 'delete' ? 'backgroundColor: #b91c1c' : 'backgroundColor: #0f172a'">{{t .Lang "settings.delete"}}</button>
                     </div>
                 </div>
-                <p x-show="helperMode === 'create'" class="text-xs text-gray-500 mb-3">在远程服务器以 root 执行以下命令，自动创建备份账号和目录：</p>
-                <p x-show="helperMode === 'delete'" class="text-xs text-red-400 mb-3"><strong>删除后无法恢复。</strong>在远程服务器以 root 执行，将删除账号和备份目录：</p>
+                <p x-show="helperMode === 'create'" class="text-xs text-gray-500 mb-3">{{t .Lang "settings.remote_helper_create_help"}}</p>
+                <p x-show="helperMode === 'delete'" class="text-xs text-red-400 mb-3"><strong>{{t .Lang "settings.remote_helper_delete_strong"}}</strong>{{t .Lang "settings.remote_helper_delete_help"}}</p>
 
                 <div class="p-3 rounded" style="background-color: #020617; border: 1px solid #1e293b;">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-gray-500 text-xs">复制到远程服务器执行：</span>
-                        <button @click="copyCmd()" class="text-xs py-0.5 px-2 rounded" :style="helperMode === 'delete' ? 'background-color: #7f1d1d; color: #fca5a5' : 'background-color: #1e3a5f; color: #93c5fd'">复制命令</button>
+                        <span class="text-gray-500 text-xs">{{t .Lang "settings.copy_to_remote"}}</span>
+                        <button @click="copyCmd()" class="text-xs py-0.5 px-2 rounded" :style="helperMode === 'delete' ? 'background-color: #7f1d1d; color: #fca5a5' : 'background-color: #1e3a5f; color: #93c5fd'">{{t .Lang "settings.copy_command"}}</button>
                     </div>
                     <pre class="font-mono text-gray-300 whitespace-pre-wrap text-xs leading-relaxed" x-text="genCmd()" style="word-break: break-all;"></pre>
                 </div>
 
                 <ul class="space-y-1 text-gray-500 text-xs mt-3">
-                    <li>· 密钥认证模式：命令已包含公钥，一条搞定</li>
-                    <li>· 密码认证模式：面板已自动安装 sshpass，无需手动操作</li>
-                    <li>· 建议使用<span class="text-yellow-300">专用备份账号</span>，勿用 root</li>
-                    <li>· 备份账号无需管理员权限，仅需写入目标目录</li>
+                    <li>{{t .Lang "settings.remote_helper_key_mode"}}</li>
+                    <li>{{t .Lang "settings.remote_helper_password_mode"}}</li>
+                    <li>{{t .Lang "settings.remote_helper_dedicated_user"}}</li>
+                    <li>{{t .Lang "settings.remote_helper_permission"}}</li>
                 </ul>
             </div>
             <div x-show="cfg.backup_type === 's3'" class="p-4 rounded text-xs text-gray-400" style="background-color: #0f172a; border: 1px solid #1e293b;">
-                <h4 class="text-sm font-medium text-gray-300 mb-3">S3 兼容对象存储配置提示</h4>
+                <h4 class="text-sm font-medium text-gray-300 mb-3">{{t .Lang "settings.s3_help_title"}}</h4>
                 <ul class="space-y-2">
-                    <li>· 支持 Cloudflare R2、AWS S3、MinIO、Backblaze B2 等 S3 兼容服务。</li>
-                    <li>· 在对象存储中创建 Bucket，并创建具有对象读写权限的 Access Key。</li>
-                    <li>· Cloudflare R2 Endpoint 示例：<code class="text-gray-300">https://账号ID.r2.cloudflarestorage.com</code>。</li>
-                    <li>· Cloudflare R2 的 Region 通常填写 <code class="text-gray-300">auto</code>，其他服务按服务商要求填写。</li>
-                    <li>· 路径前缀用于区分不同面板，例如 <code class="text-gray-300">wp-panel/server-1</code>。</li>
-                    <li>· 大备份文件会自动使用 S3 分片上传，恢复时仍是一个完整备份对象。</li>
+                    <li>{{t .Lang "settings.s3_help_supported"}}</li>
+                    <li>{{t .Lang "settings.s3_help_bucket"}}</li>
+                    <li>{{t .Lang "settings.s3_help_endpoint"}} <code class="text-gray-300">https://account-id.r2.cloudflarestorage.com</code></li>
+                    <li>{{t .Lang "settings.s3_help_region"}} <code class="text-gray-300">auto</code></li>
+                    <li>{{t .Lang "settings.s3_help_prefix"}} <code class="text-gray-300">wp-panel/server-1</code></li>
+                    <li>{{t .Lang "settings.s3_help_multipart"}}</li>
                 </ul>
             </div>
         </div>
@@ -448,44 +448,44 @@
             <div x-show="showHelp" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" @click.self="showHelp = false">
                 <div class="rounded-lg shadow-xl w-full max-w-xl p-6 max-h-80vh overflow-y-auto" style="background-color: #1e293b; border: 1px solid #334155;">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-white">远程备份使用说明</h3>
+                        <h3 class="text-lg font-semibold text-white">{{t .Lang "settings.remote_help_title"}}</h3>
                         <button @click="showHelp = false" class="text-gray-400 hover:text-white text-xl">&times;</button>
                     </div>
                     <div class="text-sm text-gray-300 space-y-4">
                         <div>
-                            <p class="font-medium text-blue-400 mb-1">工作流程</p>
+                            <p class="font-medium text-blue-400 mb-1">{{t .Lang "settings.workflow"}}</p>
                             <ol class="text-gray-400 list-decimal list-inside space-y-1">
-                                <li>面板在本地完成数据库或文件备份</li>
-                                <li>自动通过 SSH + rsync 或 S3 兼容 API 将备份文件传送到远程位置</li>
-                                <li>如果关闭「保留本地备份」，传送成功后自动删除本地文件以节省空间</li>
+                                <li>{{t .Lang "settings.workflow_local_backup"}}</li>
+                                <li>{{t .Lang "settings.workflow_transfer"}}</li>
+                                <li>{{t .Lang "settings.workflow_delete_local"}}</li>
                             </ol>
                         </div>
                         <div>
-                            <p class="font-medium text-blue-400 mb-1">远程服务器要求</p>
+                            <p class="font-medium text-blue-400 mb-1">{{t .Lang "settings.remote_server_requirements"}}</p>
                             <ul class="text-gray-400 list-disc list-inside space-y-1">
-                                <li>已开启 SSH 服务并能从本机连接</li>
-                                <li>目标目录存在且备份账号有写入权限</li>
-                                <li>防火墙放行 SSH 端口（默认 22）</li>
+                                <li>{{t .Lang "settings.remote_req_ssh"}}</li>
+                                <li>{{t .Lang "settings.remote_req_path"}}</li>
+                                <li>{{t .Lang "settings.remote_req_firewall"}}</li>
                             </ul>
                         </div>
                         <div>
-                            <p class="font-medium text-blue-400 mb-1">认证方式</p>
+                            <p class="font-medium text-blue-400 mb-1">{{t .Lang "settings.auth_methods"}}</p>
                             <ul class="text-gray-400 list-disc list-inside space-y-1">
-                                <li><span class="text-yellow-300">SSH 密钥（推荐）</span>：面板自动生成密钥对，右侧助手生成的一键命令已包含公钥，远程粘贴执行即可。无需安装额外软件。</li>
-                                <li><span class="text-gray-500">密码</span>：面板保存设置时自动安装 sshpass，无需手动操作。</li>
-                                <li><span class="text-yellow-300">S3 兼容对象存储</span>：使用 Access Key 和 Secret Key 签名上传，不需要远程 SSH 账号；大文件会自动分片上传。</li>
+                                <li>{{t .Lang "settings.auth_key_detail"}}</li>
+                                <li>{{t .Lang "settings.auth_password_detail"}}</li>
+                                <li>{{t .Lang "settings.auth_s3_detail"}}</li>
                             </ul>
                         </div>
                         <div>
-                            <p class="font-medium text-blue-400 mb-1">安全建议</p>
+                            <p class="font-medium text-blue-400 mb-1">{{t .Lang "settings.security_advice"}}</p>
                             <ul class="text-gray-400 list-disc list-inside space-y-1">
-                                <li>在远程服务器创建<span class="text-yellow-300">专用备份账号</span>，不要使用 root，权限最小化更安全</li>
-                                <li>远程备份目录不会自动清理旧文件，建议定期手动检查</li>
-                                <li>密钥文件位于 <code class="text-gray-500">/www/server/panel/remote_backup_key</code>，妥善保管</li>
+                                <li>{{t .Lang "settings.security_dedicated"}}</li>
+                                <li>{{t .Lang "settings.security_cleanup"}}</li>
+                                <li>{{t .Lang "settings.security_key_path"}} <code class="text-gray-500">/www/server/panel/remote_backup_key</code></li>
                             </ul>
                         </div>
                         <div class="p-3 rounded" style="background-color: #0f172a; border: 1px solid #334155;">
-                            <p class="text-gray-400 text-xs">提示：右侧「一键设置」助手生成的命令可直接复制到远程服务器 SSH 终端粘贴执行，回车即完成全部配置。</p>
+                            <p class="text-gray-400 text-xs">{{t .Lang "settings.remote_help_tip"}}</p>
                         </div>
                     </div>
                 </div>
@@ -495,21 +495,21 @@
 
     <div class="card mb-6" x-data="dbBackup()" x-init="fetchBackups()">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-white">面板数据库备份</h3>
+            <h3 class="text-lg font-semibold text-white">{{t .Lang "settings.panel_db_backup"}}</h3>
             <div class="flex items-center space-x-2">
                 <button @click="doBackup()" :disabled="backingUp" class="btn-primary text-sm" x-text="backingUp ? '备份中...' : '立即备份'"></button>
             </div>
         </div>
-        <p class="text-gray-400 text-xs mb-2">每天凌晨 2:30 自动备份面板数据库，保留最近 7 份。恢复后面板将自动重启。</p>
-        <p class="text-yellow-500/80 text-xs mb-4">⚠ 备份包含敏感数据（密码哈希、数据库凭证等），请勿分享给他人。面板无法启动时，可通过 SSH 从 /www/server/panel/backups/panel-db/ 获取备份文件。</p>
+        <p class="text-gray-400 text-xs mb-2">{{t .Lang "settings.panel_db_backup_help"}}</p>
+        <p class="text-yellow-500/80 text-xs mb-4">{{t .Lang "settings.panel_db_backup_warning"}}</p>
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="border-b border-gray-700">
                     <tr>
-                        <th class="table-header">备份时间</th>
-                        <th class="table-header">文件名</th>
-                        <th class="table-header">大小</th>
-                        <th class="table-header">操作</th>
+                        <th class="table-header">{{t .Lang "settings.backup_time"}}</th>
+                        <th class="table-header">{{t .Lang "settings.filename"}}</th>
+                        <th class="table-header">{{t .Lang "settings.size"}}</th>
+                        <th class="table-header">{{t .Lang "settings.actions"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -519,14 +519,14 @@
                             <td class="table-cell text-xs font-mono" x-text="b.filename"></td>
                             <td class="table-cell text-sm" x-text="b.size_text"></td>
                             <td class="table-cell">
-                                <button @click="doDownload(b.filename)" class="btn-primary text-xs py-1 px-2">下载</button>
-                                <button @click="doRestore(b.filename)" class="btn-warning text-xs py-1 px-2 ml-1">恢复</button>
-                                <button @click="doDelete(b.filename)" class="btn-danger text-xs py-1 px-2 ml-1">删除</button>
+                                <button @click="doDownload(b.filename)" class="btn-primary text-xs py-1 px-2">{{t .Lang "settings.download"}}</button>
+                                <button @click="doRestore(b.filename)" class="btn-warning text-xs py-1 px-2 ml-1">{{t .Lang "settings.restore"}}</button>
+                                <button @click="doDelete(b.filename)" class="btn-danger text-xs py-1 px-2 ml-1">{{t .Lang "settings.delete"}}</button>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="backups.length === 0">
-                        <td colspan="4" class="table-cell text-center text-gray-500 py-6">暂无备份记录</td>
+                        <td colspan="4" class="table-cell text-center text-gray-500 py-6">{{t .Lang "settings.no_backup_records"}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -534,15 +534,15 @@
     </div>
 
     <div class="card" x-data="operationLogs()" x-init="fetchLogs()">
-        <h3 class="text-lg font-semibold text-white mb-4">最近操作日志</h3>
+        <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "settings.recent_operation_logs"}}</h3>
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="border-b border-gray-700">
                     <tr>
-                        <th class="table-header">时间</th>
-                        <th class="table-header">操作</th>
-                        <th class="table-header">目标</th>
-                        <th class="table-header">状态</th>
+                        <th class="table-header">{{t .Lang "settings.time"}}</th>
+                        <th class="table-header">{{t .Lang "settings.operation"}}</th>
+                        <th class="table-header">{{t .Lang "settings.target"}}</th>
+                        <th class="table-header">{{t .Lang "settings.status"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -558,7 +558,7 @@
                         </tr>
                     </template>
                     <tr x-show="logs.length === 0">
-                        <td colspan="4" class="table-cell text-center text-gray-500 py-8">暂无操作日志</td>
+                        <td colspan="4" class="table-cell text-center text-gray-500 py-8">{{t .Lang "settings.no_operation_logs"}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -566,11 +566,11 @@
         <div x-show="logTotal > 0" class="flex items-center justify-between mt-4 pt-3 border-t border-gray-700/50">
             <span class="text-sm text-gray-400" x-text="`共 ${logTotal} 条记录`"></span>
             <div class="flex items-center space-x-1" x-show="logTotalPages > 1">
-                <button @click="logGoPage(logPage-1)" :disabled="logPage <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+                <button @click="logGoPage(logPage-1)" :disabled="logPage <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">{{t .Lang "settings.prev_page"}}</button>
                 <template x-for="p in logPageNumbers" :key="p">
                     <button @click="logGoPage(p)" :class="p === logPage ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'" class="px-3 py-1 text-sm rounded" x-text="p"></button>
                 </template>
-                <button @click="logGoPage(logPage+1)" :disabled="logPage >= logTotalPages" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+                <button @click="logGoPage(logPage+1)" :disabled="logPage >= logTotalPages" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">{{t .Lang "settings.next_page"}}</button>
             </div>
         </div>
     </div>

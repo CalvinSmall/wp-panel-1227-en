@@ -2,10 +2,10 @@
 {{define "cron_content"}}
 <div x-data="cronManager()" x-init="fetchList()">
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-white">计划任务</h2>
+        <h2 class="text-xl font-bold text-white">{{t .Lang "nav.cron"}}</h2>
         <div class="flex space-x-3">
-            <button @click="showLog = true; fetchCronLogs()" class="btn-secondary text-sm">查看日志</button>
-            <button @click="openCreate()" class="btn-primary">创建任务</button>
+            <button @click="showLog = true; fetchCronLogs()" class="btn-secondary text-sm">{{t .Lang "cron.view_logs"}}</button>
+            <button @click="openCreate()" class="btn-primary">{{t .Lang "cron.create_job"}}</button>
         </div>
     </div>
 
@@ -14,13 +14,13 @@
             <table class="w-full">
                 <thead class="border-b border-gray-700">
                     <tr>
-                        <th class="table-header">任务名称</th>
-                        <th class="table-header">周期</th>
-                        <th class="table-header">类型</th>
-                        <th class="table-header">内容</th>
-                        <th class="table-header">状态</th>
-                        <th class="table-header">上次手动执行</th>
-                        <th class="table-header">操作</th>
+                        <th class="table-header">{{t .Lang "cron.job_name"}}</th>
+                        <th class="table-header">{{t .Lang "cron.schedule"}}</th>
+                        <th class="table-header">{{t .Lang "cron.type"}}</th>
+                        <th class="table-header">{{t .Lang "cron.content"}}</th>
+                        <th class="table-header">{{t .Lang "cron.status"}}</th>
+                        <th class="table-header">{{t .Lang "cron.last_manual_run"}}</th>
+                        <th class="table-header">{{t .Lang "cron.actions"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -38,14 +38,14 @@
                             <td class="table-cell">
                                 <div class="flex flex-wrap gap-1">
                                     <button @click="runJob(job)" :disabled="job.running" class="btn-success text-xs py-1 px-2" :class="job.running ? 'opacity-50 cursor-not-allowed' : ''" x-text="job.running ? '执行中...' : '执行'"></button>
-                                    <button @click="openEdit(job)" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">编辑</button>
-                                    <button @click="deleteJob(job)" class="btn-danger text-xs py-1 px-2">删除</button>
+                                    <button @click="openEdit(job)" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "cron.edit"}}</button>
+                                    <button @click="deleteJob(job)" class="btn-danger text-xs py-1 px-2">{{t .Lang "cron.delete"}}</button>
                                 </div>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="jobs.length === 0">
-                        <td colspan="7" class="table-cell text-center text-gray-500 py-8">暂无任务</td>
+                        <td colspan="7" class="table-cell text-center text-gray-500 py-8">{{t .Lang "cron.no_jobs"}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -53,15 +53,15 @@
     </div>
 
     <div class="card mt-6" x-data="{ sysJobs: [] }" x-init="fetchSysCron()">
-        <h3 class="text-lg font-semibold text-white mb-4">系统任务 <span class="text-xs text-gray-500 font-normal">（只读）</span></h3>
+        <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "cron.system_jobs"}} <span class="text-xs text-gray-500 font-normal">{{t .Lang "cron.readonly"}}</span></h3>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead class="border-b border-gray-700 text-gray-400">
                     <tr>
-                        <th class="py-2 text-left">来源</th>
-                        <th class="py-2 text-left">周期</th>
-                        <th class="py-2 text-left">用户</th>
-                        <th class="py-2 text-left">命令</th>
+                        <th class="py-2 text-left">{{t .Lang "cron.source"}}</th>
+                        <th class="py-2 text-left">{{t .Lang "cron.schedule"}}</th>
+                        <th class="py-2 text-left">{{t .Lang "cron.user"}}</th>
+                        <th class="py-2 text-left">{{t .Lang "cron.command"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -74,7 +74,7 @@
                         </tr>
                     </template>
                     <tr x-show="sysJobs.length === 0">
-                        <td colspan="4" class="py-4 text-center text-gray-500">暂无系统任务</td>
+                        <td colspan="4" class="py-4 text-center text-gray-500">{{t .Lang "cron.no_system_jobs"}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -84,7 +84,7 @@
     <div x-show="showLog" class="modal-overlay" @click.self="showLog = false">
         <div class="modal-content" style="max-width: 56rem;">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-white">Cron 执行日志</h3>
+                <h3 class="text-lg font-bold text-white">{{t .Lang "cron.execution_logs"}}</h3>
                 <button @click="showLog = false" class="text-gray-400 hover:text-white text-xl">&times;</button>
             </div>
             <pre x-text="cronLogContent" class="w-full rounded p-3 text-xs font-mono overflow-auto" style="background-color: #0f172a; border: 1px solid #334155; color: #94a3b8; max-height: 500px; white-space: pre-wrap; word-break: break-all;"></pre>
@@ -93,87 +93,93 @@
 
     <div x-show="showModal" class="modal-overlay" @click.self="showModal = false">
         <div class="modal-content">
-            <h3 class="text-lg font-bold text-white mb-4" x-text="editingId ? '编辑任务' : '创建任务'"></h3>
+            <h3 class="text-lg font-bold text-white mb-4">
+                <span x-show="editingId">{{t .Lang "cron.edit_job"}}</span>
+                <span x-show="!editingId">{{t .Lang "cron.create_job"}}</span>
+            </h3>
             <form @submit.prevent="saveJob">
                 <div class="mb-3">
-                    <label class="label">任务名称</label>
+                    <label class="label">{{t .Lang "cron.job_name"}}</label>
                     <input type="text" x-model="form.name" class="input-field" required>
                 </div>
                 <div class="mb-3">
-                    <label class="label">任务类型</label>
+                    <label class="label">{{t .Lang "cron.task_type"}}</label>
                     <select x-model="form.task_type" class="input-field" @change="onTaskTypeChange">
-                        <option value="command">自定义命令</option>
-                        <option value="file_backup">备份网站文件</option>
-                        <option value="wp_cron">WP Cron 调用</option>
+                        <option value="command">{{t .Lang "cron.custom_command"}}</option>
+                        <option value="file_backup">{{t .Lang "cron.backup_site_files"}}</option>
+                        <option value="wp_cron">{{t .Lang "cron.wp_cron_call"}}</option>
                     </select>
                 </div>
                 <div x-show="form.task_type === 'wp_cron'" class="p-3 rounded mb-3" style="background-color: #0f172a;">
-                    <p class="text-xs text-gray-300 mb-3"><strong class="text-white">替代 WordPress 内置伪 Cron</strong> — WordPress 默认每次页面访问才触发计划任务（发布定时文章、检查更新等），不稳定且消耗性能。此任务通过系统 Cron 定时直接调用 wp-cron.php，更可靠。</p>
+                    <p class="text-xs text-gray-300 mb-3"><strong class="text-white">{{t .Lang "cron.wp_cron_replace_title"}}</strong> — {{t .Lang "cron.wp_cron_replace_help"}}</p>
                     <div class="mb-2">
-                        <label class="text-sm text-gray-300 mb-1 block">目标网站</label>
+                        <label class="text-sm text-gray-300 mb-1 block">{{t .Lang "cron.target_site"}}</label>
                         <select x-model="form.site_id" class="input-field" @change="autoName('wp_cron')">
-                            <option value="">请选择网站</option>
+                            <option value="">{{t .Lang "cron.select_website"}}</option>
                             <template x-for="s in sites" :key="s.id">
                                 <option :value="s.id" x-text="s.domain"></option>
                             </template>
                         </select>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">创建后将自动在 wp-config.php 中添加 <code>define('DISABLE_WP_CRON', true)</code>，禁用 WordPress 内置伪 Cron。删除此任务（且该网站无其他 WP Cron 任务）时将自动移除该配置。</p>
+                    <p class="text-xs text-gray-500 mt-2">{{t .Lang "cron.wp_cron_config_help_prefix"}} <code>define('DISABLE_WP_CRON', true)</code>{{t .Lang "cron.wp_cron_config_help_suffix"}}</p>
                 </div>
                 <div x-show="form.task_type === 'file_backup'" class="p-3 rounded mb-3" style="background-color: #0f172a;">
-                    <p class="text-xs text-gray-400 mb-3"><strong class="text-white">全量备份</strong>：打包整个网站根目录。首次运行或在详情页点击执行时运行。<br><strong class="text-white">智能增量</strong>：仅备份 wp-content/uploads/ 中自上次备份后新增或修改的文件。日常定时运行建议选择此模式。</p>
+                    <p class="text-xs text-gray-400 mb-3"><strong class="text-white">{{t .Lang "cron.full_backup"}}</strong>{{t .Lang "cron.full_backup_help"}}<br><strong class="text-white">{{t .Lang "cron.smart_incremental"}}</strong>{{t .Lang "cron.smart_incremental_help"}}</p>
                     <div class="mb-2">
-                        <label class="text-sm text-gray-300 mb-1 block">目标网站</label>
+                        <label class="text-sm text-gray-300 mb-1 block">{{t .Lang "cron.target_site"}}</label>
                         <select x-model="form.site_id" class="input-field" @change="autoName('file_backup')">
-                            <option value="">请选择网站</option>
+                            <option value="">{{t .Lang "cron.select_website"}}</option>
                             <template x-for="s in sites" :key="s.id">
                                 <option :value="s.id" x-text="s.domain"></option>
                             </template>
                         </select>
                     </div>
                     <div class="mb-2">
-                        <label class="text-sm text-gray-300 mb-1 block">备份模式</label>
+                        <label class="text-sm text-gray-300 mb-1 block">{{t .Lang "cron.backup_mode"}}</label>
                         <select x-model="form.backup_mode" class="input-field">
-                            <option value="incremental">智能增量（首次自动全量）</option>
-                            <option value="full">全站备份</option>
+                            <option value="incremental">{{t .Lang "cron.incremental_first_full"}}</option>
+                            <option value="full">{{t .Lang "cron.full_site_backup"}}</option>
                         </select>
                     </div>
                     <div x-show="form.backup_mode === 'full'" class="mb-2">
-                        <label class="text-sm text-gray-300 mb-1 block">保留本地备份</label>
+                        <label class="text-sm text-gray-300 mb-1 block">{{t .Lang "cron.keep_local_backups"}}</label>
                         <div class="flex items-center space-x-2">
                             <input type="number" x-model.number="form.keep_count" class="input-field w-20 text-sm py-1.5" min="1" max="30">
-                            <span class="text-xs text-gray-500">份</span>
+                            <span class="text-xs text-gray-500">{{t .Lang "cron.copies"}}</span>
                         </div>
                     </div>
-                    <p x-show="form.backup_mode === 'incremental'" class="text-xs text-gray-500 mb-2">增量备份本地始终保留最近一份完整链，不自动清理。</p>
+                    <p x-show="form.backup_mode === 'incremental'" class="text-xs text-gray-500 mb-2">{{t .Lang "cron.incremental_keep_help"}}</p>
                     <div class="mb-2">
                         <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                             <input type="checkbox" x-model="form.notify_fail">
-                            <span>备份失败时邮件通知</span>
+                            <span>{{t .Lang "cron.notify_on_backup_failure"}}</span>
                         </label>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="label">执行周期</label>
+                    <label class="label">{{t .Lang "cron.run_schedule"}}</label>
                     <select x-model="form.cron_expression" class="input-field">
-                        <option value="">自定义 Cron 表达式</option>
-                        <option value="* * * * *">每分钟</option>
-                        <option value="*/5 * * * *">每5分钟</option>
-                        <option value="0 * * * *">每小时</option>
-                        <option value="0 2 * * *">每天凌晨2点</option>
-                        <option value="0 3 * * 0">每周日凌晨3点（每7天）</option>
-                        <option value="0 0 1,16 * *">每15天（1号、16号）</option>
-                        <option value="0 0 1 * *">每月1号（每30天）</option>
+                        <option value="">{{t .Lang "cron.custom_cron_expression"}}</option>
+                        <option value="* * * * *">{{t .Lang "cron.every_minute"}}</option>
+                        <option value="*/5 * * * *">{{t .Lang "cron.every_5_minutes"}}</option>
+                        <option value="0 * * * *">{{t .Lang "cron.every_hour"}}</option>
+                        <option value="0 2 * * *">{{t .Lang "cron.daily_2am"}}</option>
+                        <option value="0 3 * * 0">{{t .Lang "cron.weekly_sunday_3am"}}</option>
+                        <option value="0 0 1,16 * *">{{t .Lang "cron.every_15_days"}}</option>
+                        <option value="0 0 1 * *">{{t .Lang "cron.monthly_1st"}}</option>
                     </select>
-                    <input type="text" x-model="form.cron_expression" class="input-field mt-1" placeholder="或输入标准 Cron 表达式（分 时 日 月 周）">
+                    <input type="text" x-model="form.cron_expression" class="input-field mt-1" placeholder="{{t .Lang "cron.cron_expression_placeholder"}}">
                 </div>
                 <div x-show="form.task_type !== 'file_backup'" class="mb-3">
-                    <label class="label">执行命令</label>
-                    <textarea x-model="form.command" class="input-field" rows="3" placeholder="例如: wp cron event run --due-now --path=/www/wwwroot/xxx.com"></textarea>
+                    <label class="label">{{t .Lang "cron.run_command"}}</label>
+                    <textarea x-model="form.command" class="input-field" rows="3" placeholder="{{t .Lang "cron.command_placeholder"}}"></textarea>
                 </div>
                 <div class="flex justify-end space-x-3">
-                    <button type="button" @click="showModal = false" class="btn-secondary">取消</button>
-                    <button type="submit" class="btn-primary" x-text="editingId ? '保存' : '创建'"></button>
+                    <button type="button" @click="showModal = false" class="btn-secondary">{{t .Lang "cron.cancel"}}</button>
+                    <button type="submit" class="btn-primary">
+                        <span x-show="editingId">{{t .Lang "cron.save"}}</span>
+                        <span x-show="!editingId">{{t .Lang "cron.create"}}</span>
+                    </button>
                 </div>
             </form>
         </div>

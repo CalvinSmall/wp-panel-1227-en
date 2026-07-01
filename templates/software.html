@@ -2,8 +2,8 @@
 {{define "software_content"}}
 <div x-data="softwareManager()" x-init="fetchList()">
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-white">软件管理</h2>
-        <button @click="showHelp = true" class="btn-secondary text-sm">WordPress 配置建议</button>
+        <h2 class="text-xl font-bold text-white">{{t .Lang "nav.software"}}</h2>
+        <button @click="showHelp = true" class="btn-secondary text-sm">{{t .Lang "software.wp_config_advice"}}</button>
     </div>
 
     <div x-show="showHelp" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showHelp = false">
@@ -144,17 +144,17 @@
 
     <div x-data="processGuard()" x-init="fetch()" class="card mb-6">
         <div class="flex items-center justify-between mb-3">
-            <h3 class="text-lg font-semibold text-white">进程守护</h3>
-            <span class="text-xs text-gray-500">每30秒自动检测</span>
+            <h3 class="text-lg font-semibold text-white">{{t .Lang "software.process_guard"}}</h3>
+            <span class="text-xs text-gray-500">{{t .Lang "software.auto_check_30s"}}</span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead class="border-b border-gray-700 text-gray-400 text-xs">
                     <tr>
-                        <th class="py-2 text-left font-medium">服务</th>
-                        <th class="py-2 text-left font-medium">版本</th>
-                        <th class="py-2 text-left font-medium">状态</th>
-                        <th class="py-2 text-right font-medium">操作</th>
+                        <th class="py-2 text-left font-medium">{{t .Lang "software.service"}}</th>
+                        <th class="py-2 text-left font-medium">{{t .Lang "software.version"}}</th>
+                        <th class="py-2 text-left font-medium">{{t .Lang "software.status"}}</th>
+                        <th class="py-2 text-right font-medium">{{t .Lang "software.actions"}}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-800">
@@ -170,14 +170,14 @@
                                 <span class="text-xs text-gray-400" x-text="s.version"></span>
                             </td>
                             <td class="py-2.5 pr-4">
-                                <span x-show="s.running && !s.paused" class="text-green-400 text-xs">● 运行中</span>
-                                <span x-show="s.paused" class="text-yellow-400 text-xs">● 手动停止</span>
-                                <span x-show="!s.running && !s.paused" class="text-red-400 text-xs">● 已停止</span>
+                                <span x-show="s.running && !s.paused" class="text-green-400 text-xs">{{t .Lang "software.running"}}</span>
+                                <span x-show="s.paused" class="text-yellow-400 text-xs">{{t .Lang "software.manually_stopped"}}</span>
+                                <span x-show="!s.running && !s.paused" class="text-red-400 text-xs">{{t .Lang "software.stopped"}}</span>
                             </td>
                             <td class="py-2.5 text-right whitespace-nowrap">
-                                <button x-show="s.running && !s.paused" @click="action(s.service, 'stop')" :disabled="s._acting" class="btn-secondary text-xs py-1 px-2.5">停止</button>
-                                <button x-show="!s.running || s.paused" @click="action(s.service, 'start')" :disabled="s._acting" class="btn-primary text-xs py-1 px-2.5">启动</button>
-                                <button @click="action(s.service, 'restart')" :disabled="s._acting" class="btn-secondary text-xs py-1 px-2.5 ml-1.5">重启</button>
+                                <button x-show="s.running && !s.paused" @click="action(s.service, 'stop')" :disabled="s._acting" class="btn-secondary text-xs py-1 px-2.5">{{t .Lang "software.stop"}}</button>
+                                <button x-show="!s.running || s.paused" @click="action(s.service, 'start')" :disabled="s._acting" class="btn-primary text-xs py-1 px-2.5">{{t .Lang "software.start"}}</button>
+                                <button @click="action(s.service, 'restart')" :disabled="s._acting" class="btn-secondary text-xs py-1 px-2.5 ml-1.5">{{t .Lang "software.restart"}}</button>
                             </td>
                         </tr>
                     </template>
@@ -185,7 +185,7 @@
             </table>
         </div>
         <div class="mt-3 pt-3 border-t border-gray-800 text-xs text-gray-500">
-            systemd Restart=always 提供第一层守护，面板每30秒检测异常并自动拉起。手动停止后守护不再自动启动。
+            {{t .Lang "software.process_guard_help"}}
         </div>
     </div>
 
@@ -214,8 +214,12 @@
                 </div>
 
                 <div class="flex space-x-2 mt-4">
-                    <button @click="saveConfig(sw)" :disabled="sw._saving" class="btn-primary text-sm" x-text="sw._saving ? (sw.name === 'PHP' ? '保存并重建站点 FPM 中...' : '保存并重载中...') : '保存并重载'"></button>
-                    <button @click="viewLog(sw.name)" class="btn-secondary text-sm">查看日志</button>
+                    <button @click="saveConfig(sw)" :disabled="sw._saving" class="btn-primary text-sm">
+                        <span x-show="!sw._saving">{{t .Lang "software.save_reload"}}</span>
+                        <span x-show="sw._saving && sw.name === 'PHP'">{{t .Lang "software.save_rebuild_fpm"}}</span>
+                        <span x-show="sw._saving && sw.name !== 'PHP'">{{t .Lang "software.save_reloading"}}</span>
+                    </button>
+                    <button @click="viewLog(sw.name)" class="btn-secondary text-sm">{{t .Lang "software.view_logs"}}</button>
                 </div>
             </div>
         </template>

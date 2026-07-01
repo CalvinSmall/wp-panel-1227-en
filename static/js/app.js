@@ -1,3 +1,16 @@
+function currentLocale() {
+    return (window.WP_PANEL_I18N && window.WP_PANEL_I18N.lang) || document.body?.dataset.lang || 'zh-CN';
+}
+
+function t(key, params = {}) {
+    const messages = (window.WP_PANEL_I18N && window.WP_PANEL_I18N.messages) || {};
+    let message = messages[key] || key;
+    Object.entries(params).forEach(([name, value]) => {
+        message = message.split('{{' + name + '}}').join(String(value));
+    });
+    return message;
+}
+
 function api(path, options = {}) {
     const prefix = document.body.dataset.panelPrefix || '';
     const url = prefix + '/api' + path;
@@ -27,16 +40,16 @@ function api(path, options = {}) {
         .then(async (resp) => {
             if (resp.status === 401 && path !== '/auth/login') {
                 window.location.href = prefix + '/login';
-                throw new Error('登录已失效，请重新登录');
+                throw new Error(t('auth.session_expired'));
             }
             if (resp.status === 503) {
-                throw new Error('面板服务繁忙，请稍后重试');
+                throw new Error(t('common.service_busy'));
             }
             const contentType = resp.headers.get('content-type') || '';
             if (!contentType.includes('application/json')) {
                 const text = await resp.text();
                 console.error('Non-JSON response:', resp.status, text.substring(0, 200));
-                throw new Error('面板服务返回异常 (' + resp.status + ')，请检查服务是否正在运行或刷新后重试');
+                throw new Error(t('common.service_exception', { status: resp.status }));
             }
             const data = await resp.json();
             if (!resp.ok) {
@@ -46,7 +59,7 @@ function api(path, options = {}) {
                 throw err;
             }
             if (!data.success) {
-                const err = new Error(data.message || '操作失败');
+                const err = new Error(data.message || t('common.operation_failed'));
                 if (data.conflicts) err.conflicts = data.conflicts;
                 throw err;
             }
@@ -54,12 +67,12 @@ function api(path, options = {}) {
         })
         .catch(err => {
             if (timedOut) {
-                err = new Error('请求等待超时，请稍后刷新历史记录查看是否已完成。');
+                err = new Error(t('common.request_timeout'));
             }
             const message = friendlyAPIError(err);
             const displayErr = message === err.message ? err : new Error(message);
             if (err.conflicts) displayErr.conflicts = err.conflicts;
-            if (message !== '登录已失效，请重新登录' && !displayErr.conflicts && !silent && !suppressToast) {
+            if (message !== t('auth.session_expired') && !displayErr.conflicts && !silent && !suppressToast) {
                 console.error('Fetch failed:', err.message, 'URL:', url);
                 showToast(displayErr.message, 'error');
             }
@@ -73,12 +86,12 @@ function api(path, options = {}) {
 function friendlyAPIError(err) {
     const message = err && err.message ? err.message : '';
     if (/Load failed|Failed to fetch|NetworkError|Network request failed|fetch failed/i.test(message)) {
-        return '无法连接面板服务。请检查面板是否正在运行、网络连接、HTTPS 证书或访问入口是否正确，然后刷新重试。';
+        return t('common.network_error');
     }
     if (/AbortError|The operation was aborted/i.test(message)) {
-        return '请求已取消，请重试。';
+        return t('common.request_cancelled');
     }
-    return message || '请求失败，请稍后重试';
+    return message || t('common.request_failed');
 }
 
 function formatBytes(bytes) {
@@ -92,7 +105,7 @@ function formatBytes(bytes) {
 function fmtTime(t) {
     if (!t) return '--';
     // Handles both RFC 3339 (2026-05-22T05:48:55Z) and SQLite (2026-05-22 05:48:55)
-    return new Date(t.replace(' ', 'T')).toLocaleString('zh-CN');
+    return new Date(t.replace(' ', 'T')).toLocaleString(currentLocale());
 }
 
 function formatUptime(seconds) {
@@ -131,8 +144,8 @@ function confirmModal(message) {
             <div style="background:#1f2937;border:1px solid #374151;padding:24px;max-width:32rem;width:100%;margin:0 16px;max-height:80vh;display:flex;flex-direction:column;">
                 <p id="modal-message" style="color:#e5e7eb;margin-bottom:16px;white-space:pre-wrap;overflow-y:auto;flex:1;min-height:0;"></p>
                 <div style="display:flex;justify-content:flex-end;gap:12px;flex-shrink:0;">
-                    <button id="modal-cancel" style="background:#4b5563;color:#fff;border:none;padding:8px 16px;cursor:pointer;font-size:14px;">取消</button>
-                    <button id="modal-confirm" style="background:#dc2626;color:#fff;border:none;padding:8px 16px;cursor:pointer;font-size:14px;">确认</button>
+                    <button id="modal-cancel" style="background:#4b5563;color:#fff;border:none;padding:8px 16px;cursor:pointer;font-size:14px;">${t('common.cancel')}</button>
+                    <button id="modal-confirm" style="background:#dc2626;color:#fff;border:none;padding:8px 16px;cursor:pointer;font-size:14px;">${t('common.confirm')}</button>
                 </div>
             </div>
         `;

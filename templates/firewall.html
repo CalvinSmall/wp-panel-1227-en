@@ -2,8 +2,8 @@
 {{define "firewall_content"}}
 <div x-data="firewallManager()" x-init="fetchBans(); fetchWPSecurityReport(); refreshFileSecurityEvents()">
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-white">安全防御</h2>
-        <button @click="showRules = true" class="btn-secondary text-sm">防御规则说明</button>
+        <h2 class="text-xl font-bold text-white">{{t .Lang "nav.firewall"}}</h2>
+        <button @click="showRules = true" class="btn-secondary text-sm">{{t .Lang "firewall.rules_help"}}</button>
     </div>
 
     <div x-show="showRules" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showRules = false">
@@ -107,19 +107,19 @@
     </div>
 
     <div class="card mb-6">
-        <h3 class="text-lg font-semibold text-white mb-4">手动封禁 IP</h3>
+        <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "firewall.manual_ban_ip"}}</h3>
         <div class="flex items-end space-x-3">
             <div class="flex-1">
-                <label class="block text-sm text-gray-300 mb-1">IP 地址</label>
+                <label class="block text-sm text-gray-300 mb-1">{{t .Lang "firewall.ip_address"}}</label>
                 <input type="text" x-model="banIP" class="input-field" placeholder="192.168.1.100">
             </div>
             <div>
-                <label class="block text-sm text-gray-300 mb-1">封禁时长</label>
+                <label class="block text-sm text-gray-300 mb-1">{{t .Lang "firewall.ban_duration"}}</label>
                 <select x-model="banDuration" class="input-field">
-                    <option value="600">10 分钟</option>
-                    <option value="3600">1 小时</option>
-                    <option value="86400">24 小时</option>
-                    <option value="0">永久</option>
+                    <option value="600">{{t .Lang "firewall.duration_10m"}}</option>
+                    <option value="3600">{{t .Lang "firewall.duration_1h"}}</option>
+                    <option value="86400">{{t .Lang "firewall.duration_24h"}}</option>
+                    <option value="0">{{t .Lang "firewall.permanent"}}</option>
                 </select>
             </div>
             <button @click="manualBan()" :disabled="banSubmitting" class="btn-danger" x-text="banSubmitting ? '封禁中...' : '封禁'"></button>
@@ -129,9 +129,9 @@
     <div class="card mb-6">
         <div class="flex items-center justify-between mb-4">
             <div>
-                <h3 class="text-lg font-semibold text-white">WordPress 可疑访问分析</h3>
-                <p class="text-xs text-gray-500 mt-1">基于本机 WordPress 安全日志和 Nginx 错误日志统计，仅提供证据整理，不自动封禁。</p>
-                <p class="text-xs text-gray-500 mt-1">分析结果缓存 30 秒；当 WordPress 站点超过 50 个或磁盘 I/O 较慢时，首次刷新可能稍慢。</p>
+                <h3 class="text-lg font-semibold text-white">{{t .Lang "firewall.wp_suspicious_access"}}</h3>
+                <p class="text-xs text-gray-500 mt-1">{{t .Lang "firewall.wp_suspicious_access_help"}}</p>
+                <p class="text-xs text-gray-500 mt-1">{{t .Lang "firewall.wp_suspicious_access_cache_help"}}</p>
             </div>
             <button @click="fetchWPSecurityReport()" :disabled="securityReportLoading" class="btn-secondary text-xs py-1.5 px-3" x-text="securityReportLoading ? '分析中...' : '刷新分析'"></button>
         </div>
@@ -139,13 +139,13 @@
             <table class="w-full">
                 <thead class="border-b border-gray-700">
                     <tr>
-                        <th class="table-header">IP 地址</th>
-                        <th class="table-header">站点</th>
-                        <th class="table-header">风险</th>
-                        <th class="table-header">次数</th>
-                        <th class="table-header">最近时间</th>
-                        <th class="table-header">路径样本</th>
-                        <th class="table-header">操作</th>
+                        <th class="table-header">{{t .Lang "firewall.ip_address"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.site"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.risk"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.count"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.last_seen"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.path_samples"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.actions"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -162,16 +162,16 @@
                                 </template>
                             </td>
                             <td class="table-cell whitespace-nowrap">
-                                <button @click="copySecurityReport(item)" class="btn-secondary text-xs py-1 px-2">复制报告</button>
-                                <button @click="banIP = item.ip_address; showToast('IP已填入手动封禁IP框，请手动选择封禁时长和点击封禁按钮', 'success')" class="btn-danger text-xs py-1 px-2 ml-1">填入封禁</button>
+                                <button @click="copySecurityReport(item)" class="btn-secondary text-xs py-1 px-2">{{t .Lang "firewall.copy_report"}}</button>
+                                <button @click="banIP = item.ip_address; showToast('IP已填入手动封禁IP框，请手动选择封禁时长和点击封禁按钮', 'success')" class="btn-danger text-xs py-1 px-2 ml-1">{{t .Lang "firewall.fill_ban"}}</button>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="securityReportLoaded && securityReportItems.length === 0">
-                        <td colspan="7" class="table-cell text-center text-gray-500 py-6">暂无 WordPress 可疑访问统计</td>
+                        <td colspan="7" class="table-cell text-center text-gray-500 py-6">{{t .Lang "firewall.no_wp_suspicious_access"}}</td>
                     </tr>
                     <tr x-show="!securityReportLoaded">
-                        <td colspan="7" class="table-cell text-center text-gray-500 py-6">正在读取本机日志...</td>
+                        <td colspan="7" class="table-cell text-center text-gray-500 py-6">{{t .Lang "firewall.reading_local_logs"}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -181,8 +181,8 @@
     <div class="card mb-6">
         <div class="flex items-center justify-between mb-4">
             <div>
-                <h3 class="text-lg font-semibold text-white">文件安全事件</h3>
-                <p class="text-xs text-gray-500 mt-1">记录运行数据目录 PHP 执行尝试和扫描发现的可疑 PHP 文件，仅展示和告警，不自动封禁、不删除文件。</p>
+                <h3 class="text-lg font-semibold text-white">{{t .Lang "firewall.file_security_events"}}</h3>
+                <p class="text-xs text-gray-500 mt-1">{{t .Lang "firewall.file_security_events_help"}}</p>
                 <p class="text-xs text-gray-500 mt-1" x-show="fileSecuritySummary" x-text="`本次刷新：扫描 ${fileSecuritySummary.sites_scanned || 0} 个站点，发现 ${fileSecuritySummary.file_events || 0} 个文件事件，导入 ${fileSecuritySummary.access_events || 0} 次访问事件。`"></p>
             </div>
                 <div class="flex items-center space-x-2">
@@ -194,15 +194,15 @@
             <table class="w-full">
                 <thead class="border-b border-gray-700">
                     <tr>
-                        <th class="table-header">类型</th>
-                        <th class="table-header">站点</th>
-                        <th class="table-header">风险</th>
-                        <th class="table-header">路径</th>
-                        <th class="table-header">来源</th>
-                        <th class="table-header">次数/发现</th>
-                        <th class="table-header">最近时间</th>
-                        <th class="table-header">状态</th>
-                        <th class="table-header">操作</th>
+                        <th class="table-header">{{t .Lang "firewall.type"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.site"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.risk"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.path"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.source"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.count_or_found"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.last_seen"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.status"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.actions"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -220,16 +220,16 @@
                             <td class="table-cell text-xs" x-text="formatTime(event.last_seen)"></td>
                             <td class="table-cell"><span :class="event.resolved_at ? 'badge-info' : 'badge-danger'" x-text="event.resolved_at ? '已处理' : '当前风险'"></span></td>
                             <td class="table-cell whitespace-nowrap">
-                                <button @click="copyFileSecurityEvent(event)" class="btn-secondary text-xs py-1 px-2">复制信息</button>
-                                <button x-show="event.ip_address" @click="banIP = event.ip_address; showToast('IP已填入手动封禁IP框，请手动选择封禁时长和点击封禁按钮', 'success')" class="btn-danger text-xs py-1 px-2 ml-1">填入封禁</button>
+                                <button @click="copyFileSecurityEvent(event)" class="btn-secondary text-xs py-1 px-2">{{t .Lang "firewall.copy_info"}}</button>
+                                <button x-show="event.ip_address" @click="banIP = event.ip_address; showToast('IP已填入手动封禁IP框，请手动选择封禁时长和点击封禁按钮', 'success')" class="btn-danger text-xs py-1 px-2 ml-1">{{t .Lang "firewall.fill_ban"}}</button>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="fileSecurityLoaded && fileSecurityEvents.length === 0">
-                        <td colspan="9" class="table-cell text-center text-gray-500 py-6">暂无文件安全事件</td>
+                        <td colspan="9" class="table-cell text-center text-gray-500 py-6">{{t .Lang "firewall.no_file_security_events"}}</td>
                     </tr>
                     <tr x-show="!fileSecurityLoaded">
-                        <td colspan="9" class="table-cell text-center text-gray-500 py-6">正在刷新文件安全事件...</td>
+                        <td colspan="9" class="table-cell text-center text-gray-500 py-6">{{t .Lang "firewall.refreshing_file_security_events"}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -238,24 +238,24 @@
 
     <div class="card mb-6">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-white">当前封禁列表</h3>
+            <h3 class="text-lg font-semibold text-white">{{t .Lang "firewall.current_bans"}}</h3>
             <div class="flex items-center space-x-2">
-                <input type="text" x-model="searchIP" @keydown.enter="page=1;fetchBans()" class="input-field text-sm py-1.5 w-48" placeholder="搜索 IP 地址...">
-                <button @click="page=1;fetchBans()" class="btn-secondary text-xs py-1.5 px-3">搜索</button>
+                <input type="text" x-model="searchIP" @keydown.enter="page=1;fetchBans()" class="input-field text-sm py-1.5 w-48" placeholder="{{t .Lang "firewall.search_ip_placeholder"}}">
+                <button @click="page=1;fetchBans()" class="btn-secondary text-xs py-1.5 px-3">{{t .Lang "firewall.search"}}</button>
             </div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="border-b border-gray-700">
                     <tr>
-                        <th class="table-header">IP 地址</th>
-                        <th class="table-header">等级</th>
-                        <th class="table-header">原因</th>
-                        <th class="table-header">来源</th>
-                        <th class="table-header">封禁时间</th>
-                        <th class="table-header">过期时间</th>
-                        <th class="table-header">累计次数</th>
-                        <th class="table-header">操作</th>
+                        <th class="table-header">{{t .Lang "firewall.ip_address"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.level"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.reason"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.source"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.banned_at"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.expires_at"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.ban_count"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.actions"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -273,13 +273,13 @@
                             <td class="table-cell text-xs" x-text="ban.expires_at ? formatTime(ban.expires_at) : '永久'"></td>
                             <td class="table-cell" x-text="ban.ban_count"></td>
                             <td class="table-cell">
-                                <button @click="unban(ban)" class="btn-success text-xs py-1 px-2">解封</button>
-                                <button x-show="ban.ban_level < 5" @click="permanentBan(ban)" class="btn-danger text-xs py-1 px-2 ml-1">永久封禁</button>
+                                <button @click="unban(ban)" class="btn-success text-xs py-1 px-2">{{t .Lang "firewall.unban"}}</button>
+                                <button x-show="ban.ban_level < 5" @click="permanentBan(ban)" class="btn-danger text-xs py-1 px-2 ml-1">{{t .Lang "firewall.permanent_ban"}}</button>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="bans.length === 0">
-                        <td colspan="8" class="table-cell text-center text-gray-500 py-8">当前无封禁记录</td>
+                        <td colspan="8" class="table-cell text-center text-gray-500 py-8">{{t .Lang "firewall.no_current_bans"}}</td>
                     </tr>
                 </tbody>
             </table>
@@ -287,27 +287,27 @@
         <div x-show="totalPages > 1" class="flex items-center justify-between mt-4 pt-3 border-t border-gray-700/50">
             <span class="text-sm text-gray-400" x-text="`共 ${total} 条记录`"></span>
             <div class="flex items-center space-x-1">
-                <button @click="goPage(page-1)" :disabled="page <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+                <button @click="goPage(page-1)" :disabled="page <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">{{t .Lang "firewall.prev_page"}}</button>
                 <template x-for="p in pageNumbers" :key="p">
                     <button @click="goPage(p)" :class="p === page ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'" class="px-3 py-1 text-sm rounded" x-text="p"></button>
                 </template>
-                <button @click="goPage(page+1)" :disabled="page >= totalPages" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+                <button @click="goPage(page+1)" :disabled="page >= totalPages" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">{{t .Lang "firewall.next_page"}}</button>
             </div>
         </div>
     </div>
 
     <div class="card" x-data="{history:[], loaded:false}" x-init="api('/firewall/bans?history=1').then(r => { if (r.success) history = r.data?.data || r.data || []; loaded = true }).catch(e => {})">
-        <h3 class="text-lg font-semibold text-white mb-4">历史封禁记录（最近30条）</h3>
+        <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "firewall.ban_history"}}</h3>
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="border-b border-gray-700">
                     <tr>
-                        <th class="table-header">IP 地址</th>
-                        <th class="table-header">等级</th>
-                        <th class="table-header">原因</th>
-                        <th class="table-header">来源</th>
-                        <th class="table-header">封禁时间</th>
-                        <th class="table-header">解封时间</th>
+                        <th class="table-header">{{t .Lang "firewall.ip_address"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.level"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.reason"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.source"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.banned_at"}}</th>
+                        <th class="table-header">{{t .Lang "firewall.unbanned_at"}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -326,7 +326,7 @@
                         </tr>
                     </template>
                     <tr x-show="history.length === 0">
-                        <td colspan="6" class="table-cell text-center text-gray-500 py-4">暂无历史记录</td>
+                        <td colspan="6" class="table-cell text-center text-gray-500 py-4">{{t .Lang "firewall.no_history"}}</td>
                     </tr>
                 </tbody>
             </table>

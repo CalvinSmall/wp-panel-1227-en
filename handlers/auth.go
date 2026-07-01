@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/naibabiji/wp-panel/i18n"
 	"github.com/naibabiji/wp-panel/middleware"
 	"github.com/naibabiji/wp-panel/models"
 
@@ -29,20 +30,10 @@ type AuthHandler struct {
 	Tracker *middleware.LoginAttemptTracker
 }
 
-func (h *AuthHandler) LoginPage(c *gin.Context) {
-	c.HTML(http.StatusOK, "login.html", gin.H{
-		"Title":        "登录",
-		"RandomSuffix": h.Prefix,
-		"Active":       "login",
-		"AssetPrefix":  "/" + h.Prefix + "/assets",
-		"CSRFToken":    getCSRFTokenFromCookie(c),
-	})
-}
-
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请提供用户名和密码"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "auth.provide_credentials")))
 		return
 	}
 
@@ -57,7 +48,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if h.Tracker != nil {
 			h.Tracker.RecordAttempt(c.ClientIP(), "web_login")
 		}
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("用户名或密码错误"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "auth.invalid_credentials")))
 		return
 	}
 
@@ -65,7 +56,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if h.Tracker != nil {
 			h.Tracker.RecordAttempt(c.ClientIP(), "web_login")
 		}
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("用户名或密码错误"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "auth.invalid_credentials")))
 		return
 	}
 
@@ -93,7 +84,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) Check(c *gin.Context) {
 	username, exists := c.Get("session_username")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("未登录"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "auth.not_logged_in")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
@@ -104,17 +95,10 @@ func (h *AuthHandler) Check(c *gin.Context) {
 func (h *AuthHandler) CSRFToken(c *gin.Context) {
 	token, err := c.Cookie("csrf_token")
 	if err != nil || token == "" {
-		c.JSON(http.StatusOK, models.ErrorResponse("无CSRF token"))
+		c.JSON(http.StatusOK, models.ErrorResponse(i18n.TE(c.Request, "auth.missing_csrf")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
 		"token": token,
 	}))
-}
-
-
-
-func getCSRFTokenFromCookie(c *gin.Context) string {
-	token, _ := c.Cookie("csrf_token")
-	return token
 }
