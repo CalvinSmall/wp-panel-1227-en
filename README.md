@@ -2,6 +2,12 @@
 
 WordPress 专用服务器管理面板。一行命令，纯净 Debian 13 变身 WordPress 托管平台。
 
+## English Introduction
+
+WP Panel is a WordPress-focused server management panel built for Debian 13 VPS environments. It helps you provision and operate WordPress sites with a single Go binary, embedded templates, and a workflow centered on security, isolation, backups, SSL, and day-to-day site operations.
+
+English language support is planned for this project, but it has not been implemented yet. The current repository content remains primarily in Chinese, and any future multilingual work will follow the project’s unified i18n roadmap.
+
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8.svg)](https://go.dev/)
 
