@@ -8,7 +8,7 @@
 
     <div x-show="showHelp" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showHelp = false">
         <div class="bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
-            <h3 class="text-lg font-bold text-white mb-4">安全设置说明</h3>
+            <h3 class="text-lg font-bold text-white mb-4">{{t .Lang "security.help_title"}}</h3>
             <div class="text-sm text-gray-300 space-y-4">
                 <div>
                     <p class="text-white font-semibold mb-2">Fail2ban 配置项</p>
@@ -103,7 +103,7 @@
                 </div>
             </div>
             <div class="mt-5 text-right">
-                <button @click="showHelp = false" class="btn-primary text-sm">知道了</button>
+                <button @click="showHelp = false" class="btn-primary text-sm">{{t .Lang "security.got_it"}}</button>
             </div>
         </div>
     </div>
@@ -190,7 +190,7 @@
                 <button @click="refreshWhitelist" class="text-sm py-1 px-3 rounded" style="background-color: #166534; color: #bbf7d0;">{{t .Lang "security.fetch_now"}}</button>
             </div>
             <textarea x-model="settings.official_whitelist_ips" class="input-field font-mono text-sm" rows="5" readonly disabled style="opacity: 0.6;"></textarea>
-            <p class="text-gray-500 text-xs mt-1" x-text="'上次更新: ' + (settings.last_whitelist_update || '从未')"></p>
+            <p class="text-gray-500 text-xs mt-1" x-text="t('security.last_update_label') + (settings.last_whitelist_update || t('settings.no_data'))"></p>
         </div>
         <div class="mb-4">
             <label class="label">{{t .Lang "security.custom_whitelist"}}</label>
@@ -318,7 +318,7 @@ function securitySettings() {
             try {
                 const r = await api('/security/cdn-realip-groups');
                 if (r.success) this.cdnGroups = r.data || [];
-            } catch(e) { showToast('读取 CDN 配置组失败: ' + e.message, 'error'); }
+            } catch(e) { showToast(t('security.fetch_cdn_groups_failed') + ': ' + e.message, 'error'); }
         },
         cdnGroupModeLabel(group) {
             if ((group.ip_ranges || '').trim()) return t('security.cdn_mode_strict_trusted_ips');
@@ -352,24 +352,24 @@ function securitySettings() {
                 const url = this.cdnGroupForm.id ? '/security/cdn-realip-groups/' + this.cdnGroupForm.id : '/security/cdn-realip-groups';
                 const method = this.cdnGroupForm.id ? 'PUT' : 'POST';
                 const r = await api(url, { method, body });
-                showToast(r.data?.message || 'CDN 配置组已保存', 'success');
+                showToast(r.data?.message || t('settings.saved'), 'success');
                 this.resetCDNGroupForm();
                 await this.fetchCDNGroups();
             } catch(e) { showToast(e.message, 'error'); }
             finally { this.cdnGroupSaving = false; }
         },
         async deleteCDNGroup(group) {
-            if (!await confirmModal('确认删除 CDN 配置组「' + group.name + '」？已绑定的网站将不再使用该组。')) return;
+            if (!await confirmModal(t('security.confirm_delete_cdn_group', { name: group.name }))) return;
             try {
                 const r = await api('/security/cdn-realip-groups/' + group.id, { method: 'DELETE' });
-                showToast(r.data?.message || 'CDN 配置组已删除', 'success');
+                showToast(r.data?.message || t('settings.deleted'), 'success');
                 await this.fetchCDNGroups();
             } catch(e) { showToast(e.message, 'error'); }
         },
         async save() {
             try {
                 await api('/security/settings', { method: 'PUT', body: this.settings });
-                showToast('设置已保存', 'success');
+                showToast(t('settings.saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
         },
         async saveRateLimit() {
@@ -379,7 +379,7 @@ function securitySettings() {
                     rate_limit_rpm: String(this.settings.rate_limit_rpm || 60),
                     rate_limit_burst: String(this.settings.rate_limit_burst || 300),
                 } });
-                showToast('限速设置已保存', 'success');
+                showToast(t('settings.saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
         },
         async saveBotLimit() {
@@ -389,16 +389,13 @@ function securitySettings() {
                     bot_limit_rpm: String(this.settings.bot_limit_rpm || 30),
                     bot_limit_burst: String(this.settings.bot_limit_burst || 20),
                 } });
-                showToast('爬虫限速已保存', 'success');
+                showToast(t('settings.saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
         },
         async saveTelemetry() {
             if (!this.settings.telemetry_enabled) {
                 const confirmed = await confirmModal(
-                    '关闭后将无法统计到您的服务器安装。\n\n' +
-                    '上报内容绝对不包含任何敏感信息——只有机器匿名标识（SHA256 哈希）和面板版本号。' +
-                    '这仅是让我们知道 WP Panel 受到了多少用户的支持。\n\n' +
-                    '确认关闭？'
+                    t('security.telemetry_disable_confirm')
                 );
                 if (!confirmed) {
                     this.settings.telemetry_enabled = true;
@@ -409,25 +406,25 @@ function securitySettings() {
                 await api('/security/settings', { method: 'PUT', body: {
                     telemetry_enabled: this.settings.telemetry_enabled ? 'true' : 'false',
                 } });
-                showToast(this.settings.telemetry_enabled ? '匿名统计已开启' : '匿名统计已关闭', 'success');
+                showToast(this.settings.telemetry_enabled ? t('security.telemetry_enabled') : t('security.telemetry_disabled'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
         },
         async saveWhitelist() {
             try {
                 await api('/security/settings', { method: 'PUT', body: { whitelist_ips: this.settings.whitelist_ips || '' } });
-                showToast('白名单已更新', 'success');
+                showToast(t('settings.saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
         },
         async saveWPSecurityLogWhitelist() {
             try {
                 await api('/security/settings', { method: 'PUT', body: { wp_security_log_whitelist: this.settings.wp_security_log_whitelist || '' } });
-                showToast('WordPress 安全日志路径白名单已更新', 'success');
+                showToast(t('settings.saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
         },
         async refreshWhitelist() {
             try {
                 const r = await api('/security/whitelist/refresh', { method: 'POST' });
-                showToast(r.data?.message || '已触发', 'success');
+                showToast(r.data?.message || t('security.refresh_triggered'), 'success');
                 await this.fetchSettings();
             } catch(e) { showToast(e.message, 'error'); }
         }

@@ -36,8 +36,8 @@
                     <input type="text" x-model="cfg.admin_email" class="input-field text-sm" placeholder="admin@example.com">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="save" :disabled="saving" class="btn-primary text-sm" x-text="saving ? '保存中...' : '保存'"></button>
-                    <button @click="test" :disabled="testing" class="btn-secondary text-sm" x-text="testing ? '发送中...' : '测试发送'"></button>
+                    <button @click="save" :disabled="saving" class="btn-primary text-sm" x-text="saving ? t('alert.saving') : t('common.save')"></button>
+                    <button @click="test" :disabled="testing" class="btn-secondary text-sm" x-text="testing ? t('alert.sending') : t('alert.test_send')"></button>
                 </div>
             </div>
 
@@ -66,8 +66,8 @@
                     <input type="text" x-model="cfg.webhook_url" class="input-field text-sm" placeholder="https://...">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="save" :disabled="saving" class="btn-primary text-sm" x-text="saving ? '保存中...' : '保存'"></button>
-                    <button @click="test" :disabled="testing" class="btn-secondary text-sm" x-text="testing ? '发送中...' : '测试发送'"></button>
+                    <button @click="save" :disabled="saving" class="btn-primary text-sm" x-text="saving ? t('alert.saving') : t('common.save')"></button>
+                    <button @click="test" :disabled="testing" class="btn-secondary text-sm" x-text="testing ? t('alert.sending') : t('alert.test_send')"></button>
                 </div>
             </div>
         </div>
@@ -195,7 +195,7 @@ function smtpConfig() {
                     admin_email: this.cfg.admin_email || ''
                 };
                 await api('/alert/settings', { method: 'PUT', body });
-                showToast('SMTP 配置已保存', 'success');
+                showToast(t('alert.smtp_config_saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
             this.saving = false;
         },
@@ -203,8 +203,8 @@ function smtpConfig() {
             this.testing = true;
             try {
                 const r = await api('/alert/test-smtp', { method: 'POST', body: { email: this.cfg.admin_email || '' } });
-                showToast(r.data?.message || '发送成功', 'success');
-            } catch(e) { showToast(e.message || '发送失败', 'error'); }
+                showToast(r.data?.message || t('common.operation_success'), 'success');
+            } catch(e) { showToast(e.message || t('alert.send_failed'), 'error'); }
             this.testing = false;
         }
     }
@@ -226,17 +226,17 @@ function webhookConfig() {
                     body.webhook_enabled = body.webhook_enabled ? 'true' : 'false';
                 }
                 await api('/alert/settings', { method: 'PUT', body });
-                showToast('Webhook 配置已保存', 'success');
+                showToast(t('alert.webhook_config_saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
             this.saving = false;
         },
         async test() {
-            if (!this.cfg.webhook_url) { showToast('请填写 Webhook URL', 'error'); return; }
+            if (!this.cfg.webhook_url) { showToast(t('alert.webhook_url_required'), 'error'); return; }
             this.testing = true;
             try {
                 const r = await api('/alert/test-webhook', { method: 'POST', body: { channel: this.cfg.webhook_channel, url: this.cfg.webhook_url } });
-                showToast(r.data?.message || '发送成功', 'success');
-            } catch(e) { showToast(e.message || '发送失败', 'error'); }
+                showToast(r.data?.message || t('common.operation_success'), 'success');
+            } catch(e) { showToast(e.message || t('alert.send_failed'), 'error'); }
             this.testing = false;
         }
     }
@@ -276,7 +276,20 @@ function alertManager() {
             } catch(e) {}
         },
         typeLabel(t) {
-            const m = { alert_cpu: 'CPU高负载', alert_memory: '可用内存不足', alert_disk: '磁盘不足', alert_service: '服务异常', alert_ssl: 'SSL到期', alert_backup: '备份失败', alert_remote_backup: '远程备份失败', alert_cron_fail: '计划任务失败', alert_website_expiry: '网站到期', alert_site: '网站不可用', alert_system_update: '系统可用更新', alert_panel_update: '面板新版本' };
+            const m = {
+                alert_cpu: t('alert.type_cpu_high_load'),
+                alert_memory: t('alert.type_memory_low'),
+                alert_disk: t('alert.type_disk_pressure'),
+                alert_service: t('alert.type_service_abnormal'),
+                alert_ssl: t('alert.type_ssl_expire'),
+                alert_backup: t('alert.type_backup_failed'),
+                alert_remote_backup: t('alert.type_remote_backup_failed'),
+                alert_cron_fail: t('alert.type_cron_failed'),
+                alert_website_expiry: t('alert.type_website_expiry'),
+                alert_site: t('alert.type_site_unavailable'),
+                alert_system_update: t('alert.type_system_update'),
+                alert_panel_update: t('alert.type_panel_update')
+            };
             return m[t] || t;
         }
     }

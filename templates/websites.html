@@ -78,45 +78,45 @@
                             </td>
                             <td class="table-cell">
                                 <span :class="site.status === 'active' ? 'badge-success' : 'badge-warning'"
-                                      x-text="site.status === 'active' ? '运行中' : '已暂停'"></span>
+                                      x-text="site.status === 'active' ? t('website.status_running') : t('website.status_paused')"></span>
                             </td>
                             <td class="table-cell">
                                 <span :class="site.file_lock_enabled ? 'badge-warning' : 'badge-success'"
-                                      x-text="site.file_lock_enabled ? '已锁定' : '未锁定'"></span>
+                                      x-text="site.file_lock_enabled ? t('website.file_locked') : t('website.file_unlocked')"></span>
                             </td>
                             <td class="table-cell">
                                 <div class="space-y-1">
                                     <span :class="site.ssl_enabled ? 'badge-success' : site.ssl_last_error ? 'badge-warning' : 'badge-info'"
-                                          x-text="site.ssl_enabled ? '已启用' : site.ssl_last_error ? '待处理' : '未启用'"></span>
+                                          x-text="site.ssl_enabled ? t('website.ssl_enabled') : site.ssl_last_error ? t('website.ssl_pending') : t('website.ssl_not_enabled')"></span>
                                     <p x-show="!site.ssl_enabled && site.ssl_last_error" class="text-xs text-yellow-400 max-w-48 truncate" :title="site.ssl_last_error" x-text="site.ssl_last_error"></p>
                                 </div>
                             </td>
                             <td class="table-cell">
                                 <span :class="site.monitoring_enabled ? 'badge-success' : 'badge-info'"
-                                      x-text="site.monitoring_enabled ? '已开启' : '未开启'"></span>
+                                      x-text="site.monitoring_enabled ? t('website.monitoring_enabled') : t('website.monitoring_disabled')"></span>
                             </td>
                             <td class="table-cell">
                                 <span :class="site.fastcgi_cache_enabled ? 'badge-success' : 'badge-info'"
-                                      x-text="site.fastcgi_cache_enabled ? '已开启' : '未开启'"></span>
+                                      x-text="site.fastcgi_cache_enabled ? t('website.enabled') : t('website.disabled')"></span>
                             </td>
                             <td class="table-cell">
                                 <span :class="site.access_log_mode === 'full' ? 'badge-success' : site.access_log_mode === 'error_only' ? 'badge-warning' : 'badge-info'"
-                                      x-text="site.access_log_mode === 'full' ? '全部' : site.access_log_mode === 'error_only' ? '仅异常' : '关闭'"></span>
+                                      x-text="site.access_log_mode === 'full' ? t('website.access_log_full') : site.access_log_mode === 'error_only' ? t('website.access_log_error_only') : t('website.access_log_off')"></span>
                             </td>
                             <td class="table-cell">
                                 <span :class="site.backup_enabled ? 'badge-success' : 'badge-info'"
-                                      x-text="site.backup_enabled ? '已启用' : '未启用'"></span>
+                                      x-text="site.backup_enabled ? t('website.enabled') : t('website.disabled')"></span>
                             </td>
                             <td class="table-cell" x-text="new Date(site.created_at).toLocaleDateString('zh-CN')"></td>
-                            <td class="table-cell text-xs" x-text="site.expires_at ? new Date(site.expires_at).toLocaleDateString('zh-CN') : '永不到期'"></td>
+                            <td class="table-cell text-xs" x-text="site.expires_at ? new Date(site.expires_at).toLocaleDateString('zh-CN') : t('website.never_expires')"></td>
                             <td class="table-cell">
                                 <div class="flex space-x-2">
                                     <a :href="'/{{$.RandomSuffix}}/websites/' + site.id" class="btn-secondary text-xs py-1 px-2">{{t .Lang "website.details"}}</a>
                                     <a :href="'/{{$.RandomSuffix}}/files?site_id=' + site.id" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.file_short"}}</a>
                                     <button @click="toggleStatus(site)" class="text-xs py-1 px-2 rounded"
                                             :class="site.status === 'active' ? 'btn-warning bg-yellow-700 hover:bg-yellow-600 text-white' : 'btn-success text-xs'"
-                                            x-text="site.status === 'active' ? '暂停' : '启用'"></button>
-                                    <button x-show="site.site_type === 'wordpress'" @click="reinstallWP(site)" :disabled="reinstallingId === site.id" class="text-xs py-1 px-2 rounded" style="background-color: #7f1d1d; color: #fca5a5;" x-text="reinstallingId === site.id ? '重装中...' : '重装'"></button>
+                                            x-text="site.status === 'active' ? t('website.site_pause') : t('website.site_enable')"></button>
+                                    <button x-show="site.site_type === 'wordpress'" @click="reinstallWP(site)" :disabled="reinstallingId === site.id" class="text-xs py-1 px-2 rounded" style="background-color: #7f1d1d; color: #fca5a5;" x-text="reinstallingId === site.id ? t('website.reinstalling') : t('website.reinstall')"></button>
                                     <button @click="deleteSite(site)" class="btn-danger text-xs py-1 px-2">{{t .Lang "website.delete"}}</button>
                                 </div>
                             </td>
@@ -157,7 +157,7 @@ function websiteList() {
                 const resp = await api('/websites/' + site.id + '/status', { method: 'PATCH', body: { action } });
                 if (resp.success) {
                     site.status = action === 'pause' ? 'paused' : 'active';
-                    showToast(resp.message || '操作成功', 'success');
+                    showToast(resp.message || t('common.operation_success'), 'success');
                 }
             } catch (e) { showToast(e.message, 'error'); }
         },
@@ -178,7 +178,7 @@ function websiteList() {
             const site = this.reinstallModal.site;
             this.reinstallModal.show = false;
             this.reinstallingId = site.id;
-            showToast('正在重装 ' + site.domain + '，请稍候...', 'info');
+            showToast(t('website.reinstalling_with_domain', { domain: site.domain }), 'info');
             try {
                 const body = {};
                 if (site.site_type === 'wordpress') {
@@ -189,18 +189,18 @@ function websiteList() {
                 }
                 const resp = await api('/websites/' + site.id + '/reinstall-wp', { method: 'POST', body });
                 if (resp.success) {
-                    showToast(resp.data?.message || 'WordPress 重装完成', 'success');
+                    showToast(resp.data?.message || t('website.reinstall_completed'), 'success');
                 }
             } catch (e) { showToast(e.message, 'error'); }
             this.reinstallingId = null;
         },
         async deleteSite(site) {
-            if (!await confirmModal('确认删除网站 ' + site.domain + '？此操作不可逆。')) return;
+            if (!await confirmModal(t('website.delete_confirm', { domain: site.domain }))) return;
             try {
                 const resp = await api('/websites/' + site.id, { method: 'DELETE' });
                 if (resp.success) {
                     this.websites = this.websites.filter(s => s.id !== site.id);
-                    showToast('网站已删除', 'success');
+                    showToast(t('website.delete_success'), 'success');
                 }
             } catch (e) { showToast(e.message, 'error'); }
         }

@@ -28,16 +28,16 @@
                         <tr class="border-b border-gray-700/50">
                             <td class="table-cell font-medium" x-text="job.name"></td>
                             <td class="table-cell font-mono text-xs" x-text="job.cron_expression"></td>
-                            <td class="table-cell text-xs" x-text="job.task_type === 'file_backup' ? '文件备份' : '自定义命令'"></td>
-                            <td class="table-cell font-mono text-xs max-w-[200px] truncate" x-text="job.task_type === 'file_backup' ? (job.backup_mode === 'full' ? '全站备份' : '智能增量') : job.command"></td>
+                            <td class="table-cell text-xs" x-text="job.task_type === 'file_backup' ? t('cron.task_type_file_backup') : t('cron.task_type_command')"></td>
+                            <td class="table-cell font-mono text-xs max-w-[200px] truncate" x-text="job.task_type === 'file_backup' ? (job.backup_mode === 'full' ? t('cron.full_backup') : t('cron.smart_incremental')) : job.command"></td>
                             <td class="table-cell">
                                 <span :class="job.enabled ? 'badge-success' : 'badge-warning'"
-                                      x-text="job.enabled ? '启用' : '禁用'"></span>
+                                      x-text="job.enabled ? t('cron.status_enabled') : t('cron.status_disabled')"></span>
                             </td>
                             <td class="table-cell text-xs text-gray-400" x-text="job.last_run_at || '--'"></td>
                             <td class="table-cell">
                                 <div class="flex flex-wrap gap-1">
-                                    <button @click="runJob(job)" :disabled="job.running" class="btn-success text-xs py-1 px-2" :class="job.running ? 'opacity-50 cursor-not-allowed' : ''" x-text="job.running ? '执行中...' : '执行'"></button>
+                                    <button @click="runJob(job)" :disabled="job.running" class="btn-success text-xs py-1 px-2" :class="job.running ? 'opacity-50 cursor-not-allowed' : ''" x-text="job.running ? t('cron.job_running') : t('cron.run')"></button>
                                     <button @click="openEdit(job)" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "cron.edit"}}</button>
                                     <button @click="deleteJob(job)" class="btn-danger text-xs py-1 px-2">{{t .Lang "cron.delete"}}</button>
                                 </div>
@@ -227,7 +227,7 @@ function cronManager() {
                 if (body.task_type === "file_backup") body.command = "wp-panel file backup";
                 if (body.task_type === "wp_cron") {
                     const site = this.sites.find(s => s.id == body.site_id);
-                    if (!site) { showToast('请选择目标网站', 'error'); return; }
+                    if (!site) { showToast(t('cron.select_target_site'), 'error'); return; }
                     body.command = site.domain;
                 }
                 let r;
@@ -240,7 +240,7 @@ function cronManager() {
                     this.showModal = false;
                     this.form = { name: '', cron_expression: '', command: '', task_type: 'command', backup_mode: 'incremental', keep_count: 3, site_id: '', notify_fail: false };
                     await this.fetchList();
-                    showToast(this.editingId ? '任务已更新' : '任务创建成功', 'success');
+                    showToast(this.editingId ? t('cron.job_updated') : t('cron.job_created'), 'success');
                 }
             } catch(e) { showToast(e.message, 'error'); }
         },
@@ -248,19 +248,19 @@ function cronManager() {
             job.running = true;
             try {
                 const r = await api('/cron/' + job.id + '/run', { method: 'POST' });
-                if (r.success) { await this.fetchList(); showToast(r.data?.message || '已执行', 'success'); }
+                if (r.success) { await this.fetchList(); showToast(r.data?.message || t('cron.job_run_success'), 'success'); }
                 else { job.running = false; }
             } catch(e) { job.running = false; showToast(e.message, 'error'); }
         },
         async fetchCronLogs() {
             try {
                 const r = await api('/cron/logs?lines=100');
-                this.cronLogContent = r.success ? r.data.content : '加载失败';
-            } catch(e) { this.cronLogContent = '加载失败: ' + e.message; }
+                this.cronLogContent = r.success ? r.data.content : t('cron.load_failed');
+            } catch(e) { this.cronLogContent = t('cron.load_failed_with_error', { error: e.message }); }
         },
         async deleteJob(job) {
-            if (!await confirmModal('确认删除任务 ' + job.name + '？')) return;
-            try { await api('/cron/' + job.id, { method: 'DELETE' }); await this.fetchList(); showToast('已删除', 'success'); } catch(e) { showToast(e.message, 'error'); }
+            if (!await confirmModal(t('cron.confirm_delete', { name: job.name }))) return;
+            try { await api('/cron/' + job.id, { method: 'DELETE' }); await this.fetchList(); showToast(t('cron.deleted_success'), 'success'); } catch(e) { showToast(e.message, 'error'); }
         }
     }
 }

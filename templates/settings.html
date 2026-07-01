@@ -37,7 +37,7 @@
                 </div>
             </div>
 
-            <button @click="saveAccount" :disabled="accountSaving" class="btn-primary w-full" x-text="accountSaving ? '保存中...' : '保存账户设置'"></button>
+            <button @click="saveAccount" :disabled="accountSaving" class="btn-primary w-full" x-text="accountSaving ? t('settings.saving') : t('settings.save_account_settings')"></button>
             <p class="text-xs text-yellow-400 mt-2" x-show="accountSaved">{{t .Lang "settings.account_saved_logout"}}</p>
         </div>
 
@@ -71,7 +71,7 @@
                 <div class="flex items-center justify-between mt-1">
                     <p class="text-xs text-gray-400">{{t .Lang "settings.server_time"}}<span x-text="serverTime" class="text-white font-mono"></span></p>
                     <div class="flex items-center space-x-2">
-                        <span class="text-xs" :class="ntpSynced ? 'text-green-400' : 'text-yellow-400'" x-text="ntpSynced ? 'NTP 已同步' : 'NTP 未同步'"></span>
+                        <span class="text-xs" :class="ntpSynced ? 'text-green-400' : 'text-yellow-400'" x-text="ntpSynced ? t('settings.ntp_synced') : t('settings.ntp_not_synced')"></span>
                         <button @click="syncNTP()" class="text-xs py-0.5 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "settings.sync"}}</button>
                     </div>
                 </div>
@@ -90,7 +90,7 @@
                 <p class="text-xs text-gray-500 mb-2">{{t .Lang "settings.github_proxy_help"}}</p>
                 <div class="flex space-x-2">
                     <input type="text" x-model="githubProxy" placeholder="https://gh.wp-panel.org" class="input-field flex-1">
-                    <button @click="testProxy()" :disabled="proxyTesting" class="btn-secondary text-sm" x-text="proxyTesting ? '测试中...' : '测试'"></button>
+                    <button @click="testProxy()" :disabled="proxyTesting" class="btn-secondary text-sm" x-text="proxyTesting ? t('settings.testing') : t('settings.test')"></button>
                     <button @click="saveServerSetting('github_proxy', githubProxy)" class="btn-primary text-sm">{{t .Lang "settings.save"}}</button>
                 </div>
                 <p x-show="proxyResult" class="text-xs mt-2" :class="proxyOk ? 'text-green-400' : 'text-red-400'" x-text="proxyResult"></p>
@@ -108,8 +108,8 @@
                     <pre x-text="releaseNotes" class="text-xs text-gray-400 mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap"></pre>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <button @click="checkUpdate()" :disabled="checking" class="btn-secondary text-xs" x-text="checking ? '检查中...' : '检查更新'"></button>
-                    <button @click="doUpdate()" x-show="hasUpdate" :disabled="updating" class="btn-primary text-xs" x-text="updating ? '更新中...' : '立即更新'"></button>
+                    <button @click="checkUpdate()" :disabled="checking" class="btn-secondary text-xs" x-text="checking ? t('settings.checking') : t('settings.check_updates')"></button>
+                    <button @click="doUpdate()" x-show="hasUpdate" :disabled="updating" class="btn-primary text-xs" x-text="updating ? t('settings.updating') : t('settings.update_now')"></button>
                 </div>
                 <div x-show="updating || updateStatus.running || updateStatus.completed || updateStatus.error" class="mt-3 p-3 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
                     <div class="flex items-center justify-between mb-2">
@@ -136,7 +136,7 @@
                     </div>
                     <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                         <input type="checkbox" x-model="autoUpdate.enabled" @change="saveAutoUpdate">
-                        <span x-text="autoUpdate.enabled ? '已开启' : '已关闭'"></span>
+                        <span x-text="autoUpdate.enabled ? t('settings.enabled') : t('settings.disabled')"></span>
                     </label>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -161,7 +161,7 @@
                     </div>
                 </div>
                 <div class="mt-3 text-xs text-gray-500 space-y-1">
-                    <p>{{t .Lang "settings.last_status"}}<span class="text-gray-300" x-text="autoUpdate.lastStatus || '暂无'"></span> <span x-text="autoUpdate.lastStage ? '(' + autoUpdate.lastStage + ')' : ''"></span></p>
+                    <p>{{t .Lang "settings.last_status"}}<span class="text-gray-300" x-text="autoUpdate.lastStatus || t('settings.no_data')"></span> <span x-text="autoUpdate.lastStage ? '(' + autoUpdate.lastStage + ')' : ''"></span></p>
                     <p x-show="autoUpdate.lastTarget">{{t .Lang "settings.target_version"}}<span class="text-gray-300" x-text="autoUpdate.lastTarget"></span></p>
                     <p x-show="autoUpdate.lastError" class="text-red-400" x-text="autoUpdate.lastError"></p>
                     <p x-show="autoUpdate.lastSuccess">{{t .Lang "settings.last_success"}}<span x-text="autoUpdate.lastSuccess"></span> <span x-text="autoUpdate.lastSuccessVersion"></span></p>
@@ -173,7 +173,7 @@
             <div x-data="systemUpdate()" x-init="check()">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm text-gray-400">{{t .Lang "settings.system_updates"}}</span>
-                    <span class="text-sm text-white font-mono" x-show="count > 0" x-text="count + ' 个可用'"></span>
+                        <span class="text-sm text-white font-mono" x-show="count > 0" x-text="t('settings.available_count', { count })"></span>
                     <span class="text-xs text-gray-500" x-show="count === 0">{{t .Lang "settings.up_to_date"}}</span>
                 </div>
                 <div x-show="count > 0" class="mb-3 space-y-2">
@@ -192,8 +192,8 @@
                     <p class="text-xs text-gray-500 mt-2">{{t .Lang "settings.system_update_help"}}</p>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <button @click="check()" :disabled="checking" class="btn-secondary text-xs" x-text="checking ? '检查中...' : '刷新'"></button>
-                    <button @click="doUpdate()" x-show="count > 0" :disabled="updating" class="btn-primary text-xs" x-text="updating ? '更新中...' : '一键更新'"></button>
+                    <button @click="check()" :disabled="checking" class="btn-secondary text-xs" x-text="checking ? t('settings.checking') : t('settings.refresh')"></button>
+                    <button @click="doUpdate()" x-show="count > 0" :disabled="updating" class="btn-primary text-xs" x-text="updating ? t('settings.updating') : t('settings.one_click_update')"></button>
                 </div>
                 <p x-show="count > 0" class="text-xs text-yellow-500 mt-2">{{t .Lang "settings.system_update_warning"}}</p>
                 <pre x-show="output" class="text-xs text-gray-400 mt-3 p-3 rounded max-h-48 overflow-y-auto" style="background-color: #020617;" x-text="output"></pre>
@@ -212,7 +212,7 @@
                 <a href="/{{.RandomSuffix}}/ai-diagnostics" class="btn-secondary text-sm">{{t .Lang "settings.go_ai_diagnostics"}}</a>
                 <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" x-model="ai.enabled">
-                    <span x-text="ai.enabled ? '已启用' : '已关闭'"></span>
+                <span x-text="ai.enabled ? t('settings.enabled') : t('settings.disabled')"></span>
                 </label>
             </div>
         </div>
@@ -236,7 +236,7 @@
             </div>
             <div>
                 <label class="label">API Key</label>
-                <input type="password" x-model="ai.api_key" class="input-field text-sm" :placeholder="ai.api_key_masked || '输入 API Key'">
+                <input type="password" x-model="ai.api_key" class="input-field text-sm" :placeholder="ai.api_key_masked || t('settings.api_key_placeholder')">
             </div>
             <div>
                 <label class="label">{{t .Lang "settings.timeout_seconds"}}</label>
@@ -249,8 +249,8 @@
             {{t .Lang "settings.ai_privacy_notice"}}
         </div>
         <div class="flex items-center space-x-3 mt-4">
-            <button @click="testAI()" :disabled="aiTesting" class="btn-secondary text-sm" x-text="aiTesting ? '测试中...' : '测试连接'"></button>
-            <button @click="saveAI()" :disabled="aiSaving" class="btn-primary text-sm" x-text="aiSaving ? '保存中...' : '保存 AI 设置'"></button>
+            <button @click="testAI()" :disabled="aiTesting" class="btn-secondary text-sm" x-text="aiTesting ? t('settings.testing') : t('settings.test_connection')"></button>
+            <button @click="saveAI()" :disabled="aiSaving" class="btn-primary text-sm" x-text="aiSaving ? t('settings.saving') : t('settings.save_ai_settings')"></button>
         </div>
         <p x-show="aiTestResult" class="text-xs mt-2" :class="aiTestOK ? 'text-green-400' : 'text-red-400'" x-text="aiTestResult"></p>
     </div>
@@ -264,7 +264,7 @@
                 <div class="p-3 rounded mb-4" style="background-color: #0f172a;">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs text-gray-400">{{t .Lang "settings.local_package_status"}}</span>
-                        <span class="text-xs font-medium" :class="pkg.available ? 'text-green-400' : 'text-yellow-400'" x-text="pkg.available ? '已就绪' : '未安装'"></span>
+                <span class="text-xs font-medium" :class="pkg.available ? 'text-green-400' : 'text-yellow-400'" x-text="pkg.available ? t('settings.package_ready') : t('settings.package_not_installed')"></span>
                     </div>
                     <template x-if="pkg.available">
                         <div class="space-y-1">
@@ -284,12 +284,12 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
-                    <button @click="downloadPkg()" :disabled="downloading" class="btn-secondary text-sm" x-text="downloading ? '下载中...' : '在线下载'"></button>
+                    <button @click="downloadPkg()" :disabled="downloading" class="btn-secondary text-sm" x-text="downloading ? t('settings.downloading') : t('settings.online_download')"></button>
                     <label class="btn-primary text-sm cursor-pointer" :class="uploading ? 'opacity-50 cursor-not-allowed' : ''">
-                        <span x-text="uploading ? '上传中...' : '上传安装包'"></span>
+                        <span x-text="uploading ? t('settings.uploading') : t('settings.upload_package')"></span>
                         <input type="file" accept=".zip" class="hidden" @change="uploadPkg($event)" :disabled="uploading">
                     </label>
-                    <button x-show="pkg.available" @click="deletePkg()" :disabled="deleting" class="text-sm py-1.5 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;" x-text="deleting ? '删除中...' : '删除'"></button>
+                    <button x-show="pkg.available" @click="deletePkg()" :disabled="deleting" class="text-sm py-1.5 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;" x-text="deleting ? t('settings.deleting') : t('settings.delete')"></button>
                     <button @click="fetchStatus()" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "settings.refresh"}}</button>
                 </div>
                 <p x-show="msg" class="text-xs mt-2" :class="msgOk ? 'text-green-400' : 'text-red-400'" x-text="msg"></p>
@@ -393,8 +393,8 @@
                 </div>
 
                 <div class="flex items-center space-x-3 pt-2">
-                    <button @click="testConnection()" :disabled="testing || !cfg.enabled" class="btn-secondary text-sm" x-text="testing ? '测试中...' : '测试连接'"></button>
-                    <button @click="saveRemote()" :disabled="saving" class="btn-primary text-sm" x-text="saving ? '保存中...' : '保存设置'"></button>
+                    <button @click="testConnection()" :disabled="testing || !cfg.enabled" class="btn-secondary text-sm" x-text="testing ? t('settings.testing') : t('settings.test_connection')"></button>
+                    <button @click="saveRemote()" :disabled="saving" class="btn-primary text-sm" x-text="saving ? t('settings.saving') : t('settings.save_settings')"></button>
                 </div>
                 <p x-show="saveMsg" class="text-sm" :class="saveOK ? 'text-green-400' : 'text-red-400'" x-text="saveMsg"></p>
                 <p x-show="testResult" class="text-sm" :class="testOK ? 'text-green-400' : 'text-red-400'" x-text="testResult"></p>
@@ -497,7 +497,7 @@
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-white">{{t .Lang "settings.panel_db_backup"}}</h3>
             <div class="flex items-center space-x-2">
-                <button @click="doBackup()" :disabled="backingUp" class="btn-primary text-sm" x-text="backingUp ? '备份中...' : '立即备份'"></button>
+                <button @click="doBackup()" :disabled="backingUp" class="btn-primary text-sm" x-text="backingUp ? t('settings.backing_up') : t('settings.backup_now')"></button>
             </div>
         </div>
         <p class="text-gray-400 text-xs mb-2">{{t .Lang "settings.panel_db_backup_help"}}</p>
@@ -553,7 +553,7 @@
                             <td class="table-cell text-sm" x-text="log.target || '--'"></td>
                             <td class="table-cell">
                                 <span :class="log.status === 'success' ? 'badge-success' : 'badge-danger'"
-                                      x-text="log.status === 'success' ? '成功' : '失败'"></span>
+                                      x-text="log.status === 'success' ? t('settings.success') : t('settings.failed')"></span>
                             </td>
                         </tr>
                     </template>
@@ -564,7 +564,7 @@
             </table>
         </div>
         <div x-show="logTotal > 0" class="flex items-center justify-between mt-4 pt-3 border-t border-gray-700/50">
-            <span class="text-sm text-gray-400" x-text="`共 ${logTotal} 条记录`"></span>
+                <span class="text-sm text-gray-400" x-text="t('settings.total_records', { count: logTotal })"></span>
             <div class="flex items-center space-x-1" x-show="logTotalPages > 1">
                 <button @click="logGoPage(logPage-1)" :disabled="logPage <= 1" class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed">{{t .Lang "settings.prev_page"}}</button>
                 <template x-for="p in logPageNumbers" :key="p">
@@ -597,19 +597,19 @@ function wpPackage() {
             try {
                 const r = await api('/settings/wp-package/download', { method: 'POST' });
                 this.msgOk = r.success;
-                this.msg = r.data?.message || '下载完成';
+                this.msg = r.data?.message || t('settings.package_download_complete');
                 if (r.success) this.fetchStatus();
             } catch(e) { this.msgOk = false; this.msg = e.message; }
             this.downloading = false;
         },
         async deletePkg() {
-            if (!await confirmModal('确认删除本地 WordPress 安装包？删除后建站时将自动在线下载。')) return;
+            if (!await confirmModal(t('settings.confirm_delete_local_wp_package'))) return;
             this.deleting = true;
             this.msg = '';
             try {
                 const r = await api('/settings/wp-package', { method: 'DELETE' });
                 this.msgOk = r.success;
-                this.msg = r.data?.message || '已删除';
+                this.msg = r.data?.message || t('settings.deleted');
                 if (r.success) this.fetchStatus();
             } catch(e) { this.msgOk = false; this.msg = e.message; }
             this.deleting = false;
@@ -618,7 +618,7 @@ function wpPackage() {
             const file = event.target.files[0];
             if (!file) return;
             if (!file.name.toLowerCase().endsWith('.zip')) {
-                showToast('仅支持 .zip 格式', 'error');
+                showToast(t('settings.zip_only'), 'error');
                 event.target.value = '';
                 return;
             }
@@ -636,13 +636,13 @@ function wpPackage() {
                 const r = await resp.json();
                 if (r.success) {
                     this.msgOk = true;
-                    this.msg = r.data?.message || '上传成功';
+                    this.msg = r.data?.message || t('settings.upload_success');
                     this.fetchStatus();
                 } else {
                     this.msgOk = false;
-                    this.msg = r.message || '上传失败';
+                    this.msg = r.message || t('settings.upload_failed');
                 }
-            } catch(e) { this.msgOk = false; this.msg = '上传失败: ' + e.message; }
+            } catch(e) { this.msgOk = false; this.msg = (t('settings.upload_failed') + ': ' + e.message); }
             this.uploading = false;
             event.target.value = '';
         }
@@ -738,25 +738,25 @@ function panelSettings() {
 
             if (this.basicAuthUser) body.basic_auth_user = this.basicAuthUser;
             if (this.pw.basic && this.pw.basic.length >= 8) body.basic_auth_password = this.pw.basic;
-            else if (this.pw.basic && this.pw.basic.length < 8) { showToast('BasicAuth 密码至少8位', 'error'); return; }
+            else if (this.pw.basic && this.pw.basic.length < 8) { showToast(t('settings.basic_auth_password_min_length'), 'error'); return; }
 
             if (this.username) body.username = this.username;
             if (this.pw.new1 || this.pw.new2) {
-                if (!this.pw.old) { showToast('修改 Web 密码需输入当前密码', 'error'); return; }
-                if (this.pw.new1 !== this.pw.new2) { showToast('两次密码不一致', 'error'); return; }
-                if (this.pw.new1.length < 8) { showToast('新密码至少8位', 'error'); return; }
+                if (!this.pw.old) { showToast(t('settings.current_password_required'), 'error'); return; }
+                if (this.pw.new1 !== this.pw.new2) { showToast(t('settings.passwords_not_match'), 'error'); return; }
+                if (this.pw.new1.length < 8) { showToast(t('settings.new_password_min_length'), 'error'); return; }
                 body.old_password = this.pw.old;
                 body.new_password = this.pw.new1;
             }
 
-            if (Object.keys(body).length === 0) { showToast('无修改内容', 'info'); return; }
+            if (Object.keys(body).length === 0) { showToast(t('settings.no_changes'), 'info'); return; }
 
             this.accountSaving = true;
             try {
                 await api('/settings', { method: 'PUT', body });
                 this.accountSaved = true;
                 this.pw = { old: '', new1: '', new2: '', basic: '' };
-                showToast('账户设置已保存，即将退出登录', 'success');
+                showToast(t('settings.account_saved_please_relogin'), 'success');
                 setTimeout(async () => {
                     try { await api('/auth/logout', { method: 'POST' }); } catch(e) {}
                     window.location.href = (document.body.dataset.panelPrefix || '') + '/login';
@@ -766,14 +766,14 @@ function panelSettings() {
         async syncNTP() {
             try {
                 const r = await api('/settings', { method: 'PUT', body: { ntp_sync: true } });
-                showToast(r.data?.message || '时间同步已触发', 'success');
+                showToast(r.data?.message || t('settings.time_sync_triggered'), 'success');
                 this.ntpSynced = true;
             } catch(e) { showToast(e.message, 'error'); }
         },
         async saveBasic() {
             try {
                 await api('/settings', { method: 'PUT', body: { panel_title: this.panelTitle } });
-                showToast('已保存', 'success');
+                showToast(t('settings.saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
         },
         async saveServerSetting(key, val) {
@@ -781,7 +781,7 @@ function panelSettings() {
                 const body = {};
                 body[key] = val;
                 await api('/settings', { method: 'PUT', body });
-                showToast('已更新', 'success');
+                showToast(t('settings.updated'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
         },
         async saveAutoUpdate() {
@@ -793,12 +793,12 @@ function panelSettings() {
                     panel_auto_update_release_delay_minutes: String(this.autoUpdate.delay || 15),
                     panel_auto_update_signature_timeout_minutes: String(this.autoUpdate.signatureTimeout || 120)
                 } });
-                showToast('自动更新设置已保存', 'success');
+                showToast(t('settings.auto_update_saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
         },
         async testProxy() {
             if (!this.githubProxy) {
-                showToast('请先填写反代地址', 'error');
+                showToast(t('settings.proxy_required'), 'error');
                 return;
             }
             this.proxyTesting = true;
@@ -809,11 +809,11 @@ function panelSettings() {
                     const d = r.data;
                     this.proxyOk = d.ok;
                     this.proxyResult = d.ok
-                        ? '连接成功，延迟 ' + d.latency + 'ms'
-                        : '连接失败: ' + (d.error || '未知错误');
+                        ? t('settings.connection_ok_with_latency', { latency: d.latency })
+                        : t('settings.connection_failed_with_reason', { reason: d.error || t('settings.unknown_error') });
                 } else {
                     this.proxyOk = false;
-                    this.proxyResult = r.message || '测试失败';
+                    this.proxyResult = r.message || t('settings.test_failed');
                 }
             } catch(e) {
                 this.proxyOk = false;
@@ -862,7 +862,7 @@ function panelSettings() {
                     this.ai.api_key = '';
                     this.ai.api_key_masked = r.data.api_key_masked || this.ai.api_key_masked;
                 }
-                showToast('AI 设置已保存', 'success');
+                showToast(t('settings.ai_settings_saved'), 'success');
             } catch(e) { showToast(e.message, 'error'); }
             this.aiSaving = false;
         },
@@ -874,7 +874,7 @@ function panelSettings() {
                 const r = await api('/ai/test', { method: 'POST', body: this.aiPayload(), timeout: timeoutMs });
                 const d = r.data || {};
                 this.aiTestOK = !!d.ok;
-                this.aiTestResult = d.ok ? ('连接成功，延迟 ' + d.latency_ms + 'ms') : (d.message || '连接失败');
+                this.aiTestResult = d.ok ? t('settings.connection_ok_with_latency', { latency: d.latency_ms }) : (d.message || t('settings.connection_failed'));
             } catch(e) {
                 this.aiTestOK = false;
                 this.aiTestResult = e.message;
@@ -913,7 +913,7 @@ function versionCheck() {
             this.checking = true;
             this.updateError = "";
             await this.fetchVersion();
-            if (!this.hasUpdate && !this.updateError) showToast("已是最新版本", "success");
+            if (!this.hasUpdate && !this.updateError) showToast(t('settings.up_to_date_message'), "success");
             this.checking = false;
         },
         progressPercent() {
@@ -930,13 +930,13 @@ function versionCheck() {
             if (this.updateStatus.error) return this.updateStatus.error;
             if (this.updateStatus.stage === "download_binary") {
                 if (this.updateStatus.has_total) {
-                    return (this.updateStatus.message || "正在下载更新包...") + " " + (this.updateStatus.download_percent || 0) + "%";
+                    return (this.updateStatus.message || t('settings.downloading_update_package')) + " " + (this.updateStatus.download_percent || 0) + "%";
                 }
                 if (this.updateStatus.downloaded_bytes > 0) {
-                    return (this.updateStatus.message || "正在下载更新包...") + " 已下载 " + formatBytes(this.updateStatus.downloaded_bytes);
+                    return (this.updateStatus.message || t('settings.downloading_update_package')) + " " + t('settings.downloaded', { downloaded: formatBytes(this.updateStatus.downloaded_bytes) });
                 }
             }
-            return this.updateStatus.message || "正在准备更新...";
+            return this.updateStatus.message || t('settings.preparing_update');
         },
         async fetchUpdateStatus() {
             const prefix = document.body.dataset.panelPrefix || "";
@@ -962,7 +962,7 @@ function versionCheck() {
                 if (this.updating) {
                     this.updateStatus = Object.assign({}, this.updateStatus, {
                         running: true,
-                        message: "面板正在重启或暂时无法连接...",
+                        message: t('settings.panel_restarting'),
                         percent: Math.max(this.progressPercent(), 98),
                     });
                 }
@@ -976,7 +976,7 @@ function versionCheck() {
                 this.updating = false;
                 this.updateStatus = Object.assign({}, this.updateStatus, {
                     running: false,
-                    error: "更新状态查询超时，请刷新页面确认面板状态。",
+                    error: t('settings.update_status_timeout'),
                 });
             }
         },
@@ -988,20 +988,20 @@ function versionCheck() {
             this.pollTimer = setInterval(() => this.fetchUpdateStatus(), 1000);
         },
         async doUpdate() {
-            if (!await confirmModal("确认更新到 " + this.latestVersion + "？更新期间面板将短暂不可用。")) return;
+            if (!await confirmModal(t('settings.confirm_update_version', { version: this.latestVersion }))) return;
             this.updating = true;
             this.updateError = "";
-            this.updateStatus = { running: true, completed: false, stage: "fetch_release", message: "正在准备更新...", percent: 5, download_percent: 0, downloaded_bytes: 0, total_bytes: 0, has_total: false, error: "" };
+            this.updateStatus = { running: true, completed: false, stage: "fetch_release", message: t('settings.preparing_update'), percent: 5, download_percent: 0, downloaded_bytes: 0, total_bytes: 0, has_total: false, error: "" };
             this.startStatusPolling();
             try {
                 const r = await api("/update/do", { method: "POST" });
                 this.updateStarting = false;
                 await this.fetchUpdateStatus();
                 if (!this.updateStatus.completed) {
-                    this.updateStatus = Object.assign({}, this.updateStatus, { running: false, completed: true, message: this.updateStatus.message || "更新完成，面板正在重启...", percent: 100, error: "" });
+                    this.updateStatus = Object.assign({}, this.updateStatus, { running: false, completed: true, message: this.updateStatus.message || t('settings.update_completed_restart'), percent: 100, error: "" });
                 }
-                showToast(r.data?.message || "更新已启动", "success");
-                this.updateError = "更新完成，面板正在重启，3 秒后自动刷新...";
+                showToast(r.data?.message || t('settings.update_started'), "success");
+                this.updateError = t('settings.update_completed_refresh');
                 setTimeout(() => { location.reload(); }, 3000);
             } catch(e) {
                 this.updateStarting = false;
@@ -1027,7 +1027,7 @@ function dbBackup() {
             this.backingUp = true;
             try {
                 const r = await api('/settings/db-backup', { method: 'POST' });
-                showToast(r.data?.message || '备份完成', 'success');
+                showToast(r.data?.message || t('settings.backup_finished'), 'success');
                 await this.fetchBackups();
             } catch(e) { showToast(e.message, 'error'); }
             this.backingUp = false;
@@ -1037,18 +1037,18 @@ function dbBackup() {
             window.open(prefix + '/api/settings/db-backup/' + encodeURIComponent(filename) + '/download');
         },
         async doRestore(filename) {
-            if (!await confirmModal('确认使用此备份恢复数据库？\n\n恢复前面板会先做安全备份，恢复后面板将自动重启。\n如果恢复后面板无法启动，安全备份可用于回滚。')) return;
+            if (!await confirmModal(t('settings.confirm_restore_db_backup'))) return;
             try {
                 const r = await api('/settings/db-backup/restore', { method: 'POST', body: { filename } });
-                showToast(r.data?.message || '恢复中...', 'success');
+                showToast(r.data?.message || t('settings.restoring'), 'success');
                 setTimeout(() => { location.reload(); }, 5000);
             } catch(e) { showToast(e.message, 'error'); }
         },
         async doDelete(filename) {
-            if (!await confirmModal('确认删除此备份？')) return;
+            if (!await confirmModal(t('settings.confirm_delete_backup'))) return;
             try {
                 const r = await api('/settings/db-backup?filename=' + encodeURIComponent(filename), { method: 'DELETE' });
-                showToast(r.data?.message || '已删除', 'success');
+                showToast(r.data?.message || t('settings.deleted'), 'success');
                 await this.fetchBackups();
             } catch(e) { showToast(e.message, 'error'); }
         }
@@ -1119,7 +1119,7 @@ function remoteBackup() {
             try {
                 const r = await api('/settings/remote-backup', { method: 'PUT', body: this.cfg });
                 this.saveOK = r.success;
-                this.saveMsg = r.data?.message || (r.success ? '设置已保存' : '保存失败');
+                this.saveMsg = r.data?.message || (r.success ? t('settings.saved') : t('settings.save_failed'));
                 if (r.success && this.cfg.backup_type === 'rsync' && this.cfg.auth_type === 'key') this.loadPublicKey();
             } catch(e) { this.saveOK = false; this.saveMsg = e.message; }
             this.saving = false;
@@ -1137,7 +1137,7 @@ function remoteBackup() {
             try {
                 const r = await api('/settings/remote-backup/test', { method: 'POST' });
                 this.testOK = r.success;
-                this.testResult = r.data?.message || (r.success ? '连接成功' : '连接失败');
+                this.testResult = r.data?.message || (r.success ? t('settings.connection_ok') : t('settings.connection_failed'));
             } catch(e) { this.testResult = e.message; }
             this.testing = false;
         },
@@ -1192,7 +1192,7 @@ function remoteBackup() {
             if (!cmd) return;
             try {
                 await navigator.clipboard.writeText(cmd);
-                showToast('命令已复制，粘贴到远程服务器以 root 执行', 'success');
+                showToast(t('settings.command_copied'), 'success');
             } catch(e) {
                 var ta = document.createElement('textarea');
                 ta.value = cmd;
@@ -1200,7 +1200,7 @@ function remoteBackup() {
                 ta.select();
                 document.execCommand('copy');
                 document.body.removeChild(ta);
-                showToast('命令已复制', 'success');
+                showToast(t('settings.command_copied_short'), 'success');
             }
         }
     }
@@ -1227,14 +1227,14 @@ function systemUpdate() {
             this.checking = false;
         },
         async doUpdate() {
-            if (!await confirmModal('确认执行系统更新？\n\n更新可能需要数分钟。如页面超时请不要重复点击——后台仍在执行，重复操作将导致 dpkg 锁冲突。')) return;
+            if (!await confirmModal(t('settings.confirm_system_update'))) return;
             this.updating = true;
             this.msg = '';
             this.output = '';
             try {
                 const r = await api('/system/updates/do', { method: 'POST', timeout: 120000 });
                 this.ok = r.success;
-                this.msg = r.data?.message || (r.success ? '更新完成' : '更新失败');
+                this.msg = r.data?.message || (r.success ? t('settings.system_update_completed') : t('settings.system_update_failed'));
                 this.output = r.data?.output || '';
                 if (r.success) { this.packages = []; this.count = 0; }
             } catch(e) { this.ok = false; this.msg = e.message; }

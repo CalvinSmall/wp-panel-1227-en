@@ -19,14 +19,14 @@
             <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "website.basic_info"}}</h3>
             <dl class="space-y-3">
                 <div><dt class="text-sm text-gray-400">{{t .Lang "website.domain"}}</dt><dd><a :href="(site.ssl_enabled ? 'https' : 'http') + '://' + site.domain" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline" x-text="site.domain"></a></dd></div>
-                <div><dt class="text-sm text-gray-400">{{t .Lang "website.aliases"}}</dt><dd class="text-white" x-text="site.aliases || '无'"></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.aliases"}}</dt><dd class="text-white" x-text="site.aliases || t('common.none')"></dd></div>
                 <div class="pt-2">
                     <button @click="domainModalOpen = true; editDomain = site.domain; editAliasesStr = site.aliases || ''" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.edit_domain"}}</button>
                     <a :href="(document.body.dataset.panelPrefix || '') + '/files?site_id=' + site.id" class="text-sm py-1.5 px-3 rounded ml-2 inline-block" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "nav.files"}}</a>
                     <a :href="(document.body.dataset.panelPrefix || '') + '/ai-diagnostics?site_id=' + site.id" class="text-sm py-1.5 px-3 rounded ml-2 inline-block" style="background-color: #14532d; color: #86efac;">{{t .Lang "nav.ai_diagnostics"}}</a>
                 </div>
-                <div><dt class="text-sm text-gray-400">{{t .Lang "website.status"}}</dt><dd><span :class="site.status === 'active' ? 'badge-success' : 'badge-warning'" x-text="site.status === 'active' ? '运行中' : '已暂停'"></span></dd></div>
-                <div><dt class="text-sm text-gray-400">{{t .Lang "website.type"}}</dt><dd class="text-white" x-text="site.site_type === 'php' ? '通用 PHP 网站' : 'WordPress'"></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.status"}}</dt><dd><span :class="site.status === 'active' ? 'badge-success' : 'badge-warning'" x-text="site.status === 'active' ? t('website.status_running') : t('website.status_paused')"></span></dd></div>
+                <div><dt class="text-sm text-gray-400">{{t .Lang "website.type"}}</dt><dd class="text-white" x-text="site.site_type === 'php' ? t('website.generic_php_site') : 'WordPress'"></dd></div>
                 <div class="pt-2 border-t border-gray-700/50">
                     <dt class="text-sm text-gray-400 mb-2">{{t .Lang "website.cdn_real_ip"}}</dt>
                     <div class="rounded border border-blue-900/60 bg-blue-950/30 p-2 mb-2 text-xs text-blue-200">
@@ -50,7 +50,7 @@
                         <p x-show="selectableCDNGroups().length === 0" class="text-xs text-gray-500">{{t .Lang "website.no_non_cloudflare_cdn_groups"}}</p>
                         <p class="text-xs text-gray-500" x-text="cdnRealIPModeText()"></p>
                     </div>
-                    <button @click="saveCDNRealIP()" :disabled="cdnRealIPSaving" class="btn-primary text-sm mt-2" x-text="cdnRealIPSaving ? '保存中...' : '保存其他 CDN 设置'"></button>
+                    <button @click="saveCDNRealIP()" :disabled="cdnRealIPSaving" class="btn-primary text-sm mt-2" x-text="cdnRealIPSaving ? t('common.saving') : t('website.save_other_cdn_settings')"></button>
                 </div>
                 <div><dt class="text-sm text-gray-400">{{t .Lang "website.system_user"}}</dt><dd class="text-white font-mono" x-text="site.system_user"></dd></div>
                 <div><dt class="text-sm text-gray-400">{{t .Lang "website.site_root"}}</dt><dd class="text-white font-mono text-sm" x-text="site.web_root"></dd></div>
@@ -61,17 +61,17 @@
                             <option value="">{{t .Lang "website.project_root"}}</option>
                             <option value="public">{{t .Lang "website.public_root_option"}}</option>
                         </select>
-                        <button @click="saveDocumentRoot()" :disabled="documentRootSaving" class="btn-primary text-xs py-1 px-2" x-text="documentRootSaving ? '保存中...' : '保存'"></button>
+                        <button @click="saveDocumentRoot()" :disabled="documentRootSaving" class="btn-primary text-xs py-1 px-2" x-text="documentRootSaving ? t('common.saving') : t('common.save')"></button>
                     </dd>
                     <p class="text-xs text-gray-500 mt-1">{{t .Lang "website.document_root_detail_help"}}</p>
                 </div>
                 <div><dt class="text-sm text-gray-400">{{t .Lang "website.log_dir"}}</dt><dd class="text-white font-mono text-sm" x-text="site.log_dir"></dd></div>
                 <div>
                     <dt class="text-sm text-gray-400">{{t .Lang "website.expiry_time"}}</dt>
-                    <dd class="text-white" x-show="!editingExpiry" x-text="site.expires_at ? new Date(site.expires_at).toLocaleDateString('zh-CN') : '未设置'"></dd>
+                    <dd class="text-white" x-show="!editingExpiry" x-text="site.expires_at ? new Date(site.expires_at).toLocaleDateString('zh-CN') : t('common.none')"></dd>
                     <div x-show="editingExpiry" class="flex items-center space-x-2">
                         <input type="date" x-model="expiresAtInput" class="input-field text-sm py-1 w-44">
-                        <button @click="saveExpiry()" :disabled="expirySaving" class="btn-primary text-xs py-1 px-2" x-text="expirySaving ? '保存中...' : '保存'"></button>
+                        <button @click="saveExpiry()" :disabled="expirySaving" class="btn-primary text-xs py-1 px-2" x-text="expirySaving ? t('common.saving') : t('common.save')"></button>
                         <button @click="editingExpiry = false" class="text-gray-400 hover:text-white text-xs">{{t .Lang "website.cancel"}}</button>
                     </div>
                 </div>
@@ -96,7 +96,7 @@
                     <option value="30">{{t .Lang "website.minute_30"}}</option>
                 </select>
             </div>
-            <button @click="saveMonitoring()" :disabled="monitoringSaving" class="btn-primary text-sm" x-text="monitoringSaving ? '保存中...' : '保存设置'"></button>
+            <button @click="saveMonitoring()" :disabled="monitoringSaving" class="btn-primary text-sm" x-text="monitoringSaving ? t('common.saving') : t('website.save_settings')"></button>
             <p x-show="monitoringEnabled" class="text-xs text-gray-500 mt-3">{{t .Lang "website.monitoring_enabled_help"}}</p>
             <p x-show="!monitoringEnabled" class="text-xs text-gray-600 mt-3">{{t .Lang "website.monitoring_disabled_help"}}</p>
 
@@ -110,21 +110,21 @@
                     <dt class="text-sm text-gray-400">{{t .Lang "website.table_prefix"}}</dt>
                     <dd class="flex items-center space-x-2 mt-1">
                         <input type="text" x-model="editTablePrefix" class="input-field text-sm font-mono py-1 w-28" placeholder="{{t .Lang "website.table_prefix_placeholder"}}">
-                        <button @click="detectTablePrefix()" :disabled="detectingPrefix" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;" x-text="detectingPrefix ? '检测中...' : '自动检测'"></button>
+                        <button @click="detectTablePrefix()" :disabled="detectingPrefix" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;" x-text="detectingPrefix ? t('website.detecting') : t('website.auto_detect')"></button>
                     </dd>
                     <p class="text-xs text-gray-500 mt-1">{{t .Lang "website.table_prefix_help"}}</p>
                 </div>
             </dl>
             <button @click="dbPasswordModal = true" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.change_password"}}</button>
-            <button @click="fixWPConfig()" :disabled="dbSubmitting" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #14532d; color: #86efac;" x-text="dbSubmitting ? '处理中...' : '同步数据库信息'"></button>
+            <button @click="fixWPConfig()" :disabled="dbSubmitting" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #14532d; color: #86efac;" x-text="dbSubmitting ? t('website.processing') : t('website.sync_db_info')"></button>
             <button @click="openSiteURLModal()" x-show="site.site_type === 'wordpress'" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "website.change_site_url"}}</button>
-            <button @click="clearDatabase()" :disabled="dbSubmitting" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #7f1d1d; color: #fca5a5;" x-text="dbSubmitting ? '清空中...' : '清空数据库'"></button>
+            <button @click="clearDatabase()" :disabled="dbSubmitting" class="text-sm py-1.5 px-3 rounded ml-2" style="background-color: #7f1d1d; color: #fca5a5;" x-text="dbSubmitting ? t('website.clearing') : t('website.clear_database')"></button>
 
             <hr class="my-4 border-gray-700">
 
             <div class="flex items-center space-x-3 mb-3">
-                <button @click="createBackup()" :disabled="backupSubmitting" class="btn-primary text-sm" x-text="backupSubmitting ? '备份中...' : '手动备份'"></button>
-                <button @click="uploadRestore()" :disabled="restoreUploading" class="btn-secondary text-sm" x-text="restoreUploading ? '恢复中...' : '上传恢复'"></button>
+                <button @click="createBackup()" :disabled="backupSubmitting" class="btn-primary text-sm" x-text="backupSubmitting ? t('website.backing_up') : t('website.manual_backup')"></button>
+                <button @click="uploadRestore()" :disabled="restoreUploading" class="btn-secondary text-sm" x-text="restoreUploading ? t('website.restoring') : t('website.upload_restore')"></button>
                 <input type="file" id="restoreFileInput" @change="handleRestoreUpload($event)" accept=".sql,.sql.gz,.gz,.zip" class="hidden">
             </div>
 

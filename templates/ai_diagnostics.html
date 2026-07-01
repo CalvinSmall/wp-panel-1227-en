@@ -35,7 +35,7 @@
                             </template>
                         </select>
                     </div>
-                    <button @click="runDiagnosis()" :disabled="diagnosing || !selectedSiteID" class="btn-primary w-full text-sm" x-text="diagnosing ? '诊断中 ' + elapsedSeconds + 's' : '开始诊断'"></button>
+                    <button @click="runDiagnosis()" :disabled="diagnosing || !selectedSiteID" class="btn-primary w-full text-sm" x-text="diagnosing ? t('ai_diagnostics.diagnosing', { seconds: elapsedSeconds }) : t('ai_diagnostics.start_diagnosis_button')"></button>
                     <div x-show="diagnosing" class="p-3 rounded text-xs text-gray-300" style="background-color: #0f172a; border: 1px solid #1e293b;">
                         <p x-text="waitMessage()"></p>
                         <p class="text-gray-500 mt-1">{{t .Lang "ai_diagnostics.timeout_help"}}</p>
@@ -63,7 +63,7 @@
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <h3 class="text-lg font-semibold text-white">{{t .Lang "ai_diagnostics.history"}}</h3>
-                            <p class="text-xs text-gray-500 mt-1" x-text="selectedSiteID ? '最近 ' + sessions.length + ' 条，每个网站默认保留最近 20 条。' : '请选择网站查看历史记录。'"></p>
+                            <p class="text-xs text-gray-500 mt-1" x-text="selectedSiteID ? t('ai_diagnostics.history_summary', { count: sessions.length }) : t('ai_diagnostics.select_site_for_history')"></p>
                         </div>
                         <span class="text-xs text-blue-400">{{t .Lang "ai_diagnostics.expand"}}</span>
                     </div>
@@ -95,7 +95,7 @@
                 <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-5">
                     <div>
                         <h3 class="text-lg font-semibold text-white">{{t .Lang "ai_diagnostics.results"}}</h3>
-                        <p class="text-xs text-gray-500 mt-1" x-text="selectedSite() ? selectedSite().domain : '请选择网站并开始诊断'"></p>
+                        <p class="text-xs text-gray-500 mt-1" x-text="selectedSite() ? selectedSite().domain : t('ai_diagnostics.select_site_to_start')"></p>
                     </div>
                     <span x-show="report?.risk_level" class="text-xs px-2 py-1 rounded" :class="riskClass(report?.risk_level)" x-text="riskText(report?.risk_level)"></span>
                 </div>
@@ -107,19 +107,19 @@
                 <div x-show="diagnosing" class="py-24 text-center">
                     <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
                     <p class="text-sm text-gray-400 mt-4" x-text="waitMessage()"></p>
-                    <p class="text-xs text-gray-500 mt-2" x-text="'已等待 ' + elapsedSeconds + ' 秒'"></p>
+                    <p class="text-xs text-gray-500 mt-2" x-text="t('ai_diagnostics.waiting', { seconds: elapsedSeconds })"></p>
                 </div>
 
                 <div x-show="report || rawText" class="space-y-5">
                     <div class="p-4 rounded" style="background-color: #0f172a; border: 1px solid #334155;">
-                        <p class="text-base font-semibold text-white" x-text="report?.summary || 'AI 诊断报告'"></p>
+                        <p class="text-base font-semibold text-white" x-text="report?.summary || t('ai_diagnostics.report_title')"></p>
                         <p class="text-sm text-gray-400 mt-2" x-show="report?.user_friendly_explanation" x-text="report?.user_friendly_explanation"></p>
                     </div>
 
                     <div x-show="report || rawText" class="space-y-4">
                         <div class="flex items-center justify-between gap-3">
                             <p class="text-sm text-gray-300">{{t .Lang "ai_diagnostics.raw_details"}}</p>
-                            <button @click="diagnosisCollapsed = !diagnosisCollapsed" class="btn-secondary text-xs" x-text="diagnosisCollapsed ? '展开详情' : '折叠详情'"></button>
+                            <button @click="diagnosisCollapsed = !diagnosisCollapsed" class="btn-secondary text-xs" x-text="diagnosisCollapsed ? t('ai_diagnostics.expand_details') : t('ai_diagnostics.collapse_details')"></button>
                         </div>
 
                         <div x-show="!diagnosisCollapsed" class="space-y-5">
@@ -129,7 +129,7 @@
                                     <div class="mb-3 p-4 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
                                         <div class="flex items-center justify-between gap-3 mb-2">
                                             <span class="text-sm text-white" x-text="cause.title"></span>
-                                            <span class="text-xs text-gray-500" x-text="'置信度：' + confidenceText(cause.confidence)"></span>
+                                            <span class="text-xs text-gray-500" x-text="t('ai_diagnostics.confidence_prefix') + confidenceText(cause.confidence)"></span>
                                         </div>
                                         <ul class="text-xs text-gray-400 space-y-1 list-disc list-inside">
                                             <template x-for="ev in (cause.evidence || [])" :key="ev">
@@ -177,7 +177,7 @@
                                 <template x-for="msg in messages" :key="msg.id">
                                     <div class="p-3 rounded border" :class="msg.role === 'user' ? 'border-blue-900 bg-blue-950/30' : 'border-gray-800'" style="background-color: #0f172a;">
                                         <div class="flex items-center justify-between gap-3 mb-2">
-                                            <span class="text-xs" :class="msg.role === 'user' ? 'text-blue-300' : 'text-green-300'" x-text="msg.role === 'user' ? '我' : 'AI'"></span>
+                                            <span class="text-xs" :class="msg.role === 'user' ? 'text-blue-300' : 'text-green-300'" x-text="msg.role === 'user' ? t('ai_diagnostics.chat_role_user') : t('ai_diagnostics.chat_role_ai')"></span>
                                             <span class="text-xs text-gray-600" x-text="formatTime(msg.created_at)"></span>
                                         </div>
                                         <p x-show="msg.content" class="text-sm text-gray-300 whitespace-pre-wrap" x-text="msg.content"></p>
@@ -190,7 +190,7 @@
                                 <textarea x-model="followupText" rows="3" class="input-field w-full text-sm resize-none" placeholder="{{t .Lang "ai_diagnostics.followup_placeholder"}}"></textarea>
                                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                     <span class="text-xs text-gray-600">{{t .Lang "ai_diagnostics.followup_context_help"}}</span>
-                                    <button @click="sendFollowup()" class="btn-primary text-sm shrink-0" :disabled="sendingFollowup || !followupText.trim()" x-text="sendingFollowup ? '分析中...' : '发送给 AI'"></button>
+                                <button @click="sendFollowup()" class="btn-primary text-sm shrink-0" :disabled="sendingFollowup || !followupText.trim()" x-text="sendingFollowup ? t('ai_diagnostics.analyzing') : t('ai_diagnostics.send_to_ai')"></button>
                                 </div>
                             </div>
                         </div>
@@ -208,12 +208,12 @@ function aiDiagnosticsPage() {
         selectedSiteID: '',
         symptom: 'site_500',
         symptoms: [
-            { value: 'site_500', label: '网站 500 / 白屏' },
-            { value: 'wp_admin_down', label: '后台打不开' },
-            { value: 'ssl_failure', label: 'SSL 失败' },
-            { value: 'db_connection', label: '数据库连接问题' },
-            { value: 'cache_issue', label: '缓存异常' },
-            { value: 'performance', label: '网站速度慢' }
+            { value: 'site_500', label: t('ai_diagnostics.symptom_site_500') },
+            { value: 'wp_admin_down', label: t('ai_diagnostics.symptom_wp_admin_down') },
+            { value: 'ssl_failure', label: t('ai_diagnostics.symptom_ssl_failure') },
+            { value: 'db_connection', label: t('ai_diagnostics.symptom_db_connection') },
+            { value: 'cache_issue', label: t('ai_diagnostics.symptom_cache_issue') },
+            { value: 'performance', label: t('ai_diagnostics.symptom_performance') }
         ],
         sessions: [],
         report: null,
@@ -266,11 +266,20 @@ function aiDiagnosticsPage() {
             return found ? found.label : value;
         },
         statusText(status) {
-            const map = { pending: '等待中', running: '诊断中', completed: '已完成', failed: '失败' };
+            const map = {
+                pending: t('ai_diagnostics.status_waiting'),
+                running: t('ai_diagnostics.status_running'),
+                completed: t('ai_diagnostics.status_completed'),
+                failed: t('ai_diagnostics.status_failed')
+            };
             return map[status] || status;
         },
         riskText(risk) {
-            const map = { low: '低风险', medium: '中风险', high: '高风险' };
+            const map = {
+                low: t('ai_diagnostics.risk_text_low'),
+                medium: t('ai_diagnostics.risk_text_medium'),
+                high: t('ai_diagnostics.risk_text_high')
+            };
             return map[risk] || (risk || '');
         },
         riskClass(risk) {
@@ -279,8 +288,12 @@ function aiDiagnosticsPage() {
             return 'bg-green-900/60 text-green-200';
         },
         confidenceText(confidence) {
-            const map = { low: '低', medium: '中', high: '高' };
-            return map[confidence] || (confidence || '未知');
+            const map = {
+                low: t('ai_diagnostics.risk_low'),
+                medium: t('ai_diagnostics.risk_medium'),
+                high: t('ai_diagnostics.risk_high')
+            };
+            return map[confidence] || t('ai_diagnostics.risk_unknown');
         },
         formatTime(value) {
             if (!value) return '--';
@@ -315,10 +328,10 @@ function aiDiagnosticsPage() {
                 });
                 const d = r.data || {};
                 if (d.status === 'failed') {
-                    this.error = d.error_message || 'AI 诊断失败';
+                    this.error = d.error_message || t('ai_diagnostics.diagnosis_failed');
                     showToast(this.error, 'error');
                 } else if (d.status === 'running') {
-                    this.error = d.message || '该网站已有 AI 诊断正在进行';
+                    this.error = d.message || t('ai_diagnostics.diagnosis_running');
                     showToast(this.error, 'info');
                 } else {
                     this.currentSessionID = d.session_id || null;
@@ -326,7 +339,7 @@ function aiDiagnosticsPage() {
                     this.rawText = d.raw_text || '';
                     this.diagnosisCollapsed = false;
                     await this.fetchMessages();
-                    showToast('AI 诊断完成', 'success');
+                    showToast(t('ai_diagnostics.diagnosis_completed'), 'success');
                 }
                 await this.fetchSessions();
             } catch(e) {
@@ -348,10 +361,10 @@ function aiDiagnosticsPage() {
             this.waitTimer = null;
         },
         waitMessage() {
-            if (this.elapsedSeconds < 8) return '正在收集站点日志、配置摘要和最近操作记录。';
-            if (this.elapsedSeconds < 25) return '正在请求 AI 服务并等待模型分析。';
-            if (this.elapsedSeconds < 70) return 'AI 正在整理可能原因和修复建议，请继续等待。';
-            return '本次诊断耗时较长，通常与模型响应速度或日志上下文有关。';
+            if (this.elapsedSeconds < 8) return t('ai_diagnostics.waiting_collect');
+            if (this.elapsedSeconds < 25) return t('ai_diagnostics.waiting_ai_request');
+            if (this.elapsedSeconds < 70) return t('ai_diagnostics.waiting_analysis');
+            return t('ai_diagnostics.waiting_long');
         },
         async loadSession(sessionID) {
             if (!this.selectedSiteID || !sessionID) return;
@@ -405,18 +418,18 @@ function aiDiagnosticsPage() {
                 });
                 const d = r.data || {};
                 if (d.status === 'failed') {
-                    this.error = d.error_message || 'AI 追问失败';
+                    this.error = d.error_message || t('ai_diagnostics.followup_failed');
                     showToast(this.error, 'error');
                     await this.fetchMessages();
                 } else if (d.status === 'running') {
-                    this.error = d.message || '该网站已有 AI 任务正在进行';
+                    this.error = d.message || t('ai_diagnostics.followup_running');
                     showToast(this.error, 'info');
                     this.followupText = content;
                 } else {
                     this.messages = d.messages || [];
                     if (this.messages.length > 0) this.diagnosisCollapsed = true;
                     this.scrollMessagesToBottom();
-                    showToast('AI 已回复', 'success');
+                    showToast(t('ai_diagnostics.reply_ready'), 'success');
                 }
             } catch(e) {
                 this.error = e.message;
