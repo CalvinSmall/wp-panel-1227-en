@@ -141,7 +141,7 @@
             </div>
 
             <details class="mb-2">
-                <summary class="cursor-pointer text-blue-400 hover:text-blue-300 text-xs" x-text="`备份列表（${backups.length} 份）`"></summary>
+                <summary class="cursor-pointer text-blue-400 hover:text-blue-300 text-xs" x-text="t('website.backup_list', { count: backups.length })"></summary>
                 <div class="overflow-x-auto mt-2">
                     <table class="w-full text-sm">
                         <thead class="border-b border-gray-700 text-gray-400">
@@ -159,11 +159,11 @@
                                     <td class="py-2 font-mono text-xs whitespace-nowrap" x-text="b.filename"></td>
                                     <td class="py-2 text-xs whitespace-nowrap" x-text="formatBytes(b.file_size)"></td>
                                     <td class="py-2 text-xs whitespace-nowrap" x-text="new Date(b.created_at).toLocaleString('zh-CN')"></td>
-                                    <td class="py-2 whitespace-nowrap"><span :class="b.auto ? 'badge-info' : 'badge-success'" class="text-xs" x-text="b.auto ? '自动' : '手动'"></span></td>
+                                    <td class="py-2 whitespace-nowrap"><span :class="b.auto ? 'badge-info' : 'badge-success'" class="text-xs" x-text="b.auto ? t('website.backup_auto') : t('website.backup_manual')"></span></td>
                                     <td class="py-2">
                                         <div class="flex flex-wrap gap-1">
                                             <button @click="downloadBackup(b)" class="btn-primary text-xs py-1 px-2">{{t .Lang "website.download"}}</button>
-                                            <button @click="restoreBackup(b)" :disabled="restoringId" class="text-xs py-1 px-2 rounded" style="background-color: #7f1d1d; color: #fca5a5;" x-text="restoringId === b.id ? '恢复中...' : '恢复'"></button>
+                                            <button @click="restoreBackup(b)" :disabled="restoringId" class="text-xs py-1 px-2 rounded" style="background-color: #7f1d1d; color: #fca5a5;" x-text="restoringId === b.id ? t('website.restoring') : t('website.restore')"></button>
                                             <button @click="deleteBackup(b)" :disabled="restoringId" class="btn-secondary text-xs py-1 px-2">{{t .Lang "website.delete"}}</button>
                                         </div>
                                     </td>
@@ -184,7 +184,7 @@
         <div class="card">
             <h3 class="text-lg font-semibold text-white mb-4">{{t .Lang "website.ssl_management"}}</h3>
             <div class="mb-3">
-                <span :class="site.ssl_enabled ? 'badge-success' : site.ssl_last_error ? 'badge-warning' : 'badge-info'" class="text-sm" x-text="site.ssl_enabled ? '已启用' : site.ssl_last_error ? '待处理' : '未启用'"></span>
+                <span :class="site.ssl_enabled ? 'badge-success' : site.ssl_last_error ? 'badge-warning' : 'badge-info'" class="text-sm" x-text="site.ssl_enabled ? t('website.ssl_enabled') : site.ssl_last_error ? t('website.ssl_pending') : t('website.ssl_not_enabled')"></span>
             </div>
             <div x-show="!site.ssl_enabled && site.ssl_last_error" class="mb-4 p-3 bg-yellow-900/40 border border-yellow-700 rounded-lg text-yellow-200 text-sm">
                 <p class="font-medium mb-1">{{t .Lang "website.last_ssl_failed"}}</p>
@@ -194,7 +194,7 @@
                 <dl class="space-y-3 mb-4">
                     <div><dt class="text-sm text-gray-400">{{t .Lang "website.cert_path"}}</dt><dd class="text-white font-mono text-sm break-all" x-text="site.ssl_cert_path"></dd></div>
                     <div><dt class="text-sm text-gray-400">{{t .Lang "website.private_key_path"}}</dt><dd class="text-white font-mono text-sm break-all" x-text="site.ssl_key_path"></dd></div>
-                    <div><dt class="text-sm text-gray-400">{{t .Lang "website.expiry_time"}}</dt><dd class="text-white" x-text="site.ssl_expires_at ? new Date(site.ssl_expires_at).toLocaleDateString('zh-CN') : '未知'"></dd></div>
+                    <div><dt class="text-sm text-gray-400">{{t .Lang "website.expiry_time"}}</dt><dd class="text-white" x-text="site.ssl_expires_at ? new Date(site.ssl_expires_at).toLocaleDateString('zh-CN') : t('website.unknown')"></dd></div>
                 </dl>
                 <div class="flex flex-wrap gap-3">
                     <button @click="downloadSSLPackage()" class="text-sm py-1.5 px-3 rounded" style="background-color: #374151; color: #e5e7eb;">{{t .Lang "website.download_cert_package"}}</button>
@@ -251,7 +251,7 @@ location ^~ /api/ {
                 <textarea x-model="nginxContent" rows="6" class="w-full rounded p-2 text-xs font-mono" style="background-color: #0f172a; border: 1px solid #334155; color: #e2e8f0; resize: vertical;" placeholder="if ($request_uri ~* &quot;/ai-assistant&quot;) { set $wp_skip_cache 1; }"></textarea>
             </div>
             <div class="flex space-x-3">
-                <button @click="saveNginxCustom()" :disabled="nginxSubmitting" class="btn-primary text-sm" x-text="nginxSubmitting ? '校验中...' : '保存并生效'"></button>
+                <button @click="saveNginxCustom()" :disabled="nginxSubmitting" class="btn-primary text-sm" x-text="nginxSubmitting ? t('common.saving') : t('website.save_apply')"></button>
                 <button @click="fetchNginxCustom()" class="text-sm py-1.5 px-3 rounded" style="background-color: #1e293b; border: 1px solid #334155; color: #e2e8f0;">{{t .Lang "website.refresh"}}</button>
             </div>
         </div>
@@ -263,11 +263,11 @@ location ^~ /api/ {
                     <div>
                         <div class="flex items-center gap-2 mb-1">
                             <span class="text-sm font-medium text-white">{{t .Lang "website.file_lock"}}</span>
-                            <span class="text-xs px-2 py-0.5 rounded" :class="site.file_lock_enabled ? 'bg-yellow-900/50 text-yellow-200 border border-yellow-700' : 'bg-green-900/40 text-green-200 border border-green-800'" x-text="site.file_lock_enabled ? '已开启' : '未开启'"></span>
+                            <span class="text-xs px-2 py-0.5 rounded" :class="site.file_lock_enabled ? 'bg-yellow-900/50 text-yellow-200 border border-yellow-700' : 'bg-green-900/40 text-green-200 border border-green-800'" x-text="site.file_lock_enabled ? t('website.file_locked') : t('website.file_unlocked')"></span>
                         </div>
                         <p class="text-xs text-gray-500">{{t .Lang "website.file_lock_help"}}</p>
                     </div>
-                    <button @click="toggleFileLock(!site.file_lock_enabled)" :disabled="fileLockSaving" class="text-sm py-1.5 px-3 rounded" :style="site.file_lock_enabled ? 'background-color: #1e3a5f; color: #93c5fd;' : 'background-color: #7f1d1d; color: #fca5a5;'" x-text="fileLockSaving ? '处理中...' : (site.file_lock_enabled ? '解除锁定' : '开启锁定')"></button>
+                    <button @click="toggleFileLock(!site.file_lock_enabled)" :disabled="fileLockSaving" class="text-sm py-1.5 px-3 rounded" :style="site.file_lock_enabled ? 'background-color: #1e3a5f; color: #93c5fd;' : 'background-color: #7f1d1d; color: #fca5a5;'" x-text="fileLockSaving ? t('website.processing') : (site.file_lock_enabled ? t('website.unlock') : t('website.enable_lock'))"></button>
                 </div>
             </div>
             <div class="flex items-center space-x-3 mb-3">
@@ -323,12 +323,12 @@ location ^~ /api/ {
                 <span class="text-xs text-gray-500">{{t .Lang "website.xmlrpc_help"}}</span>
             </div>
             <div class="flex items-center space-x-3 mb-3">
-                <button @click="saveWPOptimizations()" :disabled="optimizationSaving || site.file_lock_enabled" class="btn-primary text-sm" x-text="optimizationSaving ? '保存中...' : '保存设置'"></button>
+                <button @click="saveWPOptimizations()" :disabled="optimizationSaving || site.file_lock_enabled" class="btn-primary text-sm" x-text="optimizationSaving ? t('common.saving') : t('website.save_settings')"></button>
                 <button x-show="fcacheEnabled" @click="clearFCache()" class="text-sm py-1.5 px-3 rounded" style="background-color: #7f1d1d; color: #fca5a5;">{{t .Lang "website.clear_cache"}}</button>
             </div>
             <div x-show="(fcacheEnabled || disableWPUpdates || disableFileEditing || wpDebug) && site.site_type === 'wordpress'" class="flex items-center space-x-3 mb-3">
-                <button x-show="pluginStatus === 'not_installed'" @click="installPlugin()" :disabled="pluginInstalling || site.file_lock_enabled" class="btn-primary text-sm py-1.5" x-text="pluginInstalling ? '安装中...' : '安装配套插件'"></button>
-                <button x-show="pluginStatus === 'update_available'" @click="installPlugin()" :disabled="pluginInstalling || site.file_lock_enabled" class="text-sm py-1.5 px-3 rounded" style="background-color: #166534; color: #bbf7d0;" x-text="pluginInstalling ? '更新中...' : '更新配套插件'"></button>
+                <button x-show="pluginStatus === 'not_installed'" @click="installPlugin()" :disabled="pluginInstalling || site.file_lock_enabled" class="btn-primary text-sm py-1.5" x-text="pluginInstalling ? t('website.installing') : t('website.install_companion_plugin')"></button>
+                <button x-show="pluginStatus === 'update_available'" @click="installPlugin()" :disabled="pluginInstalling || site.file_lock_enabled" class="text-sm py-1.5 px-3 rounded" style="background-color: #166534; color: #bbf7d0;" x-text="pluginInstalling ? t('website.updating') : t('website.update_companion_plugin')"></button>
                 <span x-show="pluginStatus === 'installed'" class="text-xs text-green-400">{{t .Lang "website.plugin_installed"}}</span>
             </div>
             <p x-show="site.file_lock_enabled" class="text-xs text-yellow-300 mb-3">{{t .Lang "website.file_lock_enabled_notice"}}</p>
