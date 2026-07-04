@@ -27,7 +27,7 @@ func (h *CronHandler) List(c *gin.Context) {
 		 FROM cron_jobs ORDER BY created_at DESC`,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("query failed"))
 		return
 	}
 	defer rows.Close()
@@ -57,7 +57,7 @@ func (h *CronHandler) List(c *gin.Context) {
 func (h *CronHandler) Create(c *gin.Context) {
 	var req models.CreateCronRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid parameters"))
 		return
 	}
 
@@ -90,8 +90,8 @@ func (h *CronHandler) Create(c *gin.Context) {
 		req.Name, req.CronExpression, req.Command, taskType, req.BackupMode, keepCount, notifyFail, siteID, req.RunAsUser, enabled,
 	)
 	if err != nil {
-		log.Printf("创建Cron失败: %v", err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建失败"))
+		log.Printf("failed to create cron: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to create"))
 		return
 	}
 
@@ -102,9 +102,9 @@ func (h *CronHandler) Create(c *gin.Context) {
 	task := executor.GlobalQueue.Enqueue(executor.TaskRenderCron, nil)
 	<-task.ResultCh
 
-	msg := "Cron任务创建成功"
+	msg := "Cron job created"
 	if taskType == "wp_cron" {
-		msg += "，已自动禁用 WordPress 内置伪 Cron"
+		msg += ", WordPress built-in pseudo cron automatically disabled"
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": msg}))
 }
@@ -112,13 +112,13 @@ func (h *CronHandler) Create(c *gin.Context) {
 func (h *CronHandler) Update(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的任务ID"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid task ID"))
 		return
 	}
 
 	var req models.UpdateCronRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid parameters"))
 		return
 	}
 
@@ -160,7 +160,7 @@ func (h *CronHandler) Update(c *gin.Context) {
 		req.Name, req.CronExpression, req.Command, taskType, req.BackupMode, keepCount, notifyFail, req.SiteID, req.RunAsUser, enabled, id,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to update"))
 		return
 	}
 
@@ -173,13 +173,13 @@ func (h *CronHandler) Update(c *gin.Context) {
 	task := executor.GlobalQueue.Enqueue(executor.TaskRenderCron, nil)
 	<-task.ResultCh
 
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Cron任务已更新"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Cron job updated"}))
 }
 
 func (h *CronHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的任务ID"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid task ID"))
 		return
 	}
 
@@ -197,12 +197,12 @@ func (h *CronHandler) Delete(c *gin.Context) {
 	task := executor.GlobalQueue.Enqueue(executor.TaskRenderCron, nil)
 	<-task.ResultCh
 
-	msg := "Cron任务已删除"
+	msg := "Cron job deleted"
 	if taskType == "wp_cron" && siteID > 0 {
 		var count int
 		db.QueryRow("SELECT COUNT(*) FROM cron_jobs WHERE task_type = 'wp_cron' AND site_id = ?", siteID).Scan(&count)
 		if count == 0 {
-			msg += "，已恢复 WordPress 内置 Cron"
+			msg += ", WordPress built-in cron restored"
 		}
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": msg}))
@@ -218,7 +218,7 @@ func (h *CronHandler) ViewLogs(c *gin.Context) {
 	logFile := "/www/server/panel/logs/cron.log"
 	content := tailFile(logFile, lines)
 	if content == "" {
-		c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"content": "（暂无执行记录）"}))
+		c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"content": "(no execution records)"}))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"content": content}))
@@ -227,7 +227,7 @@ func (h *CronHandler) ViewLogs(c *gin.Context) {
 func (h *CronHandler) Run(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的任务ID"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid task ID"))
 		return
 	}
 
@@ -238,7 +238,7 @@ func (h *CronHandler) Run(c *gin.Context) {
 	dbResult, _ := db.Exec("UPDATE cron_jobs SET running = 1 WHERE id = ? AND running = 0", id)
 	n, _ := dbResult.RowsAffected()
 	if n == 0 {
-		c.JSON(http.StatusConflict, models.ErrorResponse("任务正在执行中，请稍后再试"))
+		c.JSON(http.StatusConflict, models.ErrorResponse("task is currently running, please try again later"))
 		return
 	}
 
@@ -386,47 +386,47 @@ var cronUserRe = regexp.MustCompile(`^(wp|php)_[a-z0-9_]+$`)
 
 func validateCronInput(name, expr, command, taskType, backupMode, runAsUser string, siteID *int) string {
 	if hasLineBreak(name) || strings.ContainsAny(name, "\"`$\\") {
-		return "任务名称不能包含换行或特殊字符"
+		return "task name cannot contain newlines or special characters"
 	}
 	if !validCronExpression(expr) {
-		return "Cron 表达式格式不正确"
+		return "invalid cron expression format"
 	}
 	switch taskType {
 	case "command":
 		if strings.TrimSpace(command) == "" {
-			return "请输入要执行的命令"
+			return "please enter a command to execute"
 		}
 		if hasLineBreak(command) {
-			return "命令不能包含换行"
+			return "command cannot contain newlines"
 		}
 	case "file_backup":
 		if siteID == nil || *siteID <= 0 {
-			return "请选择要备份的网站"
+			return "please select a website to backup"
 		}
 		if backupMode != "" && backupMode != "full" && backupMode != "incremental" {
-			return "备份模式不正确"
+			return "invalid backup mode"
 		}
 	case "wp_cron":
 		if siteID == nil || *siteID <= 0 {
-			return "请选择要调用 WP Cron 的网站"
+			return "please select a website for WP Cron"
 		}
 		if hasLineBreak(command) {
-			return "WP Cron 目标不能包含换行"
+			return "WP Cron target cannot contain newlines"
 		}
 		if !executor.IsValidDomain(command) {
-			return "WP Cron 目标必须是有效域名"
+			return "WP Cron target must be a valid domain"
 		}
 	default:
-		return "任务类型不正确"
+		return "invalid task type"
 	}
 	if runAsUser != "" {
 		if !cronUserRe.MatchString(runAsUser) {
-			return "运行用户不正确"
+			return "invalid run user"
 		}
 		var count int
 		database.GetDB().QueryRow("SELECT COUNT(*) FROM websites WHERE system_user = ?", runAsUser).Scan(&count)
 		if count == 0 {
-			return "运行用户不属于任何站点"
+			return "run user does not belong to any site"
 		}
 	}
 	return ""

@@ -23,23 +23,23 @@ type heartbeatPayload struct {
 
 var telemetryVersion string
 
-// StartTelemetry 启动匿名统计：新装面板立即上报一次，此后每天 UTC 00:00 附近上报。
-// 上报内容仅含匿名 ID（machine-id 的 SHA256 前 16 字节）和面板版本号。
+// StartTelemetry starts anonymous statistics: newly installed panels report immediately, then report daily around UTC 00:00.
+// Report content contains only anonymous ID (first 16 bytes of SHA256 of machine-id) and panel version.
 func StartTelemetry(version string) {
 	telemetryVersion = version
 
 	if !isTelemetryEnabled() {
-		log.Println("[遥测] 匿名统计已关闭，跳过")
+		log.Println("[Telemetry] Anonymous statistics disabled, skipping")
 		return
 	}
 
 	go func() {
-		// 新装面板（从未成功上报过）立即上报，更新/重启则跳过
+		// Newly installed panels (never successfully reported) report immediately; updates/restarts skip
 		if isFirstHeartbeat() {
 			sendHeartbeat()
 		}
 
-		// 计算距下一个 UTC 00:00 的间隔，加 ±5 分钟随机抖动
+		// Calculate interval to next UTC 00:00, add ±5 minute random jitter
 		now := time.Now().UTC()
 		midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
 		jitter := time.Duration(rand.Intn(600)-300) * time.Second
@@ -59,7 +59,7 @@ func StartTelemetry(version string) {
 	}()
 }
 
-// isFirstHeartbeat 检查是否从未成功上报过心跳（新装面板）。
+// isFirstHeartbeat checks if heartbeat has never been successfully reported (newly installed panel).
 func isFirstHeartbeat() bool {
 	db := database.GetDB()
 	if db == nil {
@@ -90,22 +90,22 @@ func sendHeartbeat() {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Post(url+"/api/heartbeat", "application/json", bytes.NewReader(body))
 	if err != nil {
-		log.Printf("[遥测] 上报失败: %v", err)
+		log.Printf("[Telemetry] Report failed: %v", err)
 		return
 	}
 	resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Printf("[遥测] 上报返回非预期状态: %d", resp.StatusCode)
+		log.Printf("[Telemetry] Report returned unexpected status: %d", resp.StatusCode)
 		return
 	}
 
-	// 标记首次心跳已发送，后续重启不再立即上报
+	// Mark first heartbeat sent; subsequent restarts will not report immediately
 	db := database.GetDB()
 	if db != nil {
-		db.Exec("INSERT OR IGNORE INTO security_settings (skey, svalue, description) VALUES ('telemetry_first_sent', ?, '首次心跳上报时间')", time.Now().UTC().Format(time.RFC3339))
+		db.Exec("INSERT OR IGNORE INTO security_settings (skey, svalue, description) VALUES ('telemetry_first_sent', ?, 'First heartbeat report time')", time.Now().UTC().Format(time.RFC3339))
 	}
 
-	log.Println("[遥测] 匿名心跳上报成功")
+	log.Println("[Telemetry] Anonymous heartbeat reported successfully")
 }
 
 func generateAnonymousID() string {

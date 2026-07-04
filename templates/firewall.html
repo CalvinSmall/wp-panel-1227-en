@@ -8,93 +8,93 @@
 
     <div x-show="showRules" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showRules = false">
         <div class="bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
-            <h3 class="text-lg font-bold text-white mb-4">安全防御规则说明</h3>
+            <h3 class="text-lg font-bold text-white mb-4">Security Defense Rules Explained</h3>
             <div class="text-sm text-gray-300 space-y-4">
                 <div>
-                    <p class="text-white font-semibold mb-1">检测范围</p>
-                    <p>自动封禁规则监控所有网站的 access.log 和 error.log；WordPress 可疑访问分析额外读取 wp-security.log，仅做本地统计和证据整理。</p>
+                    <p class="text-white font-semibold mb-1">Detection Scope</p>
+                    <p>Auto-ban rules monitor access.log and error.log of all sites; WordPress suspicious access analysis additionally reads wp-security.log for local statistics and evidence collection only.</p>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-1">触发条件（命中以下任一规则计为 1 次违规）</p>
+                    <p class="text-white font-semibold mb-1">Trigger Conditions (matching any of the following rules counts as 1 violation)</p>
                     <ul class="list-disc list-inside space-y-1 ml-2">
-                        <li><code class="text-gray-300">POST /wp-login.php</code> — WordPress 登录暴力破解</li>
-                        <li><code class="text-gray-300">POST /xmlrpc.php</code> 返回 <span class="text-gray-300">HTTP 403</span> — 禁用 XML-RPC 后仍被请求（含 <code class="text-gray-300">//xmlrpc.php</code> 变体）</li>
-                        <li>返回 <span class="text-gray-300">HTTP 429</span> — 超出请求频率限制</li>
-                        <li>敏感文件扫描返回 <span class="text-gray-300">404</span> — 如 <code class="text-gray-300">.env</code>、<code class="text-gray-300">.git</code>、<code class="text-gray-300">wp-config.php</code>、<code class="text-gray-300">.sql</code>、压缩包等</li>
-                        <li class="text-green-400">404 泛滥检测 — 任意路径返回 404 达 <span class="text-green-300">30 次/60 秒</span> 判定为目录扫描（独立规则，固定阈值）</li>
-                        <li>WordPress 异常路径访问 — 写入 <code class="text-gray-300">wp-security.log</code>，用于管理员分析，不自动封禁</li>
+                        <li><code class="text-gray-300">POST /wp-login.php</code> — WordPress login brute force attack</li>
+                        <li><code class="text-gray-300">POST /xmlrpc.php</code> returning <span class="text-gray-300">HTTP 403</span> — still being requested after XML-RPC is disabled (including <code class="text-gray-300">//xmlrpc.php</code> variants)</li>
+                        <li>Returning <span class="text-gray-300">HTTP 429</span> — exceeding request rate limits</li>
+                        <li>Sensitive file scanning returning <span class="text-gray-300">404</span> — e.g., <code class="text-gray-300">.env</code>, <code class="text-gray-300">.git</code>, <code class="text-gray-300">wp-config.php</code>, <code class="text-gray-300">.sql</code>, archives, etc.</li>
+                        <li class="text-green-400">404 flood detection — any path returning 404 up to <span class="text-green-300">30 times/60 seconds</span> is classified as directory scanning (independent rule, fixed threshold)</li>
+                        <li>WordPress abnormal path access — logged to <code class="text-gray-300">wp-security.log</code> for admin analysis, no auto-ban</li>
                     </ul>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-1">封禁阈值</p>
-                    <p>前 4 项规则默认 <span class="text-blue-400">60 秒</span>内累计 <span class="text-blue-400">5 次</span>违规 → 自动封禁（可在「安全设置」页面自定义阈值、窗口和封禁时长）。</p>
-                    <p>404 泛滥规则固定为 <span class="text-blue-400">30 次/60 秒</span>，不开放自定义。</p>
+                    <p class="text-white font-semibold mb-1">Ban Threshold</p>
+                    <p>The first 4 rules default to <span class="text-blue-400">5</span> violations within <span class="text-blue-400">60 seconds</span> → automatic ban (threshold, window, and ban duration can be customized on the "Security Settings" page).</p>
+                    <p>The 404 flood rule is fixed at <span class="text-blue-400">30 times/60 seconds</span> and is not customizable.</p>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-1">多级渐进封禁</p>
+                    <p class="text-white font-semibold mb-1">Multi-Level Progressive Banning</p>
                     <ul class="space-y-1 ml-2">
-                        <li>首次违规 → Fail2ban 封禁 <span class="text-blue-400">10 分钟</span>，到期自动解除</li>
-                        <li>24 小时内再次违规 → 升级为 <span class="text-blue-400">24 小时</span> 封禁，同时写入 Nftables 持久规则</li>
-                        <li>累计 3 次 24 小时封禁 → 自动转为<span class="text-red-400">永久封禁</span>，仅通过 Nftables 持久规则封锁</li>
+                        <li>First violation → Fail2ban bans for <span class="text-blue-400">10 minutes</span>, auto-unbans on expiry</li>
+                        <li>Second violation within 24 hours → escalated to <span class="text-blue-400">24-hour</span> ban, also written to Nftables persistent rules</li>
+                        <li>3 cumulative 24-hour bans → automatically converted to <span class="text-red-400">permanent ban</span>, enforced via Nftables persistent rules only</li>
                     </ul>
-                    <p class="text-gray-500 mt-1">封禁列表可通过「来源」列区分 Fail2ban 临时封禁 与 Nftables 持久封禁。</p>
+                    <p class="text-gray-500 mt-1">The ban list can distinguish between Fail2ban temporary bans and Nftables persistent bans via the "Source" column.</p>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-1">封禁机制</p>
+                    <p class="text-white font-semibold mb-1">Ban Mechanism</p>
                     <ul class="space-y-1 ml-2">
-                        <li><span class="text-blue-400">Fail2ban</span> — 管理网站防护封禁（jail: <code class="text-gray-300">wppanel</code>、<code class="text-gray-300">wppanel-404</code>）和 SSH 防护封禁（jail: <code class="text-gray-300">wppanel-sshd</code>），到期自动释放</li>
-                        <li><span class="text-purple-400">Nftables 持久</span> — 管理永久封禁、扫描防御封禁（来源: <code class="text-gray-300">panel_scan</code>）和面板认证封禁（来源: <code class="text-gray-300">panel</code>），独立于 Fail2ban，到期自动解除</li>
-                        <li><span class="text-green-400">Nginx 黑名单</span> — 与 Fail2ban 联动，Web 防护 jail 封禁时同步写入 Nginx geo 黑名单，被禁 IP 直接返回 <code class="text-gray-300">444</code>（关闭连接），确保 Cloudflare 代理场景下也能有效拦截</li>
+                        <li><span class="text-blue-400">Fail2ban</span> — manages website protection bans (jails: <code class="text-gray-300">wppanel</code>, <code class="text-gray-300">wppanel-404</code>) and SSH protection bans (jail: <code class="text-gray-300">wppanel-sshd</code>), auto-releases on expiry</li>
+                        <li><span class="text-purple-400">Nftables Persistent</span> — manages permanent bans, scan defense bans (source: <code class="text-gray-300">panel_scan</code>), and panel authentication bans (source: <code class="text-gray-300">panel</code>), independent of Fail2ban, auto-unbans on expiry</li>
+                        <li><span class="text-green-400">Nginx Blacklist</span> — integrated with Fail2ban; when a Web protection jail bans an IP, it is also written to the Nginx geo blacklist, causing banned IPs to receive a <code class="text-gray-300">444</code> (connection closed), ensuring effective blocking even under Cloudflare proxy</li>
                     </ul>
-                    <p class="text-gray-500 mt-1">三条通道同时生效：Nftables 拦截直连源站的请求，Nginx 拦截经 Cloudflare 转发的请求，Fail2ban 到期自动释放。</p>
+                    <p class="text-gray-500 mt-1">All three channels take effect simultaneously: Nftables blocks direct-to-origin requests, Nginx blocks Cloudflare-forwarded requests, and Fail2ban auto-releases on expiry.</p>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-1">Cloudflare 场景说明</p>
+                    <p class="text-white font-semibold mb-1">Cloudflare Scenario</p>
                     <ul class="space-y-1 ml-2">
-                        <li>面板自动部署 <code class="text-gray-300">/etc/nginx/conf.d/wppanel-realip.conf</code>，从 Cloudflare 的 <code class="text-gray-300">CF-Connecting-IP</code> 头部还原真实访客 IP</li>
-                        <li>白名单刷新时自动更新 Cloudflare 官方 IP 段，确保仅信任 Cloudflare 来源</li>
-                        <li>无需任何手动配置，检测到 Cloudflare 代理时自动生效</li>
+                        <li>The panel auto-deploys <code class="text-gray-300">/etc/nginx/conf.d/wppanel-realip.conf</code> to restore the real visitor IP from Cloudflare's <code class="text-gray-300">CF-Connecting-IP</code> header</li>
+                        <li>Whitelist refresh automatically updates Cloudflare official IP ranges, ensuring only Cloudflare sources are trusted</li>
+                        <li>No manual configuration needed; automatically takes effect when Cloudflare proxy is detected</li>
                     </ul>
-                    <p class="text-gray-500 mt-1">如需关闭 Nginx 层封禁：删除 <code class="text-gray-300">/etc/fail2ban/action.d/wppanel-nginx.conf</code>，并从 <code class="text-gray-300">/etc/fail2ban/jail.d/wppanel.conf</code> 中移除 <code class="text-gray-300">wppanel-nginx</code> action，然后 <code class="text-gray-300">systemctl reload fail2ban && nginx -s reload</code>。</p>
+                    <p class="text-gray-500 mt-1">To disable Nginx-layer banning: delete <code class="text-gray-300">/etc/fail2ban/action.d/wppanel-nginx.conf</code> and remove the <code class="text-gray-300">wppanel-nginx</code> action from <code class="text-gray-300">/etc/fail2ban/jail.d/wppanel.conf</code>, then run <code class="text-gray-300">systemctl reload fail2ban && nginx -s reload</code>.</p>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-1">扫描防御</p>
+                    <p class="text-white font-semibold mb-1">Scan Defense</p>
                     <ul class="space-y-1 ml-2">
-                        <li>针对面板 <span class="text-blue-400">8443</span> 端口的扫描防护，不作用于网站端口（80/443）</li>
-                        <li>非浏览器特征请求（如 curl、脚本、扫描器）访问面板端口且未命中随机入口 → 封禁 <span class="text-red-400">30 天</span>；常见浏览器系统探测路径和带 BasicAuth 头的请求不会直接触发扫描封禁</li>
-                        <li>命中随机入口（<code class="text-gray-300">/{suffix}</code>）的请求正常放行，不受影响</li>
+                        <li>Scan protection for the panel on port <span class="text-blue-400">8443</span>; does not affect website ports (80/443)</li>
+                        <li>Non-browser characteristic requests (e.g., curl, scripts, scanners) accessing the panel port without matching the random entry → banned for <span class="text-red-400">30 days</span>; common browser probing paths and requests with BasicAuth headers do not directly trigger scan bans</li>
+                        <li>Requests matching the random entry (<code class="text-gray-300">/{suffix}</code>) pass through normally and are not affected</li>
                     </ul>
-                    <p class="text-gray-500 mt-1">触发后写入面板封禁列表，来源标注为「扫描防御」，等级为临时 30 天。</p>
+                    <p class="text-gray-500 mt-1">After triggering, the IP is written to the panel ban list with source labeled "Scan Defense" and level set to temporary 30 days.</p>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-1">白名单豁免</p>
-                    <p>127.0.0.1、Cloudflare / Googlebot / Bingbot 官方 IP 段、自定义白名单 IP 不会被封禁。白名单在「安全设置」页面管理。</p>
-                    <p class="text-gray-500 mt-1">WordPress 安全日志路径白名单只排除正常所有权验证文件等路径，不影响 IP 封禁白名单。</p>
+                    <p class="text-white font-semibold mb-1">Whitelist Exemption</p>
+                    <p>127.0.0.1, Cloudflare / Googlebot / Bingbot official IP ranges, and custom whitelist IPs are never banned. The whitelist is managed on the "Security Settings" page.</p>
+                    <p class="text-gray-500 mt-1">The WordPress security log path whitelist only excludes legitimate ownership verification files and similar paths; it does not affect the IP ban whitelist.</p>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-1">请求频率限制原理</p>
-                    <p>采用令牌桶算法：每 IP 一个桶，容量 = 突发缓冲（默认 300），每秒补充 1 个令牌。请求到达消耗令牌，耗尽后返回 429。人类浏览有自然停顿，停顿期间桶自动回满；机器人持续请求则被压制在 1 次/秒。</p>
-                    <p class="text-red-400 mt-1">⚠ 多次 429 会被 Fail2ban 自动封禁。请确保突发缓冲足够日常使用。</p>
-                    <p class="text-green-400">✓ 提高突发缓冲不影响拦截机器人，不削弱安全防护。</p>
+                    <p class="text-white font-semibold mb-1">Rate Limiting Principle</p>
+                    <p>Uses the token bucket algorithm: one bucket per IP, capacity = burst buffer (default 300), replenished at 1 token per second. Each request consumes a token; when depleted, a 429 is returned. Human browsing has natural pauses during which the bucket refills; bots are throttled to 1/second.</p>
+                    <p class="text-red-400 mt-1">⚠ Multiple 429s will be automatically banned by Fail2ban. Ensure the burst buffer is sufficient for daily use.</p>
+                    <p class="text-green-400">✓ Increasing burst buffer does not affect bot blocking and does not weaken security.</p>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-1">服务器验证命令</p>
-                    <p class="text-gray-500 mb-1">SSH 登录服务器执行以下命令查看当前封禁状态：</p>
+                    <p class="text-white font-semibold mb-1">Server Verification Commands</p>
+                    <p class="text-gray-500 mb-1">SSH into the server and run the following commands to check the current ban status:</p>
                     <div class="bg-gray-900 rounded p-3 font-mono text-xs text-gray-300 space-y-2">
                         <div>
-                            <span class="text-gray-500"># 查看网站防护封禁</span>
+                            <span class="text-gray-500"># Check website protection bans</span>
                             <br><span class="text-green-400">fail2ban-client</span> status wppanel
                         </div>
                         <div>
-                            <span class="text-gray-500"># 查看 404 泛滥封禁</span>
+                            <span class="text-gray-500"># Check 404 flood bans</span>
                             <br><span class="text-green-400">fail2ban-client</span> status wppanel-404
                         </div>
                         <div>
-                            <span class="text-gray-500"># 查看 SSH 暴力破解封禁</span>
+                            <span class="text-gray-500"># Check SSH brute force bans</span>
                             <br><span class="text-green-400">fail2ban-client</span> status wppanel-sshd
                         </div>
                         <div>
-                            <span class="text-gray-500"># 查看 Nftables 持久封禁（扫描防御 + 面板认证封禁）</span>
+                            <span class="text-gray-500"># Check Nftables persistent bans (scan defense + panel auth bans)</span>
                             <br><span class="text-green-400">nft</span> list set ip wppanel_persist banned_ips
                         </div>
                     </div>
@@ -408,8 +408,8 @@ function firewallManager() {
         banLevelText(l) { return [t('firewall.ban_level_empty'), t('firewall.ban_level_rate_limit'), t('firewall.ban_level_10m'), t('firewall.ban_level_24h'), t('firewall.ban_level_30d'), t('firewall.ban_level_permanent')][l] || t('firewall.unknown'); },
         banLevelClass(l) { return ['','badge-info','badge-warning','badge-danger','badge-danger','badge-danger'][l] || 'badge-info'; },
         riskClass(level) {
-            if (level === '高' || level === 'high') return 'badge-danger';
-            if (level === '中' || level === 'medium') return 'badge-warning';
+            if (level === 'high') return 'badge-danger';
+            if (level === 'medium') return 'badge-warning';
             return 'badge-info';
         },
         riskLabel(level) {

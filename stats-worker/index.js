@@ -1,6 +1,6 @@
-// WP Panel 匿名安装统计 Worker
-// POST /api/heartbeat — 面板匿名心跳上报
-// GET  /api/stats     — 公开统计（total + 精确 active_24h 滚动窗口）
+// WP Panel Anonymous Installation Statistics Worker
+// POST /api/heartbeat — Panel anonymous heartbeat reporting
+// GET  /api/stats     — Public statistics (total + precise active_24h rolling window)
 
 export default {
   async fetch(request, env) {
@@ -15,7 +15,7 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // 公开统计 — 按 id:* 的 last 时间精确计算最近 24 小时活跃数
+    // Public statistics — precisely calculate last 24-hour active count by id:* last timestamp
     if (request.method === 'GET' && url.pathname === '/api/stats') {
       const stats = await getStats(env);
       return new Response(JSON.stringify(stats), {
@@ -27,7 +27,7 @@ export default {
       });
     }
 
-    // 匿名心跳 — 面板定时上报
+    // Anonymous heartbeat — panel periodic reporting
     if (request.method === 'POST' && url.pathname === '/api/heartbeat') {
       try {
         const body = await request.json();
@@ -50,7 +50,7 @@ export default {
       }
     }
 
-    // 兼容旧部署：重建 total 快照。/api/stats 不再依赖该计数器。
+    // Legacy deployment compatibility: rebuild total snapshot. /api/stats no longer depends on this counter.
     if (request.method === 'POST' && url.pathname === '/api/migrate') {
       const stats = await getStats(env);
       await env.STATS_KV.put('meta:total', String(stats.total));
@@ -114,7 +114,7 @@ async function getStats(env) {
   };
 }
 
-// 写入心跳：每个匿名实例保留首次和最近一次上报时间。
+// Write heartbeat: each anonymous instance retains first and most recent reporting time.
 async function saveHeartbeat(env, anonymousId, version) {
   const now = new Date().toISOString();
   const idKey = `id:${anonymousId}`;
@@ -133,7 +133,7 @@ async function saveHeartbeat(env, anonymousId, version) {
     { metadata: { last: now } }
   ));
 
-  // 新安装 → 总数 +1
+  // New installation → total +1
   if (!existing) {
     const total = parseInt(await env.STATS_KV.get('meta:total')) || 0;
     writes.push(env.STATS_KV.put('meta:total', String(total + 1)));

@@ -42,16 +42,16 @@ func isSafeWebhookURL(rawURL string) error {
 		return err
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return fmt.Errorf("不支持的协议: %s", u.Scheme)
+		return fmt.Errorf("Unsupported protocol: %s", u.Scheme)
 	}
 	host := u.Hostname()
 	ips, err := net.LookupIP(host)
 	if err != nil {
-		return fmt.Errorf("无法解析主机名: %s", host)
+		return fmt.Errorf("Cannot resolve hostname: %s", host)
 	}
 	for _, ip := range ips {
 		if isBlockedIP(ip) {
-			return fmt.Errorf("不允许的内网地址: %s", ip.String())
+			return fmt.Errorf("Private network address not allowed: %s", ip.String())
 		}
 	}
 	return nil
@@ -76,7 +76,7 @@ func safeWebhookClient() *http.Client {
 				}
 				for _, ip := range ips {
 					if isBlockedIP(ip) {
-						return nil, fmt.Errorf("webhook: 目标 IP 被禁止: %s", ip.String())
+						return nil, fmt.Errorf("webhook: destination IP blocked: %s", ip.String())
 					}
 				}
 				return dialer.DialContext(ctx, network, addr)
@@ -88,11 +88,11 @@ func safeWebhookClient() *http.Client {
 func SendWebhook(subject, body string) error {
 	cfg := GetWebhookConfig()
 	if cfg == nil || cfg.Enabled != "true" || cfg.URL == "" {
-		return fmt.Errorf("Webhook 未启用或未配置")
+		return fmt.Errorf("Webhook not enabled or not configured")
 	}
 
 	if err := isSafeWebhookURL(cfg.URL); err != nil {
-		return fmt.Errorf("Webhook URL 不安全: %w", err)
+		return fmt.Errorf("Webhook URL is unsafe: %w", err)
 	}
 
 	client := safeWebhookClient()
@@ -108,12 +108,12 @@ func SendWebhook(subject, body string) error {
 
 	resp, err := client.Post(cfg.URL, "application/json", bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("Webhook 请求失败: %w", err)
+		return fmt.Errorf("Webhook request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("Webhook 返回错误状态: %d", resp.StatusCode)
+		return fmt.Errorf("Webhook returned error status: %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -121,17 +121,17 @@ func SendWebhook(subject, body string) error {
 func sendBark(client *http.Client, baseURL, title, body string) error {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return fmt.Errorf("Bark URL 格式错误: %w", err)
+		return fmt.Errorf("Bark URL format error: %w", err)
 	}
 	u = u.JoinPath(url.PathEscape(title), url.PathEscape(body))
 	resp, err := client.Get(u.String())
 	if err != nil {
-		return fmt.Errorf("Bark 请求失败: %w", err)
+		return fmt.Errorf("Bark request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("Bark 返回错误状态: %d", resp.StatusCode)
+		return fmt.Errorf("Bark returned error status: %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -178,7 +178,7 @@ func buildPayload(channel, subject, body string) ([]byte, error) {
 			"time":    time.Now().Format("2006-01-02 15:04:05"),
 		}
 	default:
-		return nil, fmt.Errorf("不支持的推送渠道: %s", channel)
+		return nil, fmt.Errorf("Unsupported push channel: %s", channel)
 	}
 
 	return json.Marshal(payload)
@@ -186,11 +186,11 @@ func buildPayload(channel, subject, body string) ([]byte, error) {
 
 func TestWebhook(channel, url string) error {
 	if err := isSafeWebhookURL(url); err != nil {
-		return fmt.Errorf("Webhook URL 不安全: %w", err)
+		return fmt.Errorf("Webhook URL is unsafe: %w", err)
 	}
 
-	title := getPanelTitle() + " — 测试消息"
-	msg := "如果您收到这条消息，说明 Webhook 配置正确。"
+	title := getPanelTitle() + " — Test Message"
+	msg := "If you received this message, the webhook is configured correctly."
 
 	client := safeWebhookClient()
 
@@ -205,12 +205,12 @@ func TestWebhook(channel, url string) error {
 
 	resp, err := client.Post(url, "application/json", bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("Webhook 请求失败: %w", err)
+		return fmt.Errorf("Webhook request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("Webhook 返回错误状态: %d", resp.StatusCode)
+		return fmt.Errorf("Webhook returned error status: %d", resp.StatusCode)
 	}
 	return nil
 }

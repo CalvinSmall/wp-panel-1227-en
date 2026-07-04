@@ -1,24 +1,24 @@
-# 更新说明
+# Release Notes
 
 ## v1.2.27
 
-### 全站界面国际化
+### Full-Interface Internationalization
 
-- 新增并完善面板可见界面的 i18n 覆盖，登录页、仪表盘、设置、告警、计划任务、安全、软件、文件管理、网站列表、网站详情、AI 诊断等页面均已接入统一文案系统。
-- 中英文 locale 文件已补齐常见操作文案，减少界面中混杂英文占位或未翻译提示的情况。
-- 新增 i18n 相关回归测试，确保路由、模板和前端调用与语言键保持一致。
+- Added and improved i18n coverage for all visible panel interfaces, including login page, dashboard, settings, alerts, scheduled tasks, security, software, file management, site list, site details, AI diagnostics, and other pages, all integrated into a unified text system.
+- Chinese and English locale files now include common operation text, reducing the occurrence of untranslated English placeholders or prompts in the interface.
+- Added i18n-related regression tests to ensure routing, templates, and frontend calls remain consistent with language keys.
 
-### 可见文案整理
+### Visible Text Cleanup
 
-- 统一了部分站点详情、文件导入、AI 诊断和软件管理区域的提示措辞。
-- 修正了若干对用户操作有影响的关键提示，例如 CSRF、站点 ID、远程导入地址、AI 设置等。
+- Unified wording for site details, file imports, AI diagnostics, and software management areas.
+- Fixed several key prompts affecting user operations, such as CSRF, site ID, remote import address, AI settings, etc.
 
-### 英文项目说明
+### English Project Documentation
 
-- 新增英文版项目说明文档，便于非中文用户快速了解项目定位、功能模块、安装方式、安全模型与维护命令。
-- 默认 README 增加英文文档入口，方便直接跳转。
+- Added English version of the project documentation for non-Chinese users to quickly understand the project positioning, feature modules, installation methods, security model, and maintenance commands.
+- Default README now includes an English documentation link for easy navigation.
 
-### 验证
+### Verification
 
-- 本次更新以文案和文档为主，不涉及数据库结构变更或安装脚本调整。
-- 已完成 `go test ./...`、`go vet ./...`、`go build .` 和 `git diff --check` 验证。
+- This update focuses on text and documentation, with no database structure changes or install script adjustments.
+- Completed `go test ./...`, `go vet ./...`, `go build .`, and `git diff --check` verification.

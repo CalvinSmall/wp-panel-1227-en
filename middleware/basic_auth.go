@@ -21,7 +21,7 @@ func BasicAuth(checker *BasicAuthChecker) gin.HandlerFunc {
 		if checker.IsBanned != nil && checker.IsBanned(ip) {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"success": false,
-				"message": "IP已被临时封禁，请稍后再试",
+				"message": "IP has been temporarily banned, please try again later",
 			})
 			return
 		}

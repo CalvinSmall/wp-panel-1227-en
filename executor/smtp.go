@@ -38,13 +38,13 @@ func GetSMTPConfig() *SMTPConfig {
 func SendMail(to, subject, body string) error {
 	cfg := GetSMTPConfig()
 	if cfg == nil || cfg.Host == "" || cfg.User == "" || cfg.Pass == "" {
-		return fmt.Errorf("SMTP 未配置")
+		return fmt.Errorf("SMTP not configured")
 	}
 	if to == "" {
 		to = cfg.AdminEmail
 	}
 	if to == "" {
-		return fmt.Errorf("管理员邮箱未设置")
+		return fmt.Errorf("Admin email not set")
 	}
 
 	addr := net.JoinHostPort(cfg.Host, cfg.Port)
@@ -55,12 +55,12 @@ func SendMail(to, subject, body string) error {
 		tlsCfg := &tls.Config{ServerName: cfg.Host}
 		conn, err := tls.Dial("tcp", addr, tlsCfg)
 		if err != nil {
-			return fmt.Errorf("TLS 连接失败: %w", err)
+			return fmt.Errorf("TLS connection failed: %w", err)
 		}
 		defer conn.Close()
 		client, err := smtp.NewClient(conn, cfg.Host)
 		if err != nil {
-			return fmt.Errorf("SMTP 客户端创建失败: %w", err)
+			return fmt.Errorf("Failed to create SMTP client: %w", err)
 		}
 		defer client.Quit()
 		if err := authAndSend(client, cfg, to, msg); err != nil {
@@ -69,12 +69,12 @@ func SendMail(to, subject, body string) error {
 	case "none":
 		conn, err := net.Dial("tcp", addr)
 		if err != nil {
-			return fmt.Errorf("连接失败: %w", err)
+			return fmt.Errorf("Connection failed: %w", err)
 		}
 		defer conn.Close()
 		client, err := smtp.NewClient(conn, cfg.Host)
 		if err != nil {
-			return fmt.Errorf("SMTP 客户端创建失败: %w", err)
+			return fmt.Errorf("Failed to create SMTP client: %w", err)
 		}
 		defer client.Quit()
 		if err := authAndSend(client, cfg, to, msg); err != nil {
@@ -83,16 +83,16 @@ func SendMail(to, subject, body string) error {
 	default: // starttls
 		conn, err := net.Dial("tcp", addr)
 		if err != nil {
-			return fmt.Errorf("连接失败: %w", err)
+			return fmt.Errorf("Connection failed: %w", err)
 		}
 		defer conn.Close()
 		client, err := smtp.NewClient(conn, cfg.Host)
 		if err != nil {
-			return fmt.Errorf("SMTP 客户端创建失败: %w", err)
+			return fmt.Errorf("Failed to create SMTP client: %w", err)
 		}
 		defer client.Quit()
 		if err := client.StartTLS(&tls.Config{ServerName: cfg.Host}); err != nil {
-			return fmt.Errorf("STARTTLS 失败: %w", err)
+			return fmt.Errorf("STARTTLS failed: %w", err)
 		}
 		if err := authAndSend(client, cfg, to, msg); err != nil {
 			return err
@@ -104,7 +104,7 @@ func SendMail(to, subject, body string) error {
 func authAndSend(client *smtp.Client, cfg *SMTPConfig, to, msg string) error {
 	auth := smtp.PlainAuth("", cfg.User, cfg.Pass, cfg.Host)
 	if err := client.Auth(auth); err != nil {
-		return fmt.Errorf("认证失败: %w", err)
+		return fmt.Errorf("Authentication failed: %w", err)
 	}
 	if err := client.Mail(cfg.User); err != nil {
 		return err
@@ -134,9 +134,9 @@ func TestSMTP(to string) error {
 <html>
 <head><meta charset="UTF-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; color: #333;">
-<p style="font-size: 15px;">如果您收到这封邮件，说明 SMTP 配置正确。</p>
-<p style="font-size: 12px; color: #aaa; margin-top: 20px;">— 来自 %s 面板</p>
+<p style="font-size: 15px;">If you received this email, SMTP is configured correctly.</p>
+<p style="font-size: 12px; color: #aaa; margin-top: 20px;">— From %s panel</p>
 </body>
 </html>`, panelTitle)
-	return SendMail(to, getPanelTitle()+" — 测试邮件", body)
+	return SendMail(to, getPanelTitle()+" — Test Email", body)
 }

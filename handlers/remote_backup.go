@@ -35,7 +35,7 @@ func GetRemoteBackup(c *gin.Context) {
 	if s.S3Region == "" {
 		s.S3Region = "auto"
 	}
-	// 读取公钥
+	// Read public key
 	if s.BackupType == "rsync" && s.AuthType == "key" {
 		keyData, err := os.ReadFile("/www/server/panel/remote_backup_key.pub")
 		if err == nil {
@@ -43,10 +43,10 @@ func GetRemoteBackup(c *gin.Context) {
 		}
 	}
 	if s.Password != "" {
-		s.Password = "已设置"
+		s.Password = "set"
 	}
 	if s.S3SecretKey != "" {
-		s.S3SecretKey = "已设置"
+		s.S3SecretKey = "set"
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(s))
 }
@@ -54,7 +54,7 @@ func GetRemoteBackup(c *gin.Context) {
 func SaveRemoteBackup(c *gin.Context) {
 	var req models.RemoteBackupSettings
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid parameters"))
 		return
 	}
 	if req.Port == 0 {
@@ -83,10 +83,10 @@ func SaveRemoteBackup(c *gin.Context) {
 	db := database.GetDB()
 	var currentPassword, currentS3Secret string
 	_ = db.QueryRow(`SELECT password, s3_secret_key FROM remote_backup_settings WHERE id = 1`).Scan(&currentPassword, &currentS3Secret)
-	if req.Password == "已设置" {
+	if req.Password == "set" {
 		req.Password = currentPassword
 	}
-	if req.S3SecretKey == "已设置" {
+	if req.S3SecretKey == "set" {
 		req.S3SecretKey = currentS3Secret
 	}
 
@@ -108,7 +108,7 @@ func SaveRemoteBackup(c *gin.Context) {
 		if _, err := os.Stat(keyPath); err != nil {
 			out, err := exec.Command("ssh-keygen", "-t", "ed25519", "-f", keyPath, "-N", "", "-q").CombinedOutput()
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, models.ErrorResponse("生成SSH密钥失败: "+string(out)))
+				c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to generate SSH key: "+string(out)))
 				return
 			}
 		}
@@ -128,7 +128,7 @@ func SaveRemoteBackup(c *gin.Context) {
 		enabledVal, req.BackupType, req.Host, req.Port, req.Username, req.AuthType, req.Password, req.RemotePath, keepLocalVal,
 		req.S3Endpoint, req.S3Bucket, req.S3Region, req.S3AccessKeyID, req.S3SecretKey, strings.Trim(req.S3PathPrefix, "/"))
 
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "设置已保存"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Settings saved"}))
 }
 
 func TestRemoteBackup(c *gin.Context) {
@@ -146,10 +146,10 @@ func TestRemoteBackup(c *gin.Context) {
 	}
 	if backupType == "s3" {
 		if err := executor.ProbeS3BackupConnection(s3Endpoint, s3Bucket, s3Region, s3AccessKeyID, s3SecretKey, s3PathPrefix); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("S3 连接测试失败: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("S3 connection test failed: "+err.Error()))
 			return
 		}
-		c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "S3 连接测试成功，上传可用"}))
+		c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "S3 connection test successful, upload available"}))
 		return
 	}
 	if port == 0 {
@@ -165,7 +165,7 @@ func TestRemoteBackup(c *gin.Context) {
 		remotePath = "/home/" + username + "/backup"
 	}
 	if host == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请先填写远程服务器地址"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("please enter a remote server address first"))
 		return
 	}
 	if err := executor.ValidateRemoteBackupSettings(host, port, username, authType, remotePath); err != nil {
@@ -195,7 +195,7 @@ func TestRemoteBackup(c *gin.Context) {
 	if authType == "key" {
 		keyPath := "/www/server/panel/remote_backup_key"
 		if _, err := os.Stat(keyPath); err != nil {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("SSH密钥不存在，请先保存设置生成密钥"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("SSH key does not exist, please save settings to generate key first"))
 			return
 		}
 		args := append([]string{"-i", keyPath}, commonArgs...)
@@ -209,25 +209,25 @@ func TestRemoteBackup(c *gin.Context) {
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse(fmt.Sprintf("连接失败: %s", string(out))))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(fmt.Sprintf("connection failed: %s", string(out))))
 		return
 	}
 	if !strings.Contains(string(out), "WP_PANEL_OK") {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("连接异常: "+string(out)))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("connection abnormal: "+string(out)))
 		return
 	}
 
-	// 测试 rsync 到远程备份目录
+	// Test rsync to remote backup directory
 	tmpFile, err := os.CreateTemp("", "wp-panel-rsync-test-*")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建测试文件失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to create test file"))
 		return
 	}
 	testFile := tmpFile.Name()
 	if _, err := tmpFile.Write([]byte("WP Panel rsync test")); err != nil {
 		tmpFile.Close()
 		os.Remove(testFile)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建测试文件失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to create test file"))
 		return
 	}
 	tmpFile.Close()
@@ -247,11 +247,11 @@ func TestRemoteBackup(c *gin.Context) {
 	}
 	testOut, testErr := testCmd.CombinedOutput()
 	if testErr != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse(fmt.Sprintf("rsync 测试失败: %s", string(testOut))))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(fmt.Sprintf("rsync test failed: %s", string(testOut))))
 		return
 	}
 
-	resp := gin.H{"message": "连接测试成功，rsync 可用"}
+	resp := gin.H{"message": "Connection test successful, rsync available"}
 	if fingerprint != "" {
 		resp["host_key_fingerprint"] = fingerprint
 	}

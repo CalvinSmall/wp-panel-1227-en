@@ -105,7 +105,7 @@ func TestExecuteManualBanCreatesSingleManualRecord(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("expected one ban record, got %d", count)
 	}
-	if level != 3 || isManual != 1 || banCount != 1 || reason != "管理员手动封禁" || jail != "manual" {
+	if level != 3 || isManual != 1 || banCount != 1 || reason != "Admin manual ban" || jail != "manual" {
 		t.Fatalf("unexpected manual ban record: level=%d manual=%d count=%d reason=%q jail=%q", level, isManual, banCount, reason, jail)
 	}
 }
@@ -141,7 +141,7 @@ func TestSyncFail2banBansKeepsActiveManualBan(t *testing.T) {
 
 	if _, err := database.GetDB().Exec(
 		`INSERT INTO firewall_bans (ip_address, ban_level, reason, source_jail, is_manual, ban_count, expires_at)
-		 VALUES ('203.0.113.99', 2, '管理员手动封禁', 'manual', 1, 1, datetime('now', '+600 seconds'))`,
+		 VALUES ('203.0.113.99', 2, 'Admin manual ban', 'manual', 1, 1, datetime('now', '+600 seconds'))`,
 	); err != nil {
 		t.Fatalf("insert manual ban: %v", err)
 	}

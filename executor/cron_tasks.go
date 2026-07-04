@@ -17,7 +17,7 @@ import (
 func executeRenderCron(task *Task) TaskResult {
 	cfg := config.AppConfig
 	if cfg == nil {
-		return TaskResult{Success: false, Message: "配置未加载"}
+		return TaskResult{Success: false, Message: "Configuration not loaded"}
 	}
 
 	db := database.GetDB()
@@ -26,8 +26,8 @@ func executeRenderCron(task *Task) TaskResult {
 		 FROM cron_jobs WHERE enabled = 1`,
 	)
 	if err != nil {
-		log.Printf("查询Cron任务失败: %v", err)
-		return TaskResult{Success: false, Message: "查询Cron任务失败"}
+		log.Printf("Failed to query Cron tasks: %v", err)
+		return TaskResult{Success: false, Message: "Failed to query Cron tasks"}
 	}
 	defer rows.Close()
 
@@ -93,19 +93,19 @@ exit $RC
 	cronContent := strings.Join(cronLines, "\n") + "\n"
 
 	if err := os.WriteFile(cfg.Paths.CronFile, []byte(cronContent), 0644); err != nil {
-		log.Printf("写入Cron文件失败: %v", err)
-		return TaskResult{Success: false, Message: "写入Cron文件失败"}
+		log.Printf("Failed to write Cron file: %v", err)
+		return TaskResult{Success: false, Message: "Failed to write Cron file"}
 	}
 
 	_, _ = executeCommand("systemctl", "restart", "cron")
 
-	return TaskResult{Success: true, Message: "Cron配置已更新"}
+	return TaskResult{Success: true, Message: "Cron configuration updated"}
 }
 
 func executeRunCron(task *Task) TaskResult {
 	payload, ok := task.Payload.(*RunCronPayload)
 	if !ok {
-		return TaskResult{Success: false, Message: "任务参数类型错误"}
+		return TaskResult{Success: false, Message: "Invalid task parameter type"}
 	}
 
 	db := database.GetDB()
@@ -117,8 +117,8 @@ func executeRunCron(task *Task) TaskResult {
 		payload.JobID,
 	).Scan(&name, &cronExpr, &command, &runAsUser, &taskType, &backupMode, &keepCount, &siteIDNull)
 	if err != nil {
-		log.Printf("查询任务失败: %v", err)
-		return TaskResult{Success: false, Message: "查询任务失败"}
+		log.Printf("Failed to query tasks: %v", err)
+		return TaskResult{Success: false, Message: "Failed to query tasks"}
 	}
 	if siteIDNull != nil {
 		siteID = *siteIDNull
@@ -133,7 +133,7 @@ func executeRunCron(task *Task) TaskResult {
 
 	if taskType == "file_backup" {
 		if siteIDNull == nil {
-			return TaskResult{Success: false, Message: "关联网站已不存在"}
+			return TaskResult{Success: false, Message: "Associated website no longer exists"}
 		}
 		var msg string
 		msg, execErr = ExecuteFileBackup(siteID, backupMode, keepCount)
@@ -179,7 +179,7 @@ func executeRunCron(task *Task) TaskResult {
 
 	return TaskResult{
 		Success: execErr == nil,
-		Message: fmt.Sprintf("任务 %s 执行%s", name, map[bool]string{true: "成功", false: "失败"}[execErr == nil]),
+		Message: fmt.Sprintf("Task %s execution %s", name, map[bool]string{true: "succeeded", false: "failed"}[execErr == nil]),
 		Data:    map[string]interface{}{"output": out, "status": status, "run_at": now},
 	}
 }

@@ -211,7 +211,7 @@ func scanSiteSuspiciousRuntimeFiles(db *sql.DB, site fileSecuritySite) (int, err
 				Path:       relPath,
 				FileSize:   info.Size(),
 				FileMTime:  formatEventTime(info.ModTime()),
-				Message:    "运行数据目录中发现 PHP 可执行文件。Nginx 会阻止直接执行，请确认来源后删除或隔离。",
+				Message:    "PHP executable found in runtime data directory. Nginx will block direct execution. Please verify the source and delete or isolate.",
 				FirstSeen:  formatEventTime(time.Now()),
 				LastSeen:   formatEventTime(time.Now()),
 				EventCount: 1,
@@ -268,7 +268,7 @@ func importSiteRuntimePHPAccessEvents(db *sql.DB, site fileSecuritySite) (int, e
 				IPAddress:     m[1],
 				UserAgent:     m[6],
 				Status:        status,
-				Message:       "运行数据目录 PHP 执行请求已被 Nginx 拦截。建议检查是否存在同名可疑文件，并结合 IP 来源判断是否封禁。",
+				Message:       "PHP execution request in runtime data directory was blocked by Nginx. Recommend checking for suspicious files with the same name and banning based on IP source.",
 				FirstSeen:     seenAt,
 				LastSeen:      seenAt,
 			}

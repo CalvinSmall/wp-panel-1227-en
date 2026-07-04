@@ -53,7 +53,7 @@ func (s *SessionStore) Get(token string) *Session {
 		delete(s.sessions, token)
 		return nil
 	}
-	// 滑动续期：每次有效访问延长 30 分钟
+	// Sliding renewal: extend by 30 minutes on each valid access
 	session.ExpiresAt = time.Now().Add(30 * time.Minute)
 	return session
 }
@@ -79,17 +79,17 @@ func SessionRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := c.Cookie("wp_session")
 		if err != nil || token == "" {
-			abortSession(c, "请先登录")
+			abortSession(c, "Please log in first")
 			return
 		}
 
 		session := GlobalSessionStore.Get(token)
 		if session == nil {
-			abortSession(c, "会话已过期，请重新登录")
+			abortSession(c, "Session expired, please log in again")
 			return
 		}
 
-		// 滑动续期客户端 Cookie
+		// Sliding renewal for client cookie
 		http.SetCookie(c.Writer, &http.Cookie{
 			Name:     "wp_session",
 			Value:    session.Token,

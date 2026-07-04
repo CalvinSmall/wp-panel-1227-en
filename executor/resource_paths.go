@@ -50,7 +50,7 @@ func nginxEnabledPath(cfg *config.Config, nginxConfPath, domain string) string {
 
 func validateUnixSocketPath(path string) error {
 	if len([]byte(path)) > maxUnixSocketPathLen {
-		return fmt.Errorf("PHP-FPM socket 路径过长: %s", path)
+		return fmt.Errorf("PHP-FPM socket path too long: %s", path)
 	}
 	return nil
 }

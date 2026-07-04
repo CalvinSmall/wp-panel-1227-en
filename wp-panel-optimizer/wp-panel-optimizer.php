@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Panel Optimizer
  * Plugin URI:  https://github.com/naibabiji/wp-panel
- * Description: 与 WP Panel 面板配合，管理 FastCGI 缓存、预加载、调试模式、文章修订、内存限制等优化项。发布/更新文章自动清除缓存。
+ * Description: Works with WP Panel to manage FastCGI cache, preloading, debug mode, post revisions, memory limit, and other optimizations. Auto-clears cache on post publish/update.
  * Version:     1.1.7
  * Author:      WP Panel
  * Author URI:  https://blog.naibabiji.com
@@ -152,7 +152,7 @@ class WP_Panel_Optimizer {
         add_action(self::PRELOAD_HOOK, [__CLASS__, 'process_preload_batch']);
         self::maybe_process_preload_tick();
 
-        // 禁止检测更新：完全屏蔽更新提示和通知
+        // Disable update detection: completely block update prompts and notifications
         if (get_option(self::OPTION_NO_UPDATES, '0') === '1') {
             add_action('admin_init', [__CLASS__, 'suppress_updates']);
         }
@@ -190,7 +190,7 @@ class WP_Panel_Optimizer {
     }
 
     public static function action_links($links) {
-        $links[] = '<a href="' . admin_url('options-general.php?page=wp-panel-optimizer') . '">设置</a>';
+        $links[] = '<a href="' . admin_url('options-general.php?page=wp-panel-optimizer') . '">Settings</a>';
         return $links;
     }
 
@@ -208,7 +208,7 @@ class WP_Panel_Optimizer {
         $isPost = isset($_POST['wpp_save']);
         $notice = '';
 
-        // 面板同步：GET 时从面板拉取最新状态，POST 时不拉（避免用旧值覆盖表单新值）
+        // Panel sync: on GET, pull latest state from panel; on POST, don't pull (to avoid overwriting form values with old data)
         if (!$isPost) {
             $panelState = self::fetch_panel_state();
             if ($panelState) {
@@ -227,7 +227,7 @@ class WP_Panel_Optimizer {
         if ($isPost) {
             check_admin_referer('wpp_optimizer_settings');
             if (self::sync_file_lock_state(true)) {
-                $notice = '<div class="notice notice-warning"><p><strong>WP Panel 文件锁定已开启。</strong>当前设置未保存。如需修改会写入 wp-config.php 的优化项，请先到 WP Panel 网站详情页解除文件锁定。</p></div>';
+                $notice = '<div class="notice notice-warning"><p><strong>WP Panel file lock is enabled.</strong>Current settings not saved. To modify optimizations that write to wp-config.php, please disable file lock on the WP Panel site details page first.</p></div>';
             } else {
             $fcacheEnabled  = !empty($_POST['fcache_enabled'])  ? true : false;
             $fcacheTTL      = isset($_POST['fcache_ttl']) ? intval($_POST['fcache_ttl']) : 300;
@@ -255,10 +255,10 @@ class WP_Panel_Optimizer {
 
             $pushed = self::push_optimizer_settings($fcacheEnabled, $fcacheTTL, $noUpdates, $noFileEdit, $wpDebug, $postRevisions, $memoryLimit);
             if ($pushed === true) {
-                $notice = '<div class="notice notice-success"><p>设置已保存，已同步到面板。</p></div>';
+                $notice = '<div class="notice notice-success"><p>Settings saved and synced to panel.</p></div>';
             } else {
-                $errMsg = is_wp_error($pushed) ? $pushed->get_error_message() : '未知错误';
-                $notice = '<div class="notice notice-warning is-dismissible"><p><strong>注意：</strong>设置已保存在本地，但同步到面板失败。错误信息：<code>' . esc_html($errMsg) . '</code></p><p>下次进入本页面时将从面板拉取状态，可能覆盖本次修改。请检查插件设置中的「验证连接」是否正常。</p></div>';
+                $errMsg = is_wp_error($pushed) ? $pushed->get_error_message() : 'Unknown error';
+                $notice = '<div class="notice notice-warning is-dismissible"><p><strong>Note:</strong> Settings saved locally, but sync to panel failed. Error: <code>' . esc_html($errMsg) . '</code></p><p>Next time you enter this page, the panel state will be pulled, which may override these changes. Please check the "Verify Connection" in plugin settings.</p></div>';
             }
             }
         }
@@ -279,17 +279,17 @@ class WP_Panel_Optimizer {
         <div class="wrap">
             <?php $pluginVersion = WP_Panel_Optimizer::VERSION; ?>
             <h1>WP Panel Optimizer</h1>
-            <p>由 <a href="https://github.com/naibabiji/wp-panel" target="_blank">WP Panel</a> 面板统一管理。当前站点：<code><?php echo esc_html($currentDomain); ?></code></p>
-            <p>插件版本：<code><?php echo esc_html($pluginVersion); ?></code>
-                <button type="button" id="wpp-check-update-btn" class="button">检查更新</button>
+            <p>Managed by <a href="https://github.com/naibabiji/wp-panel" target="_blank">WP Panel</a>. Current site: <code><?php echo esc_html($currentDomain); ?></code></p>
+            <p>Plugin version: <code><?php echo esc_html($pluginVersion); ?></code>
+                <button type="button" id="wpp-check-update-btn" class="button">Check for Updates</button>
                 <span id="wpp-update-result"></span>
             </p>
             <?php echo wp_kses_post($notice); ?>
             <?php if ($missing): ?>
-                <div class="notice notice-error"><p><strong>配置文件缺失</strong> — 请在 WP Panel 面板中进入该网站详情页，点击 WordPress 优化卡片的「安装配套插件」按钮完成初始化。</p></div>
+                <div class="notice notice-error"><p><strong>Configuration file missing</strong> — Please go to the WP Panel site details page, and click the "Install Companion Plugin" button in the WordPress Optimization card to complete initialization.</p></div>
             <?php endif; ?>
             <?php if ($fileLockEnabled): ?>
-                <div class="notice notice-warning"><p><strong>WP Panel 文件锁定已开启。</strong>发文章、编辑页面、上传图片、生成缓存和写入插件运行日志不受影响；安装、更新、删除插件或主题，以及修改代码和站点配置会被阻止。如需维护插件主题或首次配置安全/缓存插件，请先到 WP Panel 网站详情页解除文件锁定。</p></div>
+                <div class="notice notice-warning"><p><strong>WP Panel file lock is enabled.</strong>Publishing posts, editing pages, uploading images, generating cache, and writing plugin runtime logs are unaffected; installing, updating, deleting plugins or themes, and modifying code and site configuration are blocked. To maintain plugins/themes or first configure security/cache plugins, please disable file lock on the WP Panel site details page first.</p></div>
             <?php endif; ?>
             <div id="wpp-verify-msg"></div>
             <hr>
@@ -298,146 +298,146 @@ class WP_Panel_Optimizer {
                 <table class="form-table">
                     <tr>
                         <th>API Key</th>
-                        <td><code><?php echo esc_html($apiKey ? substr($apiKey, 0, 8) . '...' : '未配置'); ?></code></td>
+                        <td><code><?php echo esc_html($apiKey ? substr($apiKey, 0, 8) . '...' : 'Not configured'); ?></code></td>
                     </tr>
                     <tr>
-                        <th><label for="wpp-fcache-enabled">FastCGI 缓存</label></th>
+                        <th><label for="wpp-fcache-enabled">FastCGI Cache</label></th>
                         <td>
-                            <label><input id="wpp-fcache-enabled" name="fcache_enabled" type="checkbox" value="1" <?php checked($fcacheEnabled); ?>> 开启</label>
-                            <p class="description">Nginx 将 PHP 页面缓存为静态 HTML，大幅提升访问速度。</p>
+                            <label><input id="wpp-fcache-enabled" name="fcache_enabled" type="checkbox" value="1" <?php checked($fcacheEnabled); ?>> Enable</label>
+                            <p class="description">Nginx caches PHP pages as static HTML for faster access.</p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="wpp-fcache-ttl">缓存有效期（秒）</label></th>
+                        <th><label for="wpp-fcache-ttl">Cache TTL (seconds)</label></th>
                         <td>
                             <input id="wpp-fcache-ttl" name="fcache_ttl" type="number" class="regular-text" value="<?php echo esc_attr($fcacheTTL); ?>" min="10" max="86400">
-                            <p class="description">建议 300-3600 秒（5分钟到1小时）。</p>
+                            <p class="description">Recommended 300-3600 seconds (5 minutes to 1 hour).</p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="wpp-preload-enabled">缓存预加载</label></th>
+                        <th><label for="wpp-preload-enabled">Cache Preloading</label></th>
                         <td>
-                            <label><input id="wpp-preload-enabled" name="preload_enabled" type="checkbox" value="1" <?php checked($preloadEnabled); ?>> 清除缓存后自动预加载</label>
-                            <p class="description">插件会以未登录访客身份访问本站公开页面，让 Nginx 自然生成 FastCGI 缓存文件。默认低速批处理，避免压垮小服务器。</p>
-                            <p class="description"><strong>说明：</strong>预加载只提前处理首页和最近更新的公开内容（最多为下方设置的 URL 数量），不是全站爬虫。未进入预加载队列的页面仍会在真实访客首次访问后由 Nginx 正常生成缓存。</p>
+                            <label><input id="wpp-preload-enabled" name="preload_enabled" type="checkbox" value="1" <?php checked($preloadEnabled); ?>> Auto-preload after cache clear</label>
+                            <p class="description">Plugin visits public pages as a logged-out visitor to let Nginx naturally generate FastCGI cache files. Low-speed batch processing by default to avoid overloading small servers.</p>
+                            <p class="description"><strong>Note:</strong> Preloading only processes the homepage and recently updated public content (up to the URL count set below), not a full site crawler. Pages not in the preload queue will still have Nginx generate cache normally on first real visitor access.</p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="wpp-preload-limit">单次最多预加载 URL</label></th>
+                        <th><label for="wpp-preload-limit">Max URLs per preload</label></th>
                         <td>
                             <input id="wpp-preload-limit" name="preload_limit" type="number" class="small-text" value="<?php echo esc_attr($preloadLimit); ?>" min="10" max="500">
-                            <p class="description">范围 10-500。首页优先，其次为最近更新的公开文章、页面和公开分类归档。</p>
+                            <p class="description">Range 10-500. Homepage prioritized, followed by recently updated public posts, pages, and public category archives.</p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="wpp-no-updates">禁止检测更新</label></th>
+                        <th><label for="wpp-no-updates">Disable Update Detection</label></th>
                         <td>
-                            <label><input id="wpp-no-updates" name="no_updates" type="checkbox" value="1" <?php checked($noUpdates); ?>> 完全屏蔽 WordPress 核心、插件和主题的更新检测和提示</label>
-                            <p class="description">启用后完全屏蔽更新检测，仪表盘无红点无通知，后台「检查更新」也不生效。如需更新，先关闭此开关。</p>
+                            <label><input id="wpp-no-updates" name="no_updates" type="checkbox" value="1" <?php checked($noUpdates); ?>> Completely block WordPress core, plugin, and theme update detection and prompts</label>
+                            <p class="description">When enabled, completely blocks update detection; no red dots or notifications on dashboard, "Check for Updates" button also disabled. To update, disable this switch first.</p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="wpp-no-file-edit">禁止文件编辑</label></th>
+                        <th><label for="wpp-no-file-edit">Disable File Editing</label></th>
                         <td>
-                            <label><input id="wpp-no-file-edit" name="no_file_edit" type="checkbox" value="1" <?php checked($noFileEdit); ?>> 禁止在 WordPress 后台编辑主题和插件文件</label>
-                            <p class="description">面板将写入 <code>DISALLOW_FILE_EDIT</code> 常量到 wp-config.php。</p>
+                            <label><input id="wpp-no-file-edit" name="no_file_edit" type="checkbox" value="1" <?php checked($noFileEdit); ?>> Prevent editing theme and plugin files in WordPress backend</label>
+                            <p class="description">Panel will write the <code>DISALLOW_FILE_EDIT</code> constant to wp-config.php.</p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="wpp-wp-debug">启用调试模式</label></th>
+                        <th><label for="wpp-wp-debug">Enable Debug Mode</label></th>
                         <td>
-                            <label><input id="wpp-wp-debug" name="wp_debug" type="checkbox" value="1" <?php checked($wpDebug); ?>> 开启 <code>WP_DEBUG</code></label>
-                            <p class="description">开启后 PHP 错误和警告将写入 <code>wp-content/debug.log</code>，并开启 <code>WP_DEBUG_LOG</code>、关闭 <code>WP_DEBUG_DISPLAY</code>（错误不显示在页面，仅记录日志）。<br>用于排查网站白屏、500 错误等问题，正常使用时请关闭以免日志文件持续增长。</p>
+                            <label><input id="wpp-wp-debug" name="wp_debug" type="checkbox" value="1" <?php checked($wpDebug); ?>> Enable <code>WP_DEBUG</code></label>
+                            <p class="description">When enabled, PHP errors and warnings are written to <code>wp-content/debug.log</code>, and <code>WP_DEBUG_LOG</code> is enabled while <code>WP_DEBUG_DISPLAY</code> is disabled (errors not shown on page, only logged).<br>Use for troubleshooting white screen, 500 errors, etc. Disable for normal use to prevent log file growth.</p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="wpp-post-revisions">文章修订版本数</label></th>
+                        <th><label for="wpp-post-revisions">Post Revision Count</label></th>
                         <td>
-                            <input id="wpp-post-revisions" name="post_revisions" type="number" class="small-text" value="<?php echo esc_attr($postRevisions >= 0 ? $postRevisions : ''); ?>" min="-1" placeholder="默认">
-                            <p class="description">留空 = WordPress 默认（无限制），<strong>0 = 完全不保留修订</strong>，设置为 3~5 可有效减少数据库占用。<br>每保存一次文章就会生成一个修订版本，长期不清理会占用大量数据库空间。</p>
+                            <input id="wpp-post-revisions" name="post_revisions" type="number" class="small-text" value="<?php echo esc_attr($postRevisions >= 0 ? $postRevisions : ''); ?>" min="-1" placeholder="Default">
+                            <p class="description">Leave empty = WordPress default (unlimited), <strong>0 = no revisions kept</strong>, setting to 3~5 effectively reduces database usage.<br>Each post save generates a revision; long-term accumulation consumes significant database space.</p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="wpp-memory-limit">WordPress 内存限制</label></th>
+                        <th><label for="wpp-memory-limit">WordPress Memory Limit</label></th>
                         <td>
-                            <input id="wpp-memory-limit" name="memory_limit" type="text" class="regular-text" value="<?php echo esc_attr($memoryLimit); ?>" placeholder="默认 40M">
-                            <p class="description">设置 WordPress 的 <code>WP_MEMORY_LIMIT</code>，如 <code>128M</code>、<code>256M</code>。留空使用 WordPress 默认值（40M）。<br>这是 WordPress 应用层内存限制，不是 PHP-FPM 的 <code>memory_limit</code> 硬上限；实际值不应超过面板「软件管理」中的 PHP 内存限制。遇到"Allowed memory size exhausted"错误、后台白屏时可适当调高。</p>
+                            <input id="wpp-memory-limit" name="memory_limit" type="text" class="regular-text" value="<?php echo esc_attr($memoryLimit); ?>" placeholder="Default 40M">
+                            <p class="description">Sets WordPress's <code>WP_MEMORY_LIMIT</code>, e.g. <code>128M</code>, <code>256M</code>. Leave empty for WordPress default (40M).<br>This is the WordPress application-level memory limit, not the PHP-FPM <code>memory_limit</code> hard cap; actual value should not exceed the PHP memory limit in Panel's "Software Management". Increase when encountering "Allowed memory size exhausted" errors or backend white screens.</p>
                         </td>
                     </tr>
                     <?php $xmlrpcEnabled = get_option('wpp_optimizer_xmlrpc_enabled', '0') === '1'; ?>
                     <tr>
-                        <th>XML-RPC 接口</th>
+                        <th>XML-RPC Interface</th>
                         <td>
-                            <span style="font-weight:bold;color:<?php echo $xmlrpcEnabled ? '#00a32a' : '#d63638'; ?>"><?php echo $xmlrpcEnabled ? '已开启' : '已关闭'; ?></span>
+                            <span style="font-weight:bold;color:<?php echo $xmlrpcEnabled ? '#00a32a' : '#d63638'; ?>"><?php echo $xmlrpcEnabled ? 'Enabled' : 'Disabled'; ?></span>
                             <p class="description">
-                                XML-RPC 是 WordPress 远程通信接口。关闭后 Nginx 直接返回 403，请求不到 PHP-FPM，可彻底防御 xmlrpc.php 暴力攻击。<br>
-                                影响：<strong>无法使用 Jetpack、WordPress 手机 App、pingback/trackback、第三方通过 XML-RPC 发布文章</strong>。绝大多数站点不需要此功能。<br>
-                                如需开启或关闭，请在 WP Panel 面板中打开网站详情页 → WordPress 优化 →「允许 XML-RPC 接口」开关。<br>
+                                XML-RPC is WordPress's remote communication interface. When disabled, Nginx directly returns 403, requests don't reach PHP-FPM, completely defending against xmlrpc.php brute-force attacks.<br>
+                                Impact: <strong>Cannot use Jetpack, WordPress mobile app, pingback/trackback, or third-party publishing via XML-RPC</strong>. Most sites don't need this feature.<br>
+                                To enable or disable, go to WP Panel site details page → WordPress Optimization → "Allow XML-RPC Interface" toggle.<br>
                             </p>
                         </td>
                     </tr>
                 </table>
                 <p>
-                    <button type="submit" name="wpp_save" class="button button-primary" <?php disabled($fileLockEnabled); ?>>保存设置</button>
-                    <button type="button" id="wpp-verify-btn" class="button">验证连接</button>
+                    <button type="submit" name="wpp_save" class="button button-primary" <?php disabled($fileLockEnabled); ?>>Save Settings</button>
+                    <button type="button" id="wpp-verify-btn" class="button">Verify Connection</button>
                 </p>
             </form>
 
             <hr>
-            <h2>缓存预加载</h2>
+            <h2>Cache Preloading</h2>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin:0 0 12px;">
                 <?php wp_nonce_field('wpp_cache_clear'); ?>
                 <input type="hidden" name="action" value="wpp_cache_clear">
-                <button type="submit" class="button button-primary" <?php disabled($missing); ?>>清除 Nginx 缓存</button>
-                <span class="description">适合手机后台或管理栏不方便操作时手动清理缓存。</span>
+                <button type="submit" class="button button-primary" <?php disabled($missing); ?>>Clear Nginx Cache</button>
+                <span class="description">Useful for clearing cache manually from mobile backend or admin bar.</span>
             </form>
-            <p>当前状态：<strong><?php echo esc_html($preloadStatus['running'] ? '运行中' : '空闲'); ?></strong>
+            <p>Current status: <strong><?php echo esc_html($preloadStatus['running'] ? 'Running' : 'Idle'); ?></strong>
                 <?php if (!empty($preloadStatus['last_message'])): ?>
                     <span class="description"><?php echo esc_html($preloadStatus['last_message']); ?></span>
                 <?php endif; ?>
             </p>
             <p class="description">
-                队列：<?php echo intval($preloadStatus['queued']); ?>，
-                成功：<?php echo intval($preloadStatus['done']); ?>，
-                失败：<?php echo intval($preloadStatus['failed']); ?>
+                Queue: <?php echo intval($preloadStatus['queued']); ?>,
+                Success: <?php echo intval($preloadStatus['done']); ?>,
+                Failed: <?php echo intval($preloadStatus['failed']); ?>
                 <?php if (!empty($preloadStatus['started_at'])): ?>
-                    ，开始：<?php echo esc_html($preloadStatus['started_at']); ?>
+                    , Started: <?php echo esc_html($preloadStatus['started_at']); ?>
                 <?php endif; ?>
                 <?php if (!empty($preloadStatus['last_run_at'])): ?>
-                    ，上次执行：<?php echo esc_html($preloadStatus['last_run_at']); ?>
+                    , Last run: <?php echo esc_html($preloadStatus['last_run_at']); ?>
                 <?php endif; ?>
                 <?php if (!empty($preloadStatus['finished_at'])): ?>
-                    ，结束：<?php echo esc_html($preloadStatus['finished_at']); ?>
+                    , Finished: <?php echo esc_html($preloadStatus['finished_at']); ?>
                 <?php endif; ?>
             </p>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:8px;">
                 <?php wp_nonce_field('wpp_cache_preload'); ?>
                 <input type="hidden" name="action" value="wpp_cache_preload">
-                <button type="submit" class="button" <?php disabled(!$fcacheEnabled); ?>>立即预加载</button>
+                <button type="submit" class="button" <?php disabled(!$fcacheEnabled); ?>>Preload Now</button>
             </form>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
                 <?php wp_nonce_field('wpp_cache_preload_stop'); ?>
                 <input type="hidden" name="action" value="wpp_cache_preload_stop">
-                <button type="submit" class="button" <?php disabled(!$preloadStatus['running']); ?>>停止预加载</button>
+                <button type="submit" class="button" <?php disabled(!$preloadStatus['running']); ?>>Stop Preloading</button>
             </form>
             <?php if (!$fcacheEnabled): ?>
-                <p class="description">请先开启 FastCGI 缓存，再执行预加载。</p>
+                <p class="description">Please enable FastCGI cache first before running preloading.</p>
             <?php endif; ?>
 
             <?php if (!empty($log)): ?>
             <hr>
-            <h2>最近清除记录</h2>
+            <h2>Recent Clear Records</h2>
             <table class="wp-list-table widefat fixed striped" style="max-width:600px">
-                <thead><tr><th>时间</th><th>方式</th><th>结果</th></tr></thead>
+                <thead><tr><th>Time</th><th>Method</th><th>Result</th></tr></thead>
                 <tbody>
                     <?php foreach ($log as $entry): ?>
                     <tr>
                         <td><?php echo esc_html($entry['time']); ?></td>
                         <td><?php
-                            $labels = ['manual' => '手动清除', 'auto' => '自动清除（发布文章）', 'comment' => '自动清除（评论变更）'];
-                            echo esc_html($labels[$entry['type']] ?? '自动清除');
+                            $labels = ['manual' => 'Manual Clear', 'auto' => 'Auto Clear (Post Publish)', 'comment' => 'Auto Clear (Comment Change)'];
+                            echo esc_html($labels[$entry['type']] ?? 'Auto Clear');
                         ?></td>
-                        <td><?php echo !empty($entry['success']) ? '<span style="color:green">成功</span>' : '<span style="color:red">失败</span>'; ?></td>
+                        <td><?php echo !empty($entry['success']) ? '<span style="color:green">Success</span>' : '<span style="color:red">Failed</span>'; ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -448,26 +448,26 @@ class WP_Panel_Optimizer {
             document.getElementById('wpp-verify-btn').addEventListener('click', function() {
                 var btn = this, msg = document.getElementById('wpp-verify-msg');
                 btn.disabled = true;
-                btn.textContent = '验证中...';
+                btn.textContent = 'Verifying...';
                 fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>?action=wpp_optimizer_verify&_wpnonce=<?php echo esc_attr(wp_create_nonce('wpp_optimizer_settings')); ?>')
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
-                            msg.innerHTML = '<div class="notice notice-success"><p>✓ 连接成功 — 面板 API 响应正常</p></div>';
+                            msg.innerHTML = '<div class="notice notice-success"><p>✓ Connection successful — Panel API responding normally</p></div>';
                         } else {
-                            msg.innerHTML = '<div class="notice notice-error"><p>✗ 连接失败：' + (data.data?.message || '未知错误') + '</p></div>';
+                            msg.innerHTML = '<div class="notice notice-error"><p>✗ Connection failed: ' + (data.data?.message || 'Unknown error') + '</p></div>';
                         }
                     })
                     .catch(e => {
-                        msg.innerHTML = '<div class="notice notice-error"><p>✗ 网络错误：无法连接到面板 (' + e.message + ')</p></div>';
+                        msg.innerHTML = '<div class="notice notice-error"><p>✗ Network error: Cannot connect to panel (' + e.message + ')</p></div>';
                     })
-                    .finally(() => { btn.disabled = false; btn.textContent = '验证连接'; });
+                    .finally(() => { btn.disabled = false; btn.textContent = 'Verify Connection'; });
             });
 
             document.getElementById('wpp-check-update-btn').addEventListener('click', function() {
                 var btn = this, result = document.getElementById('wpp-update-result');
                 btn.disabled = true;
-                btn.textContent = '检查中...';
+                btn.textContent = 'Checking...';
                 result.innerHTML = '';
                 fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>?action=wpp_optimizer_check_update')
                     .then(r => r.json())
@@ -475,18 +475,18 @@ class WP_Panel_Optimizer {
                         if (data.success) {
                             var d = data.data;
                             if (d.has_update) {
-                                result.innerHTML = ' <a href="' + d.release_url + '" target="_blank" style="color:#d63638;font-weight:bold">发现新版本 ' + d.latest + '（当前 ' + d.current + '）→ 在面板中更新</a>';
+                                result.innerHTML = ' <a href="' + d.release_url + '" target="_blank" style="color:#d63638;font-weight:bold">New version ' + d.latest + ' found (current ' + d.current + ') → Update in panel</a>';
                             } else {
-                                result.innerHTML = ' <span style="color:#00a32a">已是最新版本（' + d.current + '）</span>';
+                                result.innerHTML = ' <span style="color:#00a32a">Already the latest version (' + d.current + ')</span>';
                             }
                         } else {
-                            result.innerHTML = ' <span style="color:#d63638">检查失败：' + (data.data?.message || '未知错误') + '</span>';
+                            result.innerHTML = ' <span style="color:#d63638">Check failed: ' + (data.data?.message || 'Unknown error') + '</span>';
                         }
                     })
                     .catch(e => {
-                        result.innerHTML = ' <span style="color:#d63638">网络错误：' + e.message + '</span>';
+                        result.innerHTML = ' <span style="color:#d63638">Network error: ' + e.message + '</span>';
                     })
-                    .finally(() => { btn.disabled = false; btn.textContent = '检查更新'; });
+                    .finally(() => { btn.disabled = false; btn.textContent = 'Check for Updates'; });
             });
             </script>
         </div>
@@ -497,9 +497,9 @@ class WP_Panel_Optimizer {
         if (isset($_GET['wpp_cleared'])) {
             if (!isset($_GET['_wpnonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'wpp_clear_notice')) return;
             if ($_GET['wpp_cleared'] === '1') {
-                echo '<div class="notice notice-success is-dismissible"><p>Nginx 缓存已清除，旧页面将在几分钟内更新。</p></div>';
+                echo '<div class="notice notice-success is-dismissible"><p>Nginx cache cleared, old pages will update within a few minutes.</p></div>';
             } else {
-                echo '<div class="notice notice-error is-dismissible"><p>清除缓存失败，请检查面板连接是否正常。</p></div>';
+                echo '<div class="notice notice-error is-dismissible"><p>Failed to clear cache, please check panel connection.</p></div>';
             }
         }
 
@@ -508,11 +508,11 @@ class WP_Panel_Optimizer {
             $state = sanitize_key(wp_unslash($_GET['wpp_preload']));
             $count = isset($_GET['count']) ? intval($_GET['count']) : 0;
             if ($state === 'queued') {
-                echo '<div class="notice notice-success is-dismissible"><p>缓存预加载已加入队列，共 ' . esc_html($count) . ' 个 URL。</p></div>';
+                echo '<div class="notice notice-success is-dismissible"><p>Cache preload queued, total ' . esc_html($count) . ' URLs.</p></div>';
             } elseif ($state === 'stopped') {
-                echo '<div class="notice notice-warning is-dismissible"><p>缓存预加载已停止，当前队列已清空。</p></div>';
+                echo '<div class="notice notice-warning is-dismissible"><p>Cache preload stopped, current queue cleared.</p></div>';
             } else {
-                echo '<div class="notice notice-error is-dismissible"><p>缓存预加载启动失败，请确认 FastCGI 缓存已开启。</p></div>';
+                echo '<div class="notice notice-error is-dismissible"><p>Cache preload failed to start, please confirm FastCGI cache is enabled.</p></div>';
             }
         }
     }
@@ -528,7 +528,7 @@ class WP_Panel_Optimizer {
         if (!self::sync_file_lock_state()) {
             return;
         }
-        echo '<div class="notice notice-warning"><p><strong>WP Panel 文件锁定已开启。</strong>发文章、编辑页面、上传图片、生成缓存和写入插件运行日志不受影响；安装、更新、删除插件或主题，以及修改代码和站点配置会被阻止。如需维护插件主题或首次配置安全/缓存插件，请先到 WP Panel 网站详情页解除文件锁定。</p></div>';
+        echo '<div class="notice notice-warning"><p><strong>WP Panel file lock is enabled.</strong>Publishing posts, editing pages, uploading images, generating cache, and writing plugin runtime logs are unaffected; installing, updating, deleting plugins or themes, and modifying code and site configuration are blocked. To maintain plugins/themes or first configure security/cache plugins, please disable file lock on the WP Panel site details page first.</p></div>';
     }
 
     public static function admin_bar_button($bar) {
@@ -536,7 +536,7 @@ class WP_Panel_Optimizer {
         if (!self::get_panel_url()) return;
         $bar->add_node([
             'id'    => 'wpp-clear-cache',
-            'title' => '清除 Nginx 缓存',
+            'title' => 'Clear Nginx Cache',
             'href'  => wp_nonce_url(admin_url('admin-post.php?action=wpp_cache_clear'), 'wpp_cache_clear'),
         ]);
     }
@@ -579,7 +579,7 @@ class WP_Panel_Optimizer {
         $status['running'] = false;
         $status['queued'] = 0;
         $status['finished_at'] = current_time('Y-m-d H:i:s');
-        $status['last_message'] = '已手动停止';
+        $status['last_message'] = 'Manually stopped';
         update_option(self::OPTION_PRELOAD_STATUS, $status, false);
         self::redirect_preload_notice('stopped', 0);
     }
@@ -700,7 +700,7 @@ class WP_Panel_Optimizer {
         $status['running'] = true;
         $status['queued'] = count($queue);
         $status['reason'] = sanitize_key($reason);
-        $status['last_message'] = '等待后台批量预加载';
+        $status['last_message'] = 'Waiting for background batch preload';
 
         update_option(self::OPTION_PRELOAD_QUEUE, array_values($queue), false);
         update_option(self::OPTION_PRELOAD_STATUS, $status, false);
@@ -740,7 +740,7 @@ class WP_Panel_Optimizer {
             $status['running'] = false;
             $status['queued'] = 0;
             $status['finished_at'] = current_time('Y-m-d H:i:s');
-            $status['last_message'] = '预加载队列为空';
+            $status['last_message'] = 'Preload queue empty';
             update_option(self::OPTION_PRELOAD_STATUS, $status, false);
             delete_transient('wpp_optimizer_preload_lock');
             return;
@@ -778,7 +778,7 @@ class WP_Panel_Optimizer {
         $status['queued'] = count($queue);
         if (!empty($queue)) {
             $status['running'] = true;
-            $status['last_message'] = '预加载进行中';
+            $status['last_message'] = 'Preload in progress';
             update_option(self::OPTION_PRELOAD_QUEUE, array_values($queue), false);
             update_option(self::OPTION_PRELOAD_STATUS, $status, false);
             if (!wp_next_scheduled(self::PRELOAD_HOOK)) {
@@ -788,7 +788,7 @@ class WP_Panel_Optimizer {
             delete_option(self::OPTION_PRELOAD_QUEUE);
             $status['running'] = false;
             $status['finished_at'] = current_time('Y-m-d H:i:s');
-            $status['last_message'] = '预加载完成';
+            $status['last_message'] = 'Preload complete';
             update_option(self::OPTION_PRELOAD_STATUS, $status, false);
         }
 
@@ -937,7 +937,7 @@ class WP_Panel_Optimizer {
     }
 
     // ============================================================
-    // 面板 API 通信
+    // Panel API Communication
     // ============================================================
 
     private static function fetch_panel_state() {
@@ -986,7 +986,7 @@ class WP_Panel_Optimizer {
         if (is_wp_error($resp)) return $resp;
         $data = json_decode($resp, true);
         if (empty($data['success'])) {
-            return new \WP_Error('api_error', $data['message'] ?? 'API 返回错误');
+            return new \WP_Error('api_error', $data['message'] ?? 'API returned error');
         }
         return true;
     }
@@ -1036,11 +1036,11 @@ class WP_Panel_Optimizer {
         ]);
         if (is_wp_error($resp)) return $resp;
         $code = wp_remote_retrieve_response_code($resp);
-        if ($code !== 200) return new \WP_Error('github_error', "GitHub raw 返回 HTTP $code");
+        if ($code !== 200) return new \WP_Error('github_error', "GitHub raw returned HTTP $code");
 
         $body = wp_remote_retrieve_body($resp);
         if (!preg_match('/Version:\s*([0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9]+)?)/', $body, $m)) {
-            return new \WP_Error('parse_error', '无法解析插件版本');
+            return new \WP_Error('parse_error', 'Cannot parse plugin version');
         }
 
         $result = [
@@ -1055,7 +1055,7 @@ class WP_Panel_Optimizer {
         $baseUrl = self::get_panel_url();
         $apiKey  = self::get_api_key();
         if (!$baseUrl || !$apiKey) {
-            return new \WP_Error('config_missing', '面板地址或 API Key 未配置');
+            return new \WP_Error('config_missing', 'Panel address or API Key not configured');
         }
 
         $args = [
@@ -1095,15 +1095,15 @@ add_action('wp_ajax_wpp_optimizer_verify', function() {
     $domain = wp_parse_url(home_url(), PHP_URL_HOST);
     $resp = WP_Panel_Optimizer::api_request_public('GET', '/api/sites/find?domain=' . urlencode($domain));
     if (!$resp || is_wp_error($resp)) {
-        $err = is_wp_error($resp) ? $resp->get_error_message() : '无响应，请检查面板地址';
+        $err = is_wp_error($resp) ? $resp->get_error_message() : 'No response, please check panel address';
         wp_send_json(['success' => false, 'data' => ['message' => $err]]);
         return;
     }
     $data = json_decode($resp, true);
     if (!empty($data['success'])) {
         update_option(WP_Panel_Optimizer::OPTION_VERIFIED, '1');
-        wp_send_json(['success' => true, 'data' => ['message' => '连接成功']]);
+        wp_send_json(['success' => true, 'data' => ['message' => 'Connection successful']]);
     } else {
-        wp_send_json(['success' => false, 'data' => ['message' => $data['message'] ?? 'API 返回错误']]);
+        wp_send_json(['success' => false, 'data' => ['message' => $data['message'] ?? 'API returned error']]);
     }
 });

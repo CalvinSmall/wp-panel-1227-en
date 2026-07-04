@@ -164,7 +164,7 @@ func TestSnapshotPanelUpdateStatusExpiresTerminalState(t *testing.T) {
 	currentPanelUpdateStatus = PanelUpdateStatus{
 		Completed: true,
 		Stage:     "completed",
-		Message:   "更新完成",
+		Message:   "Update complete",
 		Percent:   100,
 		UpdatedAt: time.Now().Add(-updateTerminalStatusTTL - time.Second),
 	}

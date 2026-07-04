@@ -39,7 +39,7 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 func (h *DashboardHandler) GetMetrics(c *gin.Context) {
 	var query models.MetricsQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误: range 必须是 24h、7d 或 30d"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid parameter: range must be 24h, 7d or 30d"))
 		return
 	}
 
@@ -186,7 +186,7 @@ func GetAnnouncement(c *gin.Context) {
 func (h *DashboardHandler) GetSiteResources(c *gin.Context) {
 	out, err := exec.Command("ps", "-eo", "user:32,%cpu,%mem,comm").Output()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("获取进程信息失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to get process info"))
 		return
 	}
 
@@ -241,7 +241,7 @@ func (h *DashboardHandler) GetSiteResources(c *gin.Context) {
 		result = []siteRes{}
 	}
 
-	// 按 CPU 降序
+	// Sort by CPU descending
 	for i := 0; i < len(result); i++ {
 		for j := i + 1; j < len(result); j++ {
 			if result[j].CPU > result[i].CPU {

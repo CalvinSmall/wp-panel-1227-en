@@ -230,7 +230,7 @@ function fileManager() {
                 const r = await api('/websites');
                 if (r.success && r.data) this.sites = r.data;
             } catch(e) {}
-            // 从 URL 参数自动选择网站（从网站管理页面跳转过来）
+            // Auto-select website from URL parameters (redirected from website management page)
             const params = new URLSearchParams(window.location.search);
             const sid = params.get('site_id');
             if (sid && !this.selectedSite) {

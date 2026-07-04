@@ -85,7 +85,7 @@ func scanReason(c *gin.Context) string {
 		ua = "-"
 	}
 	ua = truncateRunes(ua, 160)
-	return "高危扫描: 非浏览器特征探测面板端口 (path=" + path + ", ua=" + ua + ")"
+	return "High-risk scan: non-browser probe of panel port (path=" + path + ", ua=" + ua + ")"
 }
 
 func banScanIP(db *sql.DB, ip string, reason string, hours int) {
@@ -102,13 +102,13 @@ func banScanIP(db *sql.DB, ip string, reason string, hours int) {
 		ip, reason, expires,
 	)
 	if err != nil {
-		log.Printf("扫描封禁失败 ip=%s: %v", ip, err)
+		log.Printf("Scan ban failed ip=%s: %v", ip, err)
 		return
 	}
 
 	scanDefenseAddPersistBan(ip)
 
-	log.Printf("[扫描防御] 已封禁 IP %s (理由: %s, 时长: %d小时)", ip, reason, hours)
+	log.Printf("[Scan defense] Banned IP %s (reason: %s, duration: %dh)", ip, reason, hours)
 }
 
 func ScanDefense(db *sql.DB, randomSuffix string) gin.HandlerFunc {

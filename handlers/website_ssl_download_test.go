@@ -137,7 +137,7 @@ func TestDownloadSSLPackageRejectsDisabledSSL(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(rec.Body.String(), "未启用SSL") {
+	if !strings.Contains(rec.Body.String(), "SSL is not enabled for this site") {
 		t.Fatalf("body = %q, want SSL disabled message", rec.Body.String())
 	}
 }
@@ -159,7 +159,7 @@ func TestDownloadSSLPackageMissingFiles(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
-	if !strings.Contains(rec.Body.String(), "证书文件不存在") {
+	if !strings.Contains(rec.Body.String(), "certificate file not found") {
 		t.Fatalf("body = %q, want missing certificate message", rec.Body.String())
 	}
 }
@@ -230,7 +230,7 @@ func TestSetSSLExportTogglesFlag(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%q", rec.Code, http.StatusOK, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), `"success":true`) || !strings.Contains(rec.Body.String(), "SSL 证书导出权限已保存") {
+	if !strings.Contains(rec.Body.String(), `"success":true`) || !strings.Contains(rec.Body.String(), "SSL certificate export permission saved") {
 		t.Fatalf("body = %q, want success message", rec.Body.String())
 	}
 
@@ -364,7 +364,7 @@ func TestSSLCertificateExportPayloadValidatesSiteDomain(t *testing.T) {
 	if err == nil {
 		t.Fatal("sslCertificateExportPayload error = nil, want invalid domain error")
 	}
-	if !strings.Contains(err.Error(), "网站域名格式不合法") {
+	if !strings.Contains(err.Error(), "invalid website domain format") {
 		t.Fatalf("error = %q, want invalid domain message", err.Error())
 	}
 }

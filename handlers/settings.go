@@ -88,7 +88,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		PanelAutoUpdateSigTimeout *string `json:"panel_auto_update_signature_timeout_minutes"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid parameters"))
 		return
 	}
 
@@ -97,20 +97,20 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.PanelTitle != nil && *req.PanelTitle != "" {
 		_, err := db.Exec("UPDATE security_settings SET svalue = ?, updated_at = CURRENT_TIMESTAMP WHERE skey = 'panel_title'", *req.PanelTitle)
 		if err != nil {
-			_, _ = db.Exec("INSERT INTO security_settings (skey, svalue, description) VALUES ('panel_title', ?, '面板标题')", *req.PanelTitle)
+			_, _ = db.Exec("INSERT INTO security_settings (skey, svalue, description) VALUES ('panel_title', ?, 'Panel title')", *req.PanelTitle)
 		}
 	}
 
 	if req.Username != nil && *req.Username != "" {
 		if _, err := db.Exec("UPDATE admin_users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", *req.Username); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新用户名失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to update username"))
 			return
 		}
 	}
 
 	if req.BasicAuthUser != nil && *req.BasicAuthUser != "" {
 		if err := updateConfigValue("basic_auth", "username", *req.BasicAuthUser); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新BasicAuth用户名失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to update BasicAuth username"))
 			return
 		}
 		config.AppConfig.BasicAuth.Username = *req.BasicAuthUser
@@ -118,47 +118,47 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 
 	if req.NewPassword != nil && *req.NewPassword != "" {
 		if req.OldPassword == nil || *req.OldPassword == "" {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("请输入当前密码"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("please enter current password"))
 			return
 		}
 		if len(*req.NewPassword) < 8 {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("新密码至少8位"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("new password must be at least 8 characters"))
 			return
 		}
 		var currentHash string
 		err := db.QueryRow("SELECT password_hash FROM admin_users LIMIT 1").Scan(&currentHash)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询用户失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to query user"))
 			return
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(*req.OldPassword)); err != nil {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("当前密码错误"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("current password is incorrect"))
 			return
 		}
 		newHash, err := bcrypt.GenerateFromPassword([]byte(*req.NewPassword), 12)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("密码加密失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("password encryption failed"))
 			return
 		}
 		_, err = db.Exec("UPDATE admin_users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", string(newHash))
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新密码失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to update password"))
 			return
 		}
 	}
 
 	if req.BasicAuthPw != nil && *req.BasicAuthPw != "" {
 		if len(*req.BasicAuthPw) < 8 {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("BasicAuth密码至少8位"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("BasicAuth password must be at least 8 characters"))
 			return
 		}
 		newHash, err := bcrypt.GenerateFromPassword([]byte(*req.BasicAuthPw), 12)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("密码加密失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("password encryption failed"))
 			return
 		}
 		if err := updateConfigValue("basic_auth", "password_hash", string(newHash)); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新BasicAuth密码失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to update BasicAuth password"))
 			return
 		}
 		config.AppConfig.BasicAuth.PasswordHash = string(newHash)
@@ -169,11 +169,11 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.Timezone != nil && *req.Timezone != "" {
 		tz := strings.TrimSpace(*req.Timezone)
 		if !tzRe.MatchString(tz) {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的时区"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid timezone"))
 			return
 		}
 		if err := exec.Command("timedatectl", "set-timezone", tz).Run(); err != nil {
-			log.Printf("设置时区失败 (%s): %v", tz, err)
+			log.Printf("Failed to set timezone (%s): %v", tz, err)
 		}
 	}
 
@@ -182,7 +182,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.Hostname != nil && *req.Hostname != "" {
 		host := strings.TrimSpace(*req.Hostname)
 		if !hostRe.MatchString(host) || len(host) > 253 || strings.HasPrefix(host, "-") || strings.HasSuffix(host, "-") {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的主机名"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid hostname"))
 			return
 		}
 		exec.Command("hostnamectl", "set-hostname", host).Run()
@@ -196,19 +196,19 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		proxy := strings.TrimSpace(*req.GithubProxy)
 		proxy = strings.TrimRight(proxy, "/")
 		if proxy != "" && !strings.HasPrefix(proxy, "https://") {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("反代地址必须以 https:// 开头"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("proxy URL must start with https://"))
 			return
 		}
 		_, err := db.Exec("UPDATE security_settings SET svalue = ?, updated_at = CURRENT_TIMESTAMP WHERE skey = 'github_proxy'", proxy)
 		if err != nil {
-			_, _ = db.Exec("INSERT INTO security_settings (skey, svalue, description) VALUES ('github_proxy', ?, 'GitHub 反代地址')", proxy)
+			_, _ = db.Exec("INSERT INTO security_settings (skey, svalue, description) VALUES ('github_proxy', ?, 'GitHub proxy address')", proxy)
 		}
 	}
 
 	if req.PanelAutoUpdateEnabled != nil {
 		v := strings.TrimSpace(*req.PanelAutoUpdateEnabled)
 		if v != "true" && v != "false" {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("自动更新开关参数错误"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("auto-update toggle parameter error"))
 			return
 		}
 		saveSecuritySetting("panel_auto_update_enabled", v)
@@ -216,7 +216,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.PanelAutoUpdateMode != nil {
 		v := strings.TrimSpace(*req.PanelAutoUpdateMode)
 		if v != "patch_only" && v != "all_stable" {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("自动更新模式参数错误"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("auto-update mode parameter error"))
 			return
 		}
 		saveSecuritySetting("panel_auto_update_mode", v)
@@ -224,7 +224,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.PanelAutoUpdateWindow != nil {
 		v := strings.TrimSpace(*req.PanelAutoUpdateWindow)
 		if !regexp.MustCompile(`^\d{2}:\d{2}-\d{2}:\d{2}$`).MatchString(v) {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("自动更新时间窗口格式应为 HH:MM-HH:MM"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("auto-update time window format should be HH:MM-HH:MM"))
 			return
 		}
 		saveSecuritySetting("panel_auto_update_window", v)
@@ -240,7 +240,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "设置已更新"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Settings updated"}))
 }
 
 func saveSecuritySetting(key, value string) {
@@ -252,7 +252,7 @@ func saveSecuritySetting(key, value string) {
 func saveMinuteSetting(c *gin.Context, key, raw string, min, max int) bool {
 	v, err := strconv.Atoi(strings.TrimSpace(raw))
 	if err != nil || v < min || v > max {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse(fmt.Sprintf("分钟数必须在 %d-%d 之间", min, max)))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(fmt.Sprintf("minutes must be between %d-%d", min, max)))
 		return false
 	}
 	saveSecuritySetting(key, strconv.Itoa(v))
@@ -262,11 +262,11 @@ func saveMinuteSetting(c *gin.Context, key, raw string, min, max int) bool {
 func (h *SettingsHandler) TestProxy(c *gin.Context) {
 	proxy := strings.TrimRight(strings.TrimSpace(c.Query("url")), "/")
 	if proxy == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请提供反代地址"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("please provide a proxy URL"))
 		return
 	}
 	if !strings.HasPrefix(proxy, "https://") {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("反代地址必须以 https:// 开头"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("proxy URL must start with https://"))
 		return
 	}
 
@@ -279,7 +279,7 @@ func (h *SettingsHandler) TestProxy(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
 			"ok":      false,
-			"error":   fmt.Sprintf("连接失败: %v", err),
+			"error":   fmt.Sprintf("Connection failed: %v", err),
 			"latency": elapsed,
 		}))
 		return
@@ -318,7 +318,7 @@ func (h *SettingsHandler) GetOperationLogs(c *gin.Context) {
 		 FROM operation_logs ORDER BY created_at DESC LIMIT ? OFFSET ?`, perPage, offset,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("query failed"))
 		return
 	}
 	defer rows.Close()
@@ -405,7 +405,7 @@ func getHostname() string {
 }
 
 // ============================================================
-// WordPress 安装包管理
+// WordPress Package Management
 // ============================================================
 
 func (h *SettingsHandler) GetWPPackage(c *gin.Context) {
@@ -433,20 +433,20 @@ func (h *SettingsHandler) GetWPPackage(c *gin.Context) {
 func (h *SettingsHandler) UploadWPPackage(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请选择文件"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("please select a file"))
 		return
 	}
 
-	// 校验文件扩展名
+	// Validate file extension
 	name := strings.ToLower(file.Filename)
 	if !strings.HasSuffix(name, ".zip") {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("仅支持 .zip 格式的安装包"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("only .zip packages are supported"))
 		return
 	}
 
-	// 限制文件大小（WordPress 安装包通常 25-30MB，上限 100MB）
+	// Limit file size (WordPress packages are usually 25-30MB, max 100MB)
 	if file.Size > 100*1024*1024 {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("文件过大，上限 100MB"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("file too large, max 100MB"))
 		return
 	}
 
@@ -455,37 +455,37 @@ func (h *SettingsHandler) UploadWPPackage(c *gin.Context) {
 	pkgDir := filepath.Dir(pkgPath)
 
 	if err := os.MkdirAll(pkgDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建目录失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to create directory"))
 		return
 	}
 
-	// 先写入临时文件，校验成功后再替换
+	// Write to temp file first, replace after validation
 	tmpPath := pkgPath + ".upload_tmp"
 	if err := c.SaveUploadedFile(file, tmpPath); err != nil {
 		os.Remove(tmpPath)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存文件失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to save file"))
 		return
 	}
 
-	// 基本校验：用 unzip -t 测试压缩包完整性
+	// Basic validation: use unzip -t to test archive integrity
 	if out, err := exec.Command("unzip", "-t", tmpPath).CombinedOutput(); err != nil {
 		os.Remove(tmpPath)
-		log.Printf("上传的 ZIP 校验失败: %s, %v", string(out), err)
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("文件校验失败，不是有效的 ZIP 压缩包"))
+		log.Printf("Uploaded ZIP validation failed: %s, %v", string(out), err)
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("file validation failed, not a valid ZIP archive"))
 		return
 	}
 
-	// 替换旧文件
+	// Replace old file
 	os.Remove(pkgPath)
 	if err := os.Rename(tmpPath, pkgPath); err != nil {
 		os.Remove(tmpPath)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换安装包失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to replace package"))
 		return
 	}
 
-	log.Printf("WordPress 安装包已通过上传更新: %s (%s)", pkgPath, formatFileSize(file.Size))
+	log.Printf("WordPress package updated via upload: %s (%s)", pkgPath, formatFileSize(file.Size))
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
-		"message": "安装包上传成功",
+		"message": "Package uploaded successfully",
 	}))
 }
 
@@ -495,7 +495,7 @@ func (h *SettingsHandler) DownloadWPPackage(c *gin.Context) {
 	pkgDir := filepath.Dir(pkgPath)
 
 	if err := os.MkdirAll(pkgDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建目录失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to create directory"))
 		return
 	}
 
@@ -503,35 +503,35 @@ func (h *SettingsHandler) DownloadWPPackage(c *gin.Context) {
 	if out, err := exec.Command("wget", "-q", "-T", "30", "-t", "3", "-O", tmpPath,
 		"https://wordpress.org/latest.zip").CombinedOutput(); err != nil {
 		os.Remove(tmpPath)
-		log.Printf("在线下载 WordPress 安装包失败: %s, %v", string(out), err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("下载失败，请检查服务器网络或手动上传安装包"))
+		log.Printf("Online download of WordPress package failed: %s, %v", string(out), err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("download failed, please check server network or upload package manually"))
 		return
 	}
 
-	// 校验下载的文件
+	// Validate downloaded file
 	if info, err := os.Stat(tmpPath); err != nil || info.Size() == 0 {
 		os.Remove(tmpPath)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("下载的文件无效"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("downloaded file is invalid"))
 		return
 	}
 
-	// 校验 ZIP 完整性
+	// Validate ZIP integrity
 	if out, err := exec.Command("unzip", "-t", tmpPath).CombinedOutput(); err != nil {
 		os.Remove(tmpPath)
-		log.Printf("下载的 ZIP 校验失败: %s, %v", string(out), err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("下载的文件校验失败，请重试或手动上传"))
+		log.Printf("Downloaded ZIP validation failed: %s, %v", string(out), err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("downloaded file validation failed, please retry or upload manually"))
 		return
 	}
 
-	// 替换旧文件
+	// Replace old file
 	os.Remove(pkgPath)
 	if err := os.Rename(tmpPath, pkgPath); err != nil {
 		os.Remove(tmpPath)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("替换安装包失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to replace package"))
 		return
 	}
 
-	// 更新文件时间戳为当前时间（wget 默认保留远程 Last-Modified，导致 mtime 不反映实际下载时间）
+	// Update file timestamp to current time (wget preserves remote Last-Modified by default, so mtime doesn't reflect actual download time)
 	os.Chtimes(pkgPath, time.Now(), time.Now())
 
 	info, _ := os.Stat(pkgPath)
@@ -540,9 +540,9 @@ func (h *SettingsHandler) DownloadWPPackage(c *gin.Context) {
 		sizeText = formatFileSize(info.Size())
 	}
 
-	log.Printf("WordPress 安装包已通过在线下载更新: %s (%s)", pkgPath, sizeText)
+	log.Printf("WordPress package updated via online download: %s (%s)", pkgPath, sizeText)
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
-		"message": "安装包下载成功",
+		"message": "Package downloaded successfully",
 	}))
 }
 
@@ -551,12 +551,12 @@ func (h *SettingsHandler) DeleteWPPackage(c *gin.Context) {
 	pkgPath := cfg.Paths.WordPressPackage
 
 	if err := os.Remove(pkgPath); err != nil && !os.IsNotExist(err) {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("删除失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to delete"))
 		return
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
-		"message": "安装包已删除",
+		"message": "Package deleted",
 	}))
 }
 
@@ -582,29 +582,29 @@ func updateConfigValue(section, key, value string) error {
 	configPath := "/www/server/panel/config.json"
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("读取配置文件失败")
+		return fmt.Errorf("failed to read config file")
 	}
 	var cfg map[string]map[string]interface{}
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return fmt.Errorf("解析配置文件失败")
+		return fmt.Errorf("failed to parse config file")
 	}
 	sec, ok := cfg[section]
 	if !ok {
-		return fmt.Errorf("配置段 %s 不存在", section)
+		return fmt.Errorf("config section %s not found", section)
 	}
 	sec[key] = value
 	newData, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
-		return fmt.Errorf("序列化配置失败")
+		return fmt.Errorf("failed to serialize config")
 	}
 	if err := os.WriteFile(configPath, newData, 0600); err != nil {
-		return fmt.Errorf("写入配置文件失败")
+		return fmt.Errorf("failed to write config file")
 	}
 	return nil
 }
 
 // ============================================================
-// 面板数据库备份管理
+// Panel Database Backup Management
 // ============================================================
 
 func (h *SettingsHandler) GetDBBackups(c *gin.Context) {
@@ -612,7 +612,7 @@ func (h *SettingsHandler) GetDBBackups(c *gin.Context) {
 	backupDir := filepath.Join(cfg.Panel.BackupDir, "panel-db")
 	backups, err := database.ListDBBackups(backupDir)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询备份列表失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to query backup list"))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(backups))
@@ -624,21 +624,21 @@ func (h *SettingsHandler) CreateDBBackup(c *gin.Context) {
 
 	path, err := database.BackupDatabase(backupDir)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("备份失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("backup failed: "+err.Error()))
 		return
 	}
 
-	// 校验备份完整性
+	// Verify backup integrity
 	if verr := database.VerifyDBBackup(path); verr != nil {
 		os.Remove(path)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("备份校验失败: "+verr.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("backup verification failed: "+verr.Error()))
 		return
 	}
 
 	database.CleanupOldDBBackups(backupDir, 7)
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
-		"message": "数据库备份完成",
+		"message": "Database backup complete",
 	}))
 }
 
@@ -647,7 +647,7 @@ func (h *SettingsHandler) RestoreDBBackup(c *gin.Context) {
 		Filename string `json:"filename"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.Filename == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请选择要恢复的备份"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("please select a backup to restore"))
 		return
 	}
 
@@ -660,23 +660,23 @@ func (h *SettingsHandler) RestoreDBBackup(c *gin.Context) {
 		return
 	}
 
-	// 校验备份文件完整性
+	// Verify backup file integrity
 	if verr := database.VerifyDBBackup(backupPath); verr != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("备份文件校验失败，无法恢复: "+verr.Error()))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("backup file verification failed, cannot restore: "+verr.Error()))
 		return
 	}
 
 	dbPath := cfg.SQLite.Path
 
-	// 先做一份安全备份（当前运行中的数据库），用于回滚
+	// Create a safety backup (current running database) for rollback
 	safeBackup, safeErr := database.BackupDatabase(backupDir)
 	if safeErr != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("恢复前安全备份失败: "+safeErr.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("safety backup before restore failed: "+safeErr.Error()))
 		return
 	}
 
-	// 写恢复脚本：原子替换（先 cp 到 .tmp 再 mv）→ 清理 WAL/SHM → 重启；cp/mv 失败时回滚到安全备份。
-	// 对路径中的单引号做转义，避免 shell 注入
+	// Write restore script: atomic replace (cp to .tmp then mv) -> clean WAL/SHM -> restart; rollback to safety backup if cp/mv fails.
+	// Escape single quotes in paths to prevent shell injection
 	sb := strings.ReplaceAll(safeBackup, "'", "'\\''")
 	bp := strings.ReplaceAll(backupPath, "'", "'\\''")
 	dp := strings.ReplaceAll(dbPath, "'", "'\\''")
@@ -684,13 +684,13 @@ func (h *SettingsHandler) RestoreDBBackup(c *gin.Context) {
 	script := "#!/bin/bash\n" +
 		"sleep 1\n" +
 		"rm -f '" + dp + "'.tmp\n" +
-		// 原子替换：先复制到 .tmp，再 mv（同文件系统下 mv 是原子的）
+		// Atomic replace: copy to .tmp first, then mv (mv is atomic on same filesystem)
 		"cp -f '" + bp + "' '" + dp + "'.tmp && " +
 		"mv -f '" + dp + "'.tmp '" + dp + "'\n" +
 		"restore_status=$?\n" +
 		"rm -f '" + dp + "'.tmp\n" +
 		"if [ $restore_status -ne 0 ]; then\n" +
-		// cp/mv 失败 → 回滚到安全备份
+		// cp/mv failed -> rollback to safety backup
 		"  echo 'DB restore cp/mv failed, rolling back...' >&2\n" +
 		"  cp -f '" + sb + "' '" + dp + "'\n" +
 		"fi\n" +
@@ -700,26 +700,26 @@ func (h *SettingsHandler) RestoreDBBackup(c *gin.Context) {
 
 	scriptPath := "/tmp/wp-panel-db-restore.sh"
 	if err := os.WriteFile(scriptPath, []byte(script), 0700); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建恢复脚本失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to create restore script"))
 		return
 	}
 
-	// 异步执行
+	// Run async via script
 	if err := exec.Command("bash", scriptPath).Start(); err != nil {
 		os.Remove(scriptPath)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("启动恢复脚本失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to start restore script: "+err.Error()))
 		return
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
-		"message": "数据库恢复中，面板将自动重启。如启动失败，安全备份位于 " + filepath.Base(safeBackup),
+		"message": "Database restoring, panel will restart automatically. If restart fails, safety backup at " + filepath.Base(safeBackup),
 	}))
 }
 
 func (h *SettingsHandler) DeleteDBBackup(c *gin.Context) {
 	filename := c.Query("filename")
 	if filename == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请指定文件名"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("please specify a filename"))
 		return
 	}
 
@@ -733,11 +733,11 @@ func (h *SettingsHandler) DeleteDBBackup(c *gin.Context) {
 	}
 
 	if err := os.Remove(fullPath); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("删除失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to delete"))
 		return
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "备份已删除"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Backup deleted"}))
 }
 
 func (h *SettingsHandler) DownloadDBBackup(c *gin.Context) {

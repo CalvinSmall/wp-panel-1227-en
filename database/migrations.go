@@ -247,75 +247,76 @@ var migrations = []string{
 	// seed: security_settings
 	// ============================================================
 	`INSERT OR IGNORE INTO security_settings (skey, svalue, description) VALUES
-		('panel_title',              'WP Panel', '面板标题（显示在侧边栏和浏览器标签）'),
-		('whitelist_ips',            '',         '合并的官方与自定义白名单IP/段'),
-		('fail2ban_maxretry',        '5',        'Fail2ban触发阈值'),
-		('fail2ban_findtime',        '60',       'Fail2ban统计时间窗口(秒)'),
-		('fail2ban_bantime',         '600',      'Fail2ban初犯封禁时间(秒)'),
-		('auto_whitelist_enabled',   'true',     '是否每周自动更新官方白名单'),
-		('official_whitelist_ips',   '',         '官方自动拉取的白名单IP/段'),
-		('cloudflare_realip_ips',    '',         'Cloudflare Real IP 专用官方IP段'),
-		('last_whitelist_update',    '',         '上次白名单更新时间'),
-		('rate_limit_enabled',       'true',     '是否开启全局限速'),
-		('rate_limit_rpm',           '60',       '每IP每分钟最大请求数'),
-		('rate_limit_burst',         '300',      '突发缓冲允许量'),
-		('bot_limit_enabled',        'false',    '是否开启Bot UA统一限速'),
-		('bot_limit_rpm',            '30',       '每站点Bot每分钟最大请求数'),
-		('bot_limit_burst',          '20',       'Bot突发缓冲允许量'),
-		('googlebot_ips',            '',         'Googlebot官方IP段缓存'),
-		('bingbot_ips',              '',         'Bingbot官方IP段缓存'),
-		('wp_security_log_whitelist','',         'WordPress安全日志路径白名单'),
-		('smtp_host',                '',         'SMTP 服务器地址'),
-		('smtp_port',                '587',      'SMTP 端口'),
-		('smtp_encryption',          'starttls', '加密方式：starttls/ssl/none'),
-		('smtp_user',                '',         '发件邮箱账号'),
-		('smtp_pass',                '',         '发件邮箱密码/授权码'),
-		('admin_email',              '',         '管理员通知邮箱'),
-		('alert_cpu',                'true',     'CPU > 80% 持续 5 分钟告警'),
-		('alert_memory',             'true',     '可用内存 < 10% 持续 5 分钟告警'),
-		('alert_disk',               'true',     '磁盘 > 90% 告警'),
-		('alert_service',            'true',     '服务进程异常重启告警'),
-		('alert_ssl',                'true',     'SSL 证书到期告警'),
-		('alert_backup',             'true',     '数据库备份失败告警'),
-		('alert_website_expiry',     'true',     '网站到期告警'),
-		('alert_remote_backup',      'false',    '远程备份失败告警（需先启用远程备份）'),
-		('alert_cron_fail',          'true',     '计划任务执行失败告警'),
-		('alert_site',               'true',     '网站不可用告警'),
-		('alert_system_update',      'true',     '系统可用更新告警'),
-		('alert_panel_update',       'true',     '面板新版本告警'),
-		('telemetry_enabled',        'true',     '匿名安装统计（仅上报机器标识和版本号）'),
-		('telemetry_url',            '',         '自定义统计上报地址（留空使用默认）'),
-		('github_proxy',             '',          'GitHub 反代地址，留空直连'),
-		('panel_auto_update_enabled','false',     '是否启用面板自动更新'),
-		('panel_auto_update_mode',   'patch_only','面板自动更新模式：patch_only/all_stable'),
-		('panel_auto_update_window', '03:00-05:00','面板自动更新时间窗口'),
-		('panel_auto_update_release_delay_minutes','15','面板自动更新发布延迟分钟数'),
-		('panel_auto_update_signature_timeout_minutes','120','面板自动更新等待签名超时分钟数'),
-		('panel_auto_update_last_target_version','','面板自动更新最近目标版本'),
-		('panel_auto_update_last_check_at','','面板自动更新最近检查时间'),
-		('panel_auto_update_last_attempt_at','','面板自动更新最近尝试时间'),
-		('panel_auto_update_last_status','','面板自动更新最近状态'),
-		('panel_auto_update_last_stage','','面板自动更新最近阶段'),
-		('panel_auto_update_last_error','','面板自动更新最近错误'),
-		('panel_auto_update_last_success_at','','面板自动更新最近成功时间'),
-		('panel_auto_update_last_success_version','','面板自动更新最近成功版本'),
-		('panel_auto_update_signature_wait_version','','面板自动更新等待签名版本'),
-		('panel_auto_update_signature_wait_at','','面板自动更新等待签名开始时间')`,
+		('panel_title',              'WP Panel', 'Panel title (shown in sidebar and browser tab)'),
+		('whitelist_ips',            '',         'Merged official and custom whitelist IPs/ranges'),
+		('fail2ban_maxretry',        '5',        'Fail2ban trigger threshold'),
+		('fail2ban_findtime',        '60',       'Fail2ban statistics time window (seconds)'),
+		('fail2ban_bantime',         '600',      'Fail2ban first offense ban duration (seconds)'),
+		('auto_whitelist_enabled',   'true',     'Automatically update official whitelist weekly'),
+		('official_whitelist_ips',   '',         'Officially auto-fetched whitelist IPs/ranges'),
+		('cloudflare_realip_ips',    '',         'Cloudflare Real IP official IP ranges'),
+		('last_whitelist_update',    '',         'Last whitelist update time'),
+		('rate_limit_enabled',       'true',     'Enable global rate limiting'),
+		('rate_limit_rpm',           '60',       'Max requests per minute per IP'),
+		('rate_limit_burst',         '300',      'Burst buffer allowance'),
+		('bot_limit_enabled',        'false',    'Enable Bot UA unified rate limiting'),
+		('bot_limit_rpm',            '30',       'Max requests per minute per site for bots'),
+		('bot_limit_burst',          '20',       'Bot burst buffer allowance'),
+		('googlebot_ips',            '',         'Googlebot official IP range cache'),
+		('bingbot_ips',              '',         'Bingbot official IP range cache'),
+		('wp_security_log_whitelist','',         'WordPress security log path whitelist'),
+		('smtp_host',                '',         'SMTP server address'),
+		('smtp_port',                '587',      'SMTP port'),
+		('smtp_encryption',          'starttls', 'Encryption: starttls/ssl/none'),
+		('smtp_user',                '',         'Sender email account'),
+		('smtp_pass',                '',         'Sender email password/authorization code'),
+		('admin_email',              '',         'Admin notification email'),
+		('alert_cpu',                'true',     'CPU > 80% for 5 minutes alert'),
+		('alert_memory',             'true',     'Available memory < 10% for 5 minutes alert'),
+		('alert_disk',               'true',     'Disk > 90% alert'),
+		('alert_service',            'true',     'Service process abnormal restart alert'),
+		('alert_ssl',                'true',     'SSL certificate expiration alert'),
+		('alert_backup',             'true',     'Database backup failure alert'),
+		('alert_website_expiry',     'true',     'Website expiration alert'),
+		('alert_remote_backup',      'false',    'Remote backup failure alert (requires remote backup enabled first)'),
+		('alert_cron_fail',          'true',     'Scheduled task execution failure alert'),
+		('alert_site',               'true',     'Website unavailable alert'),
+		('alert_system_update',      'true',     'System available update alert'),
+		('alert_panel_update',       'true',     'Panel new version alert'),
+		('telemetry_enabled',        'true',     'Anonymous installation statistics (only reports machine ID and version)'),
+		('telemetry_url',            '',         'Custom statistics reporting URL (leave empty for default)'),
+		('github_proxy',             '',          'GitHub reverse proxy address, leave empty for direct connection'),
+		('panel_auto_update_enabled','false',     'Enable panel auto-update'),
+		('panel_auto_update_mode',   'patch_only','Panel auto-update mode: patch_only/all_stable'),
+		('panel_auto_update_window', '03:00-05:00','Panel auto-update time window'),
+		('panel_auto_update_release_delay_minutes','15','Panel auto-update release delay in minutes'),
+		('panel_auto_update_signature_timeout_minutes','120','Panel auto-update signature wait timeout in minutes'),
+		('panel_auto_update_last_target_version','','Panel auto-update last target version'),
+		('panel_auto_update_last_check_at','','Panel auto-update last check time'),
+		('panel_auto_update_last_attempt_at','','Panel auto-update last attempt time'),
+		('panel_auto_update_last_status','','Panel auto-update last status'),
+		('panel_auto_update_last_stage','','Panel auto-update last stage'),
+		('panel_auto_update_last_error','','Panel auto-update last error'),
+		('panel_auto_update_last_success_at','','Panel auto-update last success time'),
+		('panel_auto_update_last_success_version','','Panel auto-update last success version'),
+		('panel_auto_update_signature_wait_version','','Panel auto-update signature wait version'),
+		('panel_auto_update_signature_wait_at','','Panel auto-update signature wait start time')`,
 
 	// ============================================================
 	// seed: template_versions
 	// ============================================================
 	`INSERT OR IGNORE INTO template_versions (template_type, version, description, is_active) VALUES
-		('nginx_http',   'v1.0', 'HTTP默认模板',             1),
-		('nginx_https',  'v1.0', 'HTTPS(含SSL)模板',         1),
-		('php_fpm_pool', 'v1.0', 'PHP-FPM Pool隔离模板',     1)`,
+		('nginx_http',   'v1.0', 'HTTP default template',             1),
+		('nginx_https',  'v1.0', 'HTTPS (with SSL) template',         1),
+		('php_fpm_pool', 'v1.0', 'PHP-FPM Pool isolation template',   1)`,
 
 	// ============================================================
 	// seed: cdn_realip_groups
+
 	// ============================================================
 	`INSERT OR IGNORE INTO cdn_realip_groups (name, provider, header_name, ip_ranges, builtin, enabled, description) VALUES
-		('Cloudflare', 'cloudflare', 'CF-Connecting-IP', '', 1, 1, 'Cloudflare 官方 IP 段由面板自动拉取'),
-		('通用 CDN（兼容模式）', 'compatible', 'X-Forwarded-For', '', 1, 1, '不校验来源 IP，直接信任 X-Forwarded-For')`,
+		('Cloudflare', 'cloudflare', 'CF-Connecting-IP', '', 1, 1, 'Cloudflare official IP ranges, auto-fetched by panel'),
+		('General CDN (compatible mode)', 'compatible', 'X-Forwarded-For', '', 1, 1, 'Skip source IP verification, trust X-Forwarded-For directly')`,
 
 	// ============================================================
 	// db_backups
@@ -371,7 +372,7 @@ var migrations = []string{
 	`CREATE INDEX IF NOT EXISTS idx_alert_log_type ON alert_log(alert_type, created_at)`,
 
 	// ============================================================
-	// wp_extension_config — 默认主题/插件自动安装配置
+	// wp_extension_config — Default theme/plugin auto-install configuration
 	// ============================================================
 	`CREATE TABLE IF NOT EXISTS wp_extension_config (
 		id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -393,7 +394,7 @@ var migrations = []string{
 		('plugin', 'naibabiji-b2b-product-showcase', 'B2B Product Catalog', 1),
 		('plugin', 'redis-cache',          'Redis Cache',      1)`,
 
-	// 远程备份设置
+	// Remote backup settings
 	`CREATE TABLE IF NOT EXISTS remote_backup_settings (
 			id          INTEGER PRIMARY KEY AUTOINCREMENT,
 			enabled     INTEGER NOT NULL DEFAULT 0,

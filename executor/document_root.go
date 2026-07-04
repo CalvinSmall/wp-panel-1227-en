@@ -16,7 +16,7 @@ func NormalizeDocumentRootSubdir(siteType, subdir string) (string, error) {
 	}
 	subdir = strings.Trim(subdir, "/\\")
 	if subdir != DocumentRootPublic {
-		return "", fmt.Errorf("Web入口目录只支持留空（项目根）或填写 public")
+		return "", fmt.Errorf("Web entry directory only supports empty (project root) or 'public'")
 	}
 	return subdir, nil
 }
@@ -40,11 +40,11 @@ func EnsureEffectiveDocumentRoot(projectRoot, siteType, subdir, systemUser strin
 		return documentRoot, nil
 	}
 	if err := os.MkdirAll(documentRoot, 0755); err != nil {
-		return "", fmt.Errorf("创建Web入口目录失败: %w", err)
+		return "", fmt.Errorf("Failed to create Web entry directory: %w", err)
 	}
 	if strings.TrimSpace(systemUser) != "" {
 		if _, err := executeCommand("chown", "-R", siteOwner(systemUser), documentRoot); err != nil {
-			return "", fmt.Errorf("设置Web入口目录权限失败: %w", err)
+			return "", fmt.Errorf("Failed to set Web entry directory permissions: %w", err)
 		}
 	}
 	return documentRoot, nil

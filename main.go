@@ -31,19 +31,19 @@ var (
 )
 
 func main() {
-	configPath := flag.String("config", "/www/server/panel/config.json", "配置文件路径")
-	resetPass := flag.String("passwd", "", "重置管理员密码（8位以上）")
-	resetAdmin := flag.Bool("reset-admin", false, "一键重置管理员账号密码")
-	refreshWhitelist := flag.Bool("refresh-whitelist", false, "手动触发白名单刷新")
-	unbanAll := flag.Bool("unban-all", false, "一键清空所有IP封禁记录")
-	banIPNginx := flag.String("banip-nginx", "", "将指定 IP 加入 Nginx 黑名单")
-	unbanIPNginx := flag.String("unbanip-nginx", "", "从 Nginx 黑名单移除指定 IP")
-	recordFail2banIP := flag.String("record-fail2ban", "", "记录 Fail2ban 封禁 IP")
-	banJail := flag.String("ban-jail", "", "Fail2ban jail 名称")
-	fileBackup := flag.String("file-backup", "", "执行文件备份: siteID:mode")
-	runAutoBackup := flag.Bool("run-auto-backup", false, "手动触发自动备份（测试用）")
-	showInfo := flag.Bool("info", false, "查看面板信息")
-	updateWatchdog := flag.String("update-watchdog", "", "内部使用：面板更新健康检查守护")
+	configPath := flag.String("config", "/www/server/panel/config.json", "config file path")
+	resetPass := flag.String("passwd", "", "reset admin password (8+ chars)")
+	resetAdmin := flag.Bool("reset-admin", false, "one-click reset admin username and password")
+	refreshWhitelist := flag.Bool("refresh-whitelist", false, "manually trigger whitelist refresh")
+	unbanAll := flag.Bool("unban-all", false, "clear all IP ban records")
+	banIPNginx := flag.String("banip-nginx", "", "add specified IP to Nginx ban list")
+	unbanIPNginx := flag.String("unbanip-nginx", "", "remove specified IP from Nginx ban list")
+	recordFail2banIP := flag.String("record-fail2ban", "", "record Fail2ban banned IP")
+	banJail := flag.String("ban-jail", "", "Fail2ban jail name")
+	fileBackup := flag.String("file-backup", "", "execute file backup: siteID:mode")
+	runAutoBackup := flag.Bool("run-auto-backup", false, "manually trigger auto backup (for testing)")
+	showInfo := flag.Bool("info", false, "show panel info")
+	updateWatchdog := flag.String("update-watchdog", "", "internal: panel update health check watchdog")
 	flag.Parse()
 
 	if *banIPNginx != "" || *unbanIPNginx != "" || *recordFail2banIP != "" {
@@ -53,11 +53,11 @@ func main() {
 
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("加载配置失败: %v", err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
 	if *showInfo {
-		fmt.Println("WP Panel 面板信息")
+		fmt.Println("WP Panel Information")
 		fmt.Println("─────────────────")
 		if BuildTime != "" && BuildTime != "unknown" {
 			displayTime := BuildTime
@@ -69,19 +69,19 @@ func main() {
 					displayTime = bt.Local().Format("2006-01-02 15:04:05")
 				}
 			}
-			fmt.Printf("版本: %s (构建: %s)\n", Version, displayTime)
+			fmt.Printf("Version: %s (Build: %s)\n", Version, displayTime)
 		} else {
-			fmt.Printf("版本: %s\n", Version)
+			fmt.Printf("Version: %s\n", Version)
 		}
-		fmt.Printf("HTTPS 端口: %d\n", cfg.Panel.TLSPort)
-		fmt.Printf("安全入口: /%s\n", cfg.Panel.RandomSuffix)
-		fmt.Printf("数据目录: %s\n", cfg.Panel.DataDir)
-		fmt.Printf("配置文件: %s\n", *configPath)
+		fmt.Printf("HTTPS Port: %d\n", cfg.Panel.TLSPort)
+		fmt.Printf("Secure Entry: /%s\n", cfg.Panel.RandomSuffix)
+		fmt.Printf("Data Directory: %s\n", cfg.Panel.DataDir)
+		fmt.Printf("Config File: %s\n", *configPath)
 		return
 	}
 
 	if err := database.Open(cfg.SQLite.Path); err != nil {
-		log.Fatalf("打开数据库失败: %v", err)
+		log.Fatalf("Failed to open database: %v", err)
 	}
 	defer database.Close()
 
@@ -91,13 +91,13 @@ func main() {
 	}
 
 	if err := database.RunMigrations(); err != nil {
-		log.Fatalf("数据库迁移失败: %v", err)
+		log.Fatalf("Database migration failed: %v", err)
 	}
-	// 先更新插件包，确保后续迁移复制的是最新版本
+	// Update plugin packages first to ensure subsequent migrations copy the latest version
 	executor.EnsureCacheHelperPlugin(PluginFS)
 	executor.AutoDeployPluginUpdates(PluginFS)
 	if err := database.RunUpgrades(); err != nil {
-		log.Fatalf("数据库升级失败: %v", err)
+		log.Fatalf("Database upgrade failed: %v", err)
 	}
 	executor.FinalizePendingPanelUpdate(cfg, Version)
 
@@ -113,7 +113,7 @@ func main() {
 
 	if *refreshWhitelist {
 		executor.InitQueue(cfg)
-		log.Printf("白名单刷新结果: %s", executor.RunWhitelistRefresh())
+		log.Printf("Whitelist refresh result: %s", executor.RunWhitelistRefresh())
 		return
 	}
 
@@ -135,7 +135,7 @@ func main() {
 			}
 			msg, err := executor.ExecuteFileBackup(siteID, parts[1], keepCount)
 			if err != nil {
-				log.Printf("文件备份失败: %v", err)
+				log.Printf("File backup failed: %v", err)
 				os.Exit(1)
 			}
 			log.Println(msg)
@@ -150,37 +150,37 @@ func main() {
 
 	seedAdminUser(cfg)
 
-	log.Println("数据库初始化完成")
+	log.Println("Database initialization completed")
 
 	executor.InitQueue(cfg)
-	log.Println("任务队列初始化完成")
+	log.Println("Task queue initialization completed")
 
 	collector.Start()
 
 	executor.ApplyFail2banSettings()
 	executor.EnsureOperationLogRetention()
 	if err := executor.ApplyRateLimitSettings(); err != nil {
-		log.Printf("Nginx 限速配置跳过: %v", err)
+		log.Printf("Nginx rate limit config skipped: %v", err)
 	}
 	if err := executor.EnsureLogMap(); err != nil {
-		log.Printf("Nginx 日志 map 配置跳过: %v", err)
+		log.Printf("Nginx log map config skipped: %v", err)
 	}
 	executor.EnsureAllSiteLogrotateConfigs()
 	if err := executor.EnsureNginxBannedIPsConfig(); err != nil {
-		log.Printf("Nginx 黑名单初始化失败: %v", err)
+		log.Printf("Nginx blacklist initialization failed: %v", err)
 	}
 	if err := executor.EnsureCloudflareRealIPConfig(); err != nil {
-		log.Printf("Cloudflare Real IP 配置跳过: %v", err)
+		log.Printf("Cloudflare Real IP config skipped: %v", err)
 	} else if err := executor.ApplyFail2banSettings(); err != nil {
-		log.Printf("Cloudflare Real IP 白名单应用跳过: %v", err)
+		log.Printf("Cloudflare Real IP whitelist application skipped: %v", err)
 	}
 	executor.EnsureFastCGICacheConfig()
 	// WordPress safety baseline (idempotent, only writes if not present)
 	executor.EnsureWordPressBaseline()
-	// 升级后重建全部 Nginx 和 PHP-FPM 配置，确保新模板规则对旧站生效
+	// After upgrade, rebuild all Nginx and PHP-FPM configs to ensure new template rules apply to existing sites
 	executor.GoSafe(func() {
 		if err := executor.RegenerateAllSitesNginx(); err != nil {
-			log.Printf("Nginx 批量重建部分失败: %v", err)
+			log.Printf("Nginx batch rebuild partially failed: %v", err)
 		}
 	})
 	executor.GoSafe(func() {
@@ -188,27 +188,27 @@ func main() {
 			log.Printf("PHP-FPM batch rebuild partially failed: %v", err)
 		}
 	})
-	log.Println("Nginx 日志 map 配置已就绪")
-	log.Println("FastCGI 缓存配置已就绪")
-	log.Println("Fail2ban 配置初始化完成")
+	log.Println("Nginx log map config is ready")
+	log.Println("FastCGI cache config is ready")
+	log.Println("Fail2ban config initialization completed")
 	executor.EnsureWPCommand()
-	// 远程备份密码认证依赖 sshpass；启动路径只提示，不自动修改服务器软件状态。
+	// Remote backup password authentication depends on sshpass; startup only notifies, does not automatically modify server software state.
 	if _, err := exec.LookPath("sshpass"); err != nil {
-		log.Println("sshpass 未安装，远程备份密码认证功能不可用；请通过安装脚本或包管理器手动安装")
+		log.Println("sshpass not installed, remote backup password authentication is unavailable; please install manually via installation script or package manager")
 	}
 	executor.StartProcessGuard()
 	executor.StartAlertMonitor(Version)
 	executor.StartTelemetry(Version)
 	executor.StartPanelAutoUpdateScheduler(Version, *configPath, cfg)
 	log.Println("WordPress config baseline ensured")
-	log.Println("进程守护已启动")
-	log.Println("告警监控已启动")
+	log.Println("Process guard started")
+	log.Println("Alert monitor started")
 	executor.StartAutoBackupScheduler()
-	log.Println("自动备份调度器已启动")
+	log.Println("Auto backup scheduler started")
 	executor.StartDBBackupScheduler()
-	log.Println("面板数据库备份调度器已启动")
+	log.Println("Panel database backup scheduler started")
 	executor.StartSSLRenewalScheduler()
-	log.Println("SSL 自动续期调度器已启动")
+	log.Println("SSL auto-renewal scheduler started")
 	go func() {
 		for {
 			time.Sleep(30 * time.Minute)
@@ -221,17 +221,17 @@ func main() {
 	if cfg.Panel.TLSPort > 0 && cfg.Panel.TLSCertPath != "" && cfg.Panel.TLSKeyPath != "" {
 		go func() {
 			addr := fmt.Sprintf(":%d", cfg.Panel.TLSPort)
-			log.Printf("WP Panel 启动于端口 %d (HTTPS)", cfg.Panel.TLSPort)
+			log.Printf("WP Panel started on port %d (HTTPS)", cfg.Panel.TLSPort)
 			if err := r.RunTLS(addr, cfg.Panel.TLSCertPath, cfg.Panel.TLSKeyPath); err != nil {
-				log.Fatalf("HTTPS 服务启动失败: %v", err)
+				log.Fatalf("Failed to start HTTPS server: %v", err)
 			}
 		}()
 	} else {
 		go func() {
 			addr := fmt.Sprintf(":%d", cfg.Panel.Port)
-			log.Printf("WP Panel 启动于端口 %d（HTTP，未配置TLS）", cfg.Panel.Port)
+			log.Printf("WP Panel started on port %d (HTTP, TLS not configured)", cfg.Panel.Port)
 			if err := r.Run(addr); err != nil {
-				log.Fatalf("HTTP 服务启动失败: %v", err)
+				log.Fatalf("Failed to start HTTP server: %v", err)
 			}
 		}()
 	}
@@ -239,18 +239,18 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("正在关闭面板...")
+	log.Println("Shutting down panel...")
 }
 
 func handleFail2banCLI(configPath, banIP, unbanIP, recordIP, jail string) {
 	if banIP != "" {
 		if err := executor.AddNginxBan(banIP); err != nil {
-			log.Fatalf("Nginx 封禁失败: %v", err)
+			log.Fatalf("Nginx ban failed: %v", err)
 		}
 	}
 	if unbanIP != "" {
 		if err := executor.RemoveNginxBan(unbanIP); err != nil {
-			log.Fatalf("Nginx 解封失败: %v", err)
+			log.Fatalf("Nginx unban failed: %v", err)
 		}
 	}
 	if recordIP == "" {
@@ -259,17 +259,17 @@ func handleFail2banCLI(configPath, banIP, unbanIP, recordIP, jail string) {
 
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
-		log.Fatalf("加载配置失败: %v", err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
 	if err := database.Open(cfg.SQLite.Path); err != nil {
-		log.Fatalf("打开数据库失败: %v", err)
+		log.Fatalf("Failed to open database: %v", err)
 	}
 	defer database.Close()
 	if err := database.RunMigrations(); err != nil {
-		log.Fatalf("数据库迁移失败: %v", err)
+		log.Fatalf("Database migration failed: %v", err)
 	}
 	if err := executor.RecordFail2banBan(recordIP, jail); err != nil {
-		log.Fatalf("Fail2ban 封禁记录失败: %v", err)
+		log.Fatalf("Failed to record Fail2ban ban: %v", err)
 	}
 }
 
@@ -287,10 +287,10 @@ func seedAdminUser(cfg *config.Config) {
 		cfg.Admin.Username, cfg.Admin.PasswordHash,
 	)
 	if err != nil {
-		log.Printf("创建管理员用户失败: %v", err)
+		log.Printf("Failed to create admin user: %v", err)
 		return
 	}
-	log.Println("管理员用户已从 config.json 初始化")
+	log.Println("Admin user initialized from config.json")
 }
 
 func resetAllAdmin(cfg *config.Config, configPath string) {
@@ -300,12 +300,12 @@ func resetAllAdmin(cfg *config.Config, configPath string) {
 
 	webHash, err := bcrypt.GenerateFromPassword([]byte(webPass), 12)
 	if err != nil {
-		fmt.Printf("错误: 密码加密失败: %v\n", err)
+		fmt.Printf("Error: Password encryption failed: %v\n", err)
 		os.Exit(1)
 	}
 	basicHash, err := bcrypt.GenerateFromPassword([]byte(basicPass), 12)
 	if err != nil {
-		fmt.Printf("错误: 密码加密失败: %v\n", err)
+		fmt.Printf("Error: Password encryption failed: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -320,7 +320,7 @@ func resetAllAdmin(cfg *config.Config, configPath string) {
 			username, string(webHash))
 	}
 	if err != nil {
-		fmt.Printf("错误: 更新数据库失败: %v\n", err)
+		fmt.Printf("Error: Failed to update database: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -339,8 +339,8 @@ func resetAllAdmin(cfg *config.Config, configPath string) {
 			}
 			if newData, err := json.MarshalIndent(cfgMap, "", "  "); err == nil {
 				if err := os.WriteFile(configPath, newData, 0600); err != nil {
-					fmt.Printf("错误: 写入配置文件失败: %v\n", err)
-					fmt.Println("BasicAuth 密码未更新，请检查配置文件权限")
+					fmt.Printf("Error: Failed to write config file: %v\n", err)
+					fmt.Println("BasicAuth password not updated, please check config file permissions")
 					os.Exit(1)
 				}
 			}
@@ -348,32 +348,32 @@ func resetAllAdmin(cfg *config.Config, configPath string) {
 	}
 
 	fmt.Println("")
-	fmt.Println("═══ 管理员账号已重置 ═══")
+	fmt.Println("═══ Admin Account Has Been Reset ═══")
 	fmt.Println("")
-	fmt.Println("已将 BasicAuth 和面板 Web 登录的用户名统一修改为 wpadmin")
+	fmt.Println("BasicAuth and panel Web login username has been unified to wpadmin")
 	fmt.Println("")
-	fmt.Println("BasicAuth 认证（浏览器弹窗，随机入口第一层）：")
-	fmt.Printf("  密码: %s\n", basicPass)
+	fmt.Println("BasicAuth authentication (browser popup, first layer of random entry):")
+	fmt.Printf("  Password: %s\n", basicPass)
 	fmt.Println("")
-	fmt.Println("面板 Web 登录（页面表单，BasicAuth 通过后）：")
-	fmt.Printf("  密码: %s\n", webPass)
+	fmt.Println("Panel Web login (page form, after BasicAuth):")
+	fmt.Printf("  Password: %s\n", webPass)
 	fmt.Println("")
-	fmt.Println("⚠  登录后请在「面板设置」中修改密码")
+	fmt.Println("⚠  Please change your password in Panel Settings after login")
 	fmt.Println("═══ ═══════════════════ ═══")
 	fmt.Println("")
-	fmt.Println("正在重启面板...")
+	fmt.Println("Restarting panel...")
 	exec.Command("systemctl", "restart", "wp-panel").Run()
 }
 
 func resetAdminPassword(cfg *config.Config, newPass string) {
 	if len(newPass) < 8 {
-		fmt.Println("错误: 密码至少8位")
+		fmt.Println("Error: Password must be at least 8 characters")
 		os.Exit(1)
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPass), 12)
 	if err != nil {
-		fmt.Printf("错误: 密码加密失败: %v\n", err)
+		fmt.Printf("Error: Password encryption failed: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -395,13 +395,13 @@ func resetAdminPassword(cfg *config.Config, newPass string) {
 	}
 
 	if err != nil {
-		fmt.Printf("错误: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("管理员密码已重置\n")
-	fmt.Printf("  用户名: %s\n", cfg.Admin.Username)
-	fmt.Printf("  新密码: %s\n", newPass)
+	fmt.Printf("Admin password has been reset\n")
+	fmt.Printf("  Username: %s\n", cfg.Admin.Username)
+	fmt.Printf("  New Password: %s\n", newPass)
 }
 
 func randomString(n int) string {

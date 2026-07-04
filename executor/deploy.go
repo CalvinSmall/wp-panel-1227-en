@@ -10,7 +10,7 @@ import (
 func deployWordPress(packagePath, webRoot, tmpDir string) error {
 	os.RemoveAll(tmpDir)
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		return fmt.Errorf("创建临时目录失败: %w", err)
+		return fmt.Errorf("Failed to create temporary directory: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
@@ -22,7 +22,7 @@ func deployWordPress(packagePath, webRoot, tmpDir string) error {
 
 	extractDir := filepath.Join(tmpDir, "wp_extract")
 	if _, err := executeCommand("unzip", "-q", "-o", zipPath, "-d", extractDir); err != nil {
-		return fmt.Errorf("解压失败: %w", err)
+		return fmt.Errorf("Extraction failed: %w", err)
 	}
 
 	srcDir := extractDir
@@ -32,14 +32,14 @@ func deployWordPress(packagePath, webRoot, tmpDir string) error {
 
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {
-		return fmt.Errorf("读取WordPress文件失败: %w", err)
+		return fmt.Errorf("Failed to read WordPress files: %w", err)
 	}
 
 	for _, entry := range entries {
 		srcPath := filepath.Join(srcDir, entry.Name())
 		dstPath := filepath.Join(webRoot, entry.Name())
 		if err := copyPath(srcPath, dstPath); err != nil {
-			return fmt.Errorf("移动文件 %s 失败: %w", entry.Name(), err)
+			return fmt.Errorf("Failed to move file %s: %w", entry.Name(), err)
 		}
 	}
 
@@ -99,17 +99,17 @@ func copyDir(src, dst string) error {
 }
 
 func downloadWP(localPath, destPath string) error {
-	// 优先使用本地安装包（更快、更可靠，适合国内网络环境）
+	// Prefer local installation package (faster, more reliable, suitable for domestic network environment)
 	if info, err := os.Stat(localPath); err == nil && info.Size() > 0 {
 		if _, err := executeCommand("cp", "-f", localPath, destPath); err == nil {
 			return nil
 		}
 	}
 
-	// 本地不可用，在线下载
+	// Local package not available, downloading online
 	if _, err := executeCommand("wget", "-q", "-T", "30", "-t", "3", "-O", destPath,
 		"https://wordpress.org/latest.zip"); err != nil {
-		return fmt.Errorf("本地安装包不可用且在线下载失败: %w", err)
+		return fmt.Errorf("Local package not available and online download failed: %w", err)
 	}
 
 	return nil

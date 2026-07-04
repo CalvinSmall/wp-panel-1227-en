@@ -12,7 +12,7 @@ import (
 
 func Start() {
 	go runLoop()
-	log.Println("系统指标采集器已启动(每1分钟)")
+	log.Println("System metrics collector started (every 1 minute)")
 }
 
 func runLoop() {
@@ -55,7 +55,7 @@ func collect() {
 		cpu, memPercent, memUsed, memTotal, diskRead, diskWrite, load1, load5, load15,
 	)
 	if err != nil {
-		log.Printf("采集器写入失败: %v", err)
+		log.Printf("Collector write failed: %v", err)
 	}
 }
 

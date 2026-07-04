@@ -53,7 +53,7 @@ func TestScanDefenseBansNonBrowserProbeAndRecordsRequestSummary(t *testing.T) {
 	if jail != "panel_scan" {
 		t.Fatalf("source_jail = %q, want panel_scan", jail)
 	}
-	for _, want := range []string{"高危扫描: 非浏览器特征探测面板端口", "path=/wp-login.php", "ua=curl/8.0 scanner"} {
+	for _, want := range []string{"High-risk scan: non-browser probe of panel port", "path=/wp-login.php", "ua=curl/8.0 scanner"} {
 		if !strings.Contains(reason, want) {
 			t.Fatalf("reason %q missing %q", reason, want)
 		}

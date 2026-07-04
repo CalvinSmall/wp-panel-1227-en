@@ -94,7 +94,7 @@ var (
 	panelUpdateStatusMu      sync.Mutex
 	currentPanelUpdateStatus = PanelUpdateStatus{
 		Stage:     "idle",
-		Message:   "等待更新",
+		Message:   "Waiting for update",
 		UpdatedAt: time.Now(),
 	}
 	panelUpdateAutoStarted sync.Once
@@ -102,10 +102,10 @@ var (
 
 func ExecutePanelUpdate(opts PanelUpdateOptions) (*GithubRelease, error) {
 	if runtime.GOOS != "linux" {
-		return nil, fmt.Errorf("仅支持 Linux 服务器更新")
+		return nil, fmt.Errorf("Only Linux server updates are supported")
 	}
 	if !panelUpdateMu.TryLock() {
-		return nil, fmt.Errorf("已有更新任务正在执行，请稍后再试")
+		return nil, fmt.Errorf("An update task is already running, please try again later")
 	}
 	defer panelUpdateMu.Unlock()
 
@@ -114,87 +114,87 @@ func ExecutePanelUpdate(opts PanelUpdateOptions) (*GithubRelease, error) {
 	if trigger == "" {
 		trigger = "manual"
 	}
-	recordPanelUpdateStage(trigger, "", "fetch_release", "running", "正在获取版本信息")
-	setPanelUpdateStep("fetch_release", "正在获取版本信息...", 5)
+	recordPanelUpdateStage(trigger, "", "fetch_release", "running", "Fetching version info")
+	setPanelUpdateStep("fetch_release", "Fetching version info...", 5)
 
 	latest, err := FetchLatestPanelRelease(opts.Proxy)
 	if err != nil {
-		return nil, panelUpdateFail(trigger, "", "fetch_release", "获取版本信息失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, "", "fetch_release", "Failed to fetch version info: "+err.Error())
 	}
 	if latest == nil || latest.TagName == "" {
-		return nil, panelUpdateFail(trigger, "", "fetch_release", "获取版本信息失败: release 为空")
+		return nil, panelUpdateFail(trigger, "", "fetch_release", "Failed to fetch version info: release is empty")
 	}
 	if CompareVersions(latest.TagName, opts.CurrentVersion) <= 0 {
-		return nil, panelUpdateFail(trigger, latest.TagName, "compare_version", "已经是最新版本")
+		return nil, panelUpdateFail(trigger, latest.TagName, "compare_version", "Already up to date")
 	}
 
-	setPanelUpdateStep("resolve_assets", "正在准备更新文件...", 10)
+	setPanelUpdateStep("resolve_assets", "Preparing update files...", 10)
 	downloadURL, sha256URL, sigURL := resolvePanelAssets(latest)
 	if downloadURL == "" {
-		return nil, panelUpdateFail(trigger, latest.TagName, "resolve_assets", "未找到适用于当前系统的二进制文件")
+		return nil, panelUpdateFail(trigger, latest.TagName, "resolve_assets", "No binary found for the current system")
 	}
 	if sha256URL == "" {
-		return nil, panelUpdateFail(trigger, latest.TagName, "resolve_assets", "未找到 SHA256 校验文件，无法验证更新完整性")
+		return nil, panelUpdateFail(trigger, latest.TagName, "resolve_assets", "SHA256 checksum file not found, cannot verify update integrity")
 	}
 	if sigURL == "" {
-		setPanelUpdateFailed("未找到 Ed25519 签名文件，等待签名发布")
-		recordPanelUpdateStage(trigger, latest.TagName, "waiting_signature", "waiting", "未找到 wp-panel.sha256.sig，等待签名发布")
+		setPanelUpdateFailed("Ed25519 signature file not found, waiting for signature release")
+		recordPanelUpdateStage(trigger, latest.TagName, "waiting_signature", "waiting", "wp-panel.sha256.sig not found, waiting for signature release")
 		return latest, errWaitingSignature
 	}
 
-	setPanelUpdateStep("prepare_download", "正在创建临时目录...", 12)
+	setPanelUpdateStep("prepare_download", "Creating temporary directory...", 12)
 	tmpDir, err := os.MkdirTemp("", "wp-panel-update-*")
 	if err != nil {
-		return nil, panelUpdateFail(trigger, latest.TagName, "prepare_download", "创建临时目录失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "prepare_download", "Failed to create temporary directory: "+err.Error())
 	}
 	defer os.RemoveAll(tmpDir)
 
 	newBinary := filepath.Join(tmpDir, panelBinaryName)
-	setPanelUpdateStep("download_binary", "正在下载更新包...", 15)
+	setPanelUpdateStep("download_binary", "Downloading update package...", 15)
 	if err := downloadFileWithProgress(proxyURL(opts.Proxy, downloadURL), newBinary, 10*time.Minute, setPanelBinaryDownloadProgress); err != nil {
-		return nil, panelUpdateFail(trigger, latest.TagName, "download_binary", "更新包下载失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "download_binary", "Failed to download update package: "+err.Error())
 	}
 	if err := os.Chmod(newBinary, 0755); err != nil {
-		return nil, panelUpdateFail(trigger, latest.TagName, "download_binary", "设置新版本权限失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "download_binary", "Failed to set new version permissions: "+err.Error())
 	}
 
-	setPanelUpdateStep("download_sha256", "正在下载校验文件...", 62)
+	setPanelUpdateStep("download_sha256", "Downloading checksum file...", 62)
 	shaFile := filepath.Join(tmpDir, panelBinaryName+".sha256")
 	if err := downloadFile(proxyURL(opts.Proxy, sha256URL), shaFile); err != nil {
-		return nil, panelUpdateFail(trigger, latest.TagName, "download_sha256", "SHA256 校验文件下载失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "download_sha256", "Failed to download SHA256 checksum file: "+err.Error())
 	}
-	setPanelUpdateStep("download_signature", "正在下载签名文件...", 66)
+	setPanelUpdateStep("download_signature", "Downloading signature file...", 66)
 	sigFile := filepath.Join(tmpDir, panelBinaryName+".sha256.sig")
 	if err := downloadFile(proxyURL(opts.Proxy, sigURL), sigFile); err != nil {
-		return nil, panelUpdateFail(trigger, latest.TagName, "download_signature", "签名文件下载失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "download_signature", "Failed to download signature file: "+err.Error())
 	}
-	setPanelUpdateStep("verify_signature", "正在校验更新来源...", 72)
+	setPanelUpdateStep("verify_signature", "Verifying update source...", 72)
 	if err := verifyEd25519(shaFile, sigFile); err != nil {
-		return nil, panelUpdateFail(trigger, latest.TagName, "verify_signature", "签名校验失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "verify_signature", "Signature verification failed: "+err.Error())
 	}
-	setPanelUpdateStep("verify_sha256", "正在校验更新包完整性...", 78)
+	setPanelUpdateStep("verify_sha256", "Verifying update package integrity...", 78)
 	if err := verifySHA256(newBinary, shaFile); err != nil {
-		return nil, panelUpdateFail(trigger, latest.TagName, "verify_sha256", "SHA256 校验失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "verify_sha256", "SHA256 verification failed: "+err.Error())
 	}
 
-	setPanelUpdateStep("preflight", "正在预检新版本...", 82)
+	setPanelUpdateStep("preflight", "Preflighting new version...", 82)
 	if err := preflightBinary(newBinary); err != nil {
-		return nil, panelUpdateFail(trigger, latest.TagName, "preflight", "新版本预检失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "preflight", "New version preflight failed: "+err.Error())
 	}
 	if opts.UseWatchdog {
 		if _, err := exec.LookPath("systemd-run"); err != nil {
-			return nil, panelUpdateFail(trigger, latest.TagName, "preflight", "systemd-run 不可用，无法启动独立更新守护进程: "+err.Error())
+			return nil, panelUpdateFail(trigger, latest.TagName, "preflight", "systemd-run unavailable, cannot start standalone update daemon: "+err.Error())
 		}
 	}
-	setPanelUpdateStep("disk_check", "正在检查磁盘空间...", 84)
+	setPanelUpdateStep("disk_check", "Checking disk space...", 84)
 	if err := checkUpdateDiskSpace(newBinary, opts.Config); err != nil {
 		return nil, panelUpdateFail(trigger, latest.TagName, "disk_check", err.Error())
 	}
 
-	setPanelUpdateStep("backup", "正在备份当前版本...", 88)
+	setPanelUpdateStep("backup", "Backing up current version...", 88)
 	backupPath := versionedBackupPath(opts.CurrentVersion)
 	if err := copyPanelFile(panelInstallPath, backupPath, 0755); err != nil {
-		return nil, panelUpdateFail(trigger, latest.TagName, "backup_binary", "备份旧版本失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "backup_binary", "Failed to backup old version: "+err.Error())
 	}
 
 	backupDB := ""
@@ -202,10 +202,10 @@ func ExecutePanelUpdate(opts PanelUpdateOptions) (*GithubRelease, error) {
 		backupDir := filepath.Join(opts.Config.Panel.BackupDir, "panel-db")
 		path, err := database.BackupDatabase(backupDir)
 		if err != nil {
-			return nil, panelUpdateFail(trigger, latest.TagName, "backup_database", "备份面板数据库失败: "+err.Error())
+			return nil, panelUpdateFail(trigger, latest.TagName, "backup_database", "Failed to backup panel database: "+err.Error())
 		}
 		if err := database.VerifyDBBackup(path); err != nil {
-			return nil, panelUpdateFail(trigger, latest.TagName, "backup_database", "数据库备份校验失败: "+err.Error())
+			return nil, panelUpdateFail(trigger, latest.TagName, "backup_database", "Database backup verification failed: "+err.Error())
 		}
 		backupDB = path
 	}
@@ -223,49 +223,49 @@ func ExecutePanelUpdate(opts PanelUpdateOptions) (*GithubRelease, error) {
 	if opts.UseWatchdog && opts.Config != nil {
 		planPath, err := writeRollbackPlan(opts.Config, plan)
 		if err != nil {
-			return nil, panelUpdateFail(trigger, latest.TagName, "write_rollback_plan", "写入回滚计划失败: "+err.Error())
+			return nil, panelUpdateFail(trigger, latest.TagName, "write_rollback_plan", "Failed to write rollback plan: "+err.Error())
 		}
 		plan.PlanPath = planPath
 		if err := writeRollbackPlanFile(planPath, plan); err != nil {
-			return nil, panelUpdateFail(trigger, latest.TagName, "write_rollback_plan", "写入回滚计划失败: "+err.Error())
+			return nil, panelUpdateFail(trigger, latest.TagName, "write_rollback_plan", "Failed to write rollback plan: "+err.Error())
 		}
 	}
 
-	setPanelUpdateStep("replace_binary", "正在替换面板文件...", 92)
+	setPanelUpdateStep("replace_binary", "Replacing panel files...", 92)
 	stagedBinary := panelInstallPath + ".new"
 	_ = os.Remove(stagedBinary)
 	if err := copyPanelFile(newBinary, stagedBinary, 0755); err != nil {
 		_ = os.Remove(stagedBinary)
-		return nil, panelUpdateFail(trigger, latest.TagName, "replace_binary", "暂存新版本失败: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "replace_binary", "Failed to stage new version: "+err.Error())
 	}
 	if err := os.Rename(stagedBinary, panelInstallPath); err != nil {
 		_ = os.Remove(stagedBinary)
-		return nil, panelUpdateFail(trigger, latest.TagName, "replace_binary", "替换失败，旧版本仍保留: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "replace_binary", "Replacement failed, old version still retained: "+err.Error())
 	}
 	if err := os.Chmod(panelInstallPath, 0755); err != nil {
 		if rbErr := copyPanelFile(backupPath, panelInstallPath, 0755); rbErr != nil {
-			return nil, panelUpdateFail(trigger, latest.TagName, "replace_binary", "替换后权限设置失败，且自动回滚失败: "+rbErr.Error())
+			return nil, panelUpdateFail(trigger, latest.TagName, "replace_binary", "Permission setup failed after replacement, and auto-rollback failed: "+rbErr.Error())
 		}
-		return nil, panelUpdateFail(trigger, latest.TagName, "replace_binary", "替换后权限设置失败，已回滚: "+err.Error())
+		return nil, panelUpdateFail(trigger, latest.TagName, "replace_binary", "Permission setup failed after replacement, rolled back: "+err.Error())
 	}
 
 	if opts.UseWatchdog && plan.PlanPath != "" {
 		if err := startUpdateWatchdog(backupPath, plan.PlanPath, opts.ConfigPath); err != nil {
 			if rbErr := copyPanelFile(backupPath, panelInstallPath, 0755); rbErr != nil {
-				return nil, panelUpdateFail(trigger, latest.TagName, "start_watchdog", "启动更新健康检查进程失败，且恢复旧二进制失败: "+rbErr.Error())
+				return nil, panelUpdateFail(trigger, latest.TagName, "start_watchdog", "Failed to start update health check process, and failed to restore old binary: "+rbErr.Error())
 			}
-			return nil, panelUpdateFail(trigger, latest.TagName, "start_watchdog", "启动更新健康检查进程失败: "+err.Error())
+			return nil, panelUpdateFail(trigger, latest.TagName, "start_watchdog", "Failed to start update health check process: "+err.Error())
 		}
 	}
 
-	setPanelUpdateStep("restart", "正在重启面板...", 98)
-	recordPanelUpdateStage(trigger, latest.TagName, "restart", "running", "二进制替换完成，正在重启 wp-panel")
+	setPanelUpdateStep("restart", "Restarting panel...", 98)
+	recordPanelUpdateStage(trigger, latest.TagName, "restart", "running", "Binary replacement complete, restarting wp-panel")
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		_ = exec.Command("systemctl", "restart", "wp-panel").Run()
 	}()
 
-	setPanelUpdateCompleted("更新文件已替换，面板正在重启并等待健康检查...")
+	setPanelUpdateCompleted("Update files replaced, panel restarting and waiting for health check...")
 	return latest, nil
 }
 
@@ -305,23 +305,23 @@ func FinalizePendingPanelUpdate(cfg *config.Config, currentVersion string) {
 	}
 	var plan rollbackPlan
 	if err := json.Unmarshal(data, &plan); err != nil {
-		recordPanelUpdateStage("unknown", "", "finalize", "failed", "读取回滚计划失败: "+err.Error())
+		recordPanelUpdateStage("unknown", "", "finalize", "failed", "Failed to read rollback plan: "+err.Error())
 		return
 	}
 	if currentVersion == plan.TargetVersion {
-		recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "new_process_started", "running", "新版本进程已启动，等待 watchdog 健康检查")
+		recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "new_process_started", "running", "New version process started, waiting for watchdog health check")
 	}
 }
 
 func RunUpdateWatchdog(cfg *config.Config, planPath string) {
 	data, err := os.ReadFile(planPath)
 	if err != nil {
-		log.Printf("[更新守护] 读取回滚计划失败: %v", err)
+		log.Printf("[Update daemon] Failed to read rollback plan: %v", err)
 		return
 	}
 	var plan rollbackPlan
 	if err := json.Unmarshal(data, &plan); err != nil {
-		log.Printf("[更新守护] 解析回滚计划失败: %v", err)
+		log.Printf("[Update daemon] Failed to parse rollback plan: %v", err)
 		return
 	}
 	deadline := time.Now().Add(90 * time.Second)
@@ -329,9 +329,9 @@ func RunUpdateWatchdog(cfg *config.Config, planPath string) {
 	for time.Now().Before(deadline) {
 		time.Sleep(3 * time.Second)
 		if err := healthCheck(plan.HealthURL); err == nil {
-			recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "health_check", "success", "更新后健康检查通过")
+			recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "health_check", "success", "Post-update health check passed")
 			if plan.Trigger == "auto" {
-				sendPanelUpdateMail(true, plan.TargetVersion, "health_check", "自动更新成功，健康检查通过")
+				sendPanelUpdateMail(true, plan.TargetVersion, "health_check", "Auto-update succeeded, health check passed")
 			}
 			setSecuritySetting("panel_auto_update_last_status", "success")
 			setSecuritySetting("panel_auto_update_last_success_at", time.Now().Format(time.RFC3339))
@@ -344,30 +344,30 @@ func RunUpdateWatchdog(cfg *config.Config, planPath string) {
 			healthErr = err
 		}
 	}
-	msg := "健康检查超时"
+	msg := "Health check timed out"
 	if healthErr != nil {
 		msg += ": " + healthErr.Error()
 	}
 	recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "health_check", "failed", msg)
 	if err := copyPanelFile(plan.BackupBinary, panelInstallPath, 0755); err != nil {
-		failMsg := "恢复旧二进制失败: " + err.Error()
+		failMsg := "Failed to restore old binary: " + err.Error()
 		recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "rollback_binary", "failed", failMsg)
 		sendPanelUpdateMail(false, plan.TargetVersion, "rollback_binary", failMsg)
 		return
 	}
-	recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "rollback_binary", "success", "旧二进制已恢复")
+	recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "rollback_binary", "success", "Old binary restored")
 	if shouldRestoreDBAfterHealthFailure(plan.BackupDB) {
 		if err := restoreDBFile(cfg, plan.BackupDB); err != nil {
-			recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "rollback_database", "failed", "恢复数据库失败: "+err.Error())
+			recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "rollback_database", "failed", "Failed to restore database: "+err.Error())
 		} else {
-			recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "rollback_database", "success", "数据库备份已恢复")
+			recordPanelUpdateStage(plan.Trigger, plan.TargetVersion, "rollback_database", "success", "Database backup restored")
 		}
 	}
 	setSecuritySetting("panel_auto_update_last_status", "failed")
 	setSecuritySetting("panel_auto_update_last_stage", "health_check")
 	setSecuritySetting("panel_auto_update_last_error", msg)
 	if plan.Trigger == "auto" {
-		sendPanelUpdateMail(false, plan.TargetVersion, "health_check", msg+"；已尝试回滚旧版本")
+		sendPanelUpdateMail(false, plan.TargetVersion, "health_check", msg+"；Attempted rollback to old version")
 	}
 	_ = os.Remove(planPath)
 	_ = exec.Command("systemctl", "restart", "wp-panel").Run()
@@ -481,11 +481,11 @@ func verifySHA256(filePath, shaFile string) error {
 	}
 	fields := strings.Fields(string(data))
 	if len(fields) == 0 {
-		return fmt.Errorf("SHA256 文件为空")
+		return fmt.Errorf("SHA256 file is empty")
 	}
 	expected := fields[0]
 	if len(expected) != sha256.Size*2 {
-		return fmt.Errorf("SHA256 长度异常")
+		return fmt.Errorf("SHA256 length abnormal")
 	}
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -497,7 +497,7 @@ func verifySHA256(filePath, shaFile string) error {
 		return err
 	}
 	if !strings.EqualFold(expected, fmt.Sprintf("%x", h.Sum(nil))) {
-		return fmt.Errorf("SHA256 不匹配")
+		return fmt.Errorf("SHA256 mismatch")
 	}
 	return nil
 }
@@ -505,21 +505,21 @@ func verifySHA256(filePath, shaFile string) error {
 func verifyEd25519(shaFile, sigFile string) error {
 	pubKey, err := hex.DecodeString(releasePubKeyHex)
 	if err != nil {
-		return fmt.Errorf("解析内置公钥失败")
+		return fmt.Errorf("Failed to parse built-in public key")
 	}
 	sig, err := os.ReadFile(sigFile)
 	if err != nil {
 		return err
 	}
 	if len(sig) != ed25519.SignatureSize {
-		return fmt.Errorf("签名长度异常: %d", len(sig))
+		return fmt.Errorf("Signature length abnormal: %d", len(sig))
 	}
 	message, err := os.ReadFile(shaFile)
 	if err != nil {
 		return err
 	}
 	if !ed25519.Verify(pubKey, message, sig) {
-		return fmt.Errorf("Ed25519 签名不匹配")
+		return fmt.Errorf("Ed25519 signature mismatch")
 	}
 	return nil
 }
@@ -593,7 +593,7 @@ func resetPanelUpdateStatus() {
 }
 
 func resetPanelUpdateStatusLocked() {
-	currentPanelUpdateStatus = PanelUpdateStatus{Stage: "idle", Message: "等待更新", UpdatedAt: time.Now()}
+	currentPanelUpdateStatus = PanelUpdateStatus{Stage: "idle", Message: "Waiting for update", UpdatedAt: time.Now()}
 }
 
 func panelUpdateStatusExpiredLocked(now time.Time) bool {
@@ -634,7 +634,7 @@ func setPanelBinaryDownloadProgress(downloaded, total int64) {
 	currentPanelUpdateStatus.Running = true
 	currentPanelUpdateStatus.Completed = false
 	currentPanelUpdateStatus.Stage = "download_binary"
-	currentPanelUpdateStatus.Message = "正在下载更新包..."
+	currentPanelUpdateStatus.Message = "Downloading update package..."
 	currentPanelUpdateStatus.Percent = clampPercent(overallPercent)
 	currentPanelUpdateStatus.DownloadPercent = downloadPercent
 	currentPanelUpdateStatus.DownloadedBytes = downloaded
@@ -725,11 +725,11 @@ func runPanelAutoUpdateCheck(currentVersion, configPath string, cfg *config.Conf
 		return
 	}
 	if settings.Mode != "all_stable" && !IsPatchBump(currentVersion, latest.TagName) {
-		recordPanelUpdateStage("auto", latest.TagName, "version_policy", "skipped", "当前策略仅允许 patch 自动更新")
+		recordPanelUpdateStage("auto", latest.TagName, "version_policy", "skipped", "Current policy only allows patch auto-updates")
 		return
 	}
 	if wait, ok := shouldWaitForReleaseDelay(settings, latest.TagName); ok {
-		recordPanelUpdateStage("auto", latest.TagName, "waiting_release_delay", "waiting", "等待发布成熟期: "+wait.String())
+		recordPanelUpdateStage("auto", latest.TagName, "waiting_release_delay", "waiting", "Waiting for release maturation: "+wait.String())
 		return
 	}
 	_, _, sigURL := resolvePanelAssets(latest)
@@ -837,12 +837,12 @@ func handleWaitingSignature(settings autoUpdateSettings, version string) {
 		setSecuritySetting("panel_auto_update_signature_wait_at", waitAt.Format(time.RFC3339))
 	}
 	if time.Since(waitAt) > settings.SignatureTimeout {
-		msg := "等待签名文件超时，未找到 wp-panel.sha256.sig"
+		msg := "Timeout waiting for signature file, wp-panel.sha256.sig not found"
 		recordPanelUpdateStage("auto", version, "waiting_signature", "failed", msg)
 		sendPanelUpdateMail(false, version, "waiting_signature", msg)
 		return
 	}
-	recordPanelUpdateStage("auto", version, "waiting_signature", "waiting", "未找到 wp-panel.sha256.sig，等待签名发布")
+	recordPanelUpdateStage("auto", version, "waiting_signature", "waiting", "wp-panel.sha256.sig not found, waiting for signature release")
 }
 
 func withinAutoUpdateWindow(window string, now time.Time) bool {
@@ -893,7 +893,7 @@ func parseStableSemver(version string) ([3]int, bool) {
 func checkUpdateDiskSpace(binaryPath string, cfg *config.Config) error {
 	info, err := os.Stat(binaryPath)
 	if err != nil {
-		return fmt.Errorf("读取更新包大小失败: %w", err)
+		return fmt.Errorf("Failed to read update package size: %w", err)
 	}
 	targetDirs := []string{filepath.Dir(panelInstallPath)}
 	if cfg != nil && cfg.Panel.BackupDir != "" {
@@ -903,11 +903,11 @@ func checkUpdateDiskSpace(binaryPath string, cfg *config.Config) error {
 	for _, targetDir := range targetDirs {
 		var stat syscall.Statfs_t
 		if err := syscall.Statfs(targetDir, &stat); err != nil {
-			return fmt.Errorf("检查磁盘空间失败 (%s): %w", targetDir, err)
+			return fmt.Errorf("Failed to check disk space (%s): %w", targetDir, err)
 		}
 		free := int64(stat.Bavail) * int64(stat.Bsize)
 		if free < required {
-			return fmt.Errorf("磁盘剩余空间不足 (%s): 可用 %d MB，需要至少 %d MB", targetDir, free/1024/1024, required/1024/1024)
+			return fmt.Errorf("Insufficient disk space (%s): %d MB available, at least %d MB required", targetDir, free/1024/1024, required/1024/1024)
 		}
 	}
 	return nil
@@ -1028,49 +1028,49 @@ func restoreDBFile(cfg *config.Config, backupPath string) error {
 func stageLabel(stage string) string {
 	switch stage {
 	case "fetch_release":
-		return "获取版本信息"
+		return "Fetch version info"
 	case "compare_version":
-		return "版本比较"
+		return "Version comparison"
 	case "resolve_assets":
-		return "解析发布文件"
+		return "Parse release files"
 	case "waiting_release_delay":
-		return "等待发布延迟"
+		return "Wait for release delay"
 	case "waiting_signature":
-		return "等待签名文件"
+		return "Wait for signature file"
 	case "version_policy":
-		return "版本策略检查"
+		return "Version policy check"
 	case "download_binary":
-		return "下载二进制"
+		return "Download binary"
 	case "download_sha256":
-		return "下载校验文件"
+		return "Download checksum"
 	case "download_signature":
-		return "下载签名文件"
+		return "Download signature"
 	case "verify_signature":
-		return "校验签名"
+		return "Verify signature"
 	case "verify_sha256":
-		return "校验完整性"
+		return "Verify integrity"
 	case "preflight":
-		return "预检新版本"
+		return "Preflight new version"
 	case "disk_check":
-		return "磁盘空间检查"
+		return "Disk space check"
 	case "backup_binary":
-		return "备份旧版本"
+		return "Backup old version"
 	case "backup_database":
-		return "备份数据库"
+		return "Backup database"
 	case "write_rollback_plan":
-		return "写入回滚计划"
+		return "Write rollback plan"
 	case "replace_binary":
-		return "替换二进制"
+		return "Replace binary"
 	case "start_watchdog":
-		return "启动健康检查"
+		return "Start health check"
 	case "restart":
-		return "重启面板"
+		return "Restart panel"
 	case "health_check":
-		return "健康检查"
+		return "Health check"
 	case "rollback_binary":
-		return "回滚二进制"
+		return "Rollback binary"
 	case "rollback_database":
-		return "回滚数据库"
+		return "Rollback database"
 	default:
 		return stage
 	}
@@ -1081,21 +1081,21 @@ func sendPanelUpdateMail(success bool, targetVersion, stage, message string) {
 	if cfg == nil || cfg.Host == "" || cfg.AdminEmail == "" {
 		return
 	}
-	status := "失败"
+	status := "failed"
 	if success {
-		status = "成功"
+		status = "succeeded"
 	}
 	body := fmt.Sprintf(`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; color: #333;">
-<h2>WP Panel 自动更新%s</h2>
-<p>目标版本：%s</p>
-<p>阶段：%s</p>
-<p>详情：%s</p>
-<p style="font-size: 12px; color: #aaa; margin-top: 20px;">来自 %s 面板</p>
+<h2>WP Panel Auto-Update%s</h2>
+<p>Target version: %s</p>
+<p>Stage: %s</p>
+<p>Details: %s</p>
+<p style="font-size: 12px; color: #aaa; margin-top: 20px;">From %s panel</p>
 </body></html>`, status, html.EscapeString(targetVersion), html.EscapeString(stageLabel(stage)), html.EscapeString(message), html.EscapeString(getPanelTitle()))
-	if err := SendMail("", getPanelTitle()+" 自动更新"+status, body); err != nil {
-		log.Printf("自动更新邮件发送失败: %v", err)
+	if err := SendMail("", getPanelTitle()+" Auto-Update "+status, body); err != nil {
+		log.Printf("Failed to send auto-update email: %v", err)
 	}
 }
 
@@ -1130,11 +1130,11 @@ func cleanupPanelUpdateBackups(plan rollbackPlan) {
 	if plan.BackupDB != "" {
 		backupDir := filepath.Dir(plan.BackupDB)
 		if removed := database.CleanupOldDBBackups(backupDir, panelDBBackupKeep); removed > 0 {
-			recordOperationLog("panel_"+plan.Trigger+"_update", plan.TargetVersion, "success", fmt.Sprintf("cleanup_database_backups: 已清理 %d 份旧数据库备份", removed))
+			recordOperationLog("panel_"+plan.Trigger+"_update", plan.TargetVersion, "success", fmt.Sprintf("cleanup_database_backups: cleaned %d old database backups", removed))
 		}
 	}
 	if removed := cleanupPanelBinaryBackups(panelBinaryBackupKeep); removed > 0 {
-		recordOperationLog("panel_"+plan.Trigger+"_update", plan.TargetVersion, "success", fmt.Sprintf("cleanup_binary_backups: 已清理 %d 份旧二进制备份", removed))
+		recordOperationLog("panel_"+plan.Trigger+"_update", plan.TargetVersion, "success", fmt.Sprintf("cleanup_binary_backups: cleaned %d old binary backups", removed))
 	}
 }
 

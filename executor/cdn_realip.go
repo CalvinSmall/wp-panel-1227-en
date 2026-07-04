@@ -33,10 +33,10 @@ type CDNRealIPRuntime struct {
 func NormalizeCDNRealIPHeader(raw string) (string, error) {
 	header := strings.TrimSpace(raw)
 	if header == "" {
-		return "", fmt.Errorf("真实 IP Header 不能为空")
+		return "", fmt.Errorf("Real IP Header cannot be empty")
 	}
 	if !cdnHeaderNameRe.MatchString(header) {
-		return "", fmt.Errorf("真实 IP Header 只能包含英文字母、数字和短横线")
+		return "", fmt.Errorf("Real IP Header can only contain letters, digits, and hyphens")
 	}
 	return header, nil
 }
@@ -48,7 +48,7 @@ func NormalizeCDNRealIPRanges(raw string) ([]string, error) {
 	}
 	lines := strings.Split(raw, "\n")
 	if len(lines) > 1000 {
-		return nil, fmt.Errorf("CDN 回源 IP 段数量过大")
+		return nil, fmt.Errorf("CDN origin IP range count too large")
 	}
 	seen := map[string]bool{}
 	var out []string
@@ -58,14 +58,14 @@ func NormalizeCDNRealIPRanges(raw string) ([]string, error) {
 			continue
 		}
 		if strings.ContainsAny(item, " \t\r") {
-			return nil, fmt.Errorf("CDN 回源 IP 格式不正确: %s", item)
+			return nil, fmt.Errorf("CDN origin IP format invalid: %s", item)
 		}
 		if strings.Contains(item, "/") {
 			if _, _, err := net.ParseCIDR(item); err != nil {
-				return nil, fmt.Errorf("CDN 回源 IP 格式不正确: %s", item)
+				return nil, fmt.Errorf("CDN origin IP format invalid: %s", item)
 			}
 		} else if net.ParseIP(item) == nil {
-			return nil, fmt.Errorf("CDN 回源 IP 格式不正确: %s", item)
+			return nil, fmt.Errorf("CDN origin IP format invalid: %s", item)
 		}
 		if !seen[item] {
 			seen[item] = true
@@ -156,14 +156,14 @@ func ResolveCDNRealIPRuntime(site *models.Website) (*CDNRealIPRuntime, error) {
 		if header == "" {
 			header = groupHeader
 		} else if !strings.EqualFold(header, groupHeader) {
-			return nil, fmt.Errorf("同一网站绑定的 CDN 配置组必须使用相同 Header")
+			return nil, fmt.Errorf("CDN config groups bound to the same site must use the same Header")
 		}
 
 		groupRanges := strings.TrimSpace(group.IPRanges)
 		if group.Provider == CDNProviderCloudflare && groupRanges == "" {
 			groupRanges = cachedCloudflareRealIPRanges()
 			if strings.TrimSpace(groupRanges) == "" {
-				return nil, fmt.Errorf("Cloudflare 官方 IP 段尚未缓存，请先刷新官方白名单")
+				return nil, fmt.Errorf("Cloudflare official IP ranges not cached yet, please refresh the official whitelist first")
 			}
 		}
 		normalized, err := NormalizeCDNRealIPRanges(groupRanges)
@@ -309,10 +309,10 @@ func GetEnabledCDNRealIPGroupsByIDs(groupIDs []int) ([]models.CDNRealIPGroup, er
 		seenIDs[id] = true
 		group, err := GetCDNRealIPGroup(id)
 		if err != nil {
-			return nil, fmt.Errorf("CDN 配置组不存在")
+			return nil, fmt.Errorf("CDN config group does not exist")
 		}
 		if !group.Enabled {
-			return nil, fmt.Errorf("CDN 配置组已禁用: %s", group.Name)
+			return nil, fmt.Errorf("CDN config group is disabled: %s", group.Name)
 		}
 		groups = append(groups, group)
 	}

@@ -3,9 +3,9 @@ set -e
 set -o pipefail
 
 # ============================================================
-# WP Panel 国内入口脚本
-# 主安装逻辑统一维护在 install.sh。
-# 这里仅启用国内优先策略，并在管道安装时通过多个固定来源拉取主脚本。
+# WP Panel China Entry Script
+# Main installation logic is maintained in install.sh.
+# Here we only enable China-priority strategy and fetch the main script from multiple fixed sources during pipeline installation.
 # ============================================================
 
 RED='\033[0;31m'
@@ -15,9 +15,9 @@ NC='\033[0m'
 
 GITHUB_INSTALL_URL="https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh"
 INSTALL_SCRIPT_SOURCES=(
-    "gh.wp-panel.org 反代|https://gh.wp-panel.org/${GITHUB_INSTALL_URL}"
-    "jsDelivr 反代|https://cdn.jsdelivr.net/gh/naibabiji/wp-panel@main/install.sh"
-    "GitHub 直连|${GITHUB_INSTALL_URL}"
+    "gh.wp-panel.org reverse proxy|https://gh.wp-panel.org/${GITHUB_INSTALL_URL}"
+    "jsDelivr reverse proxy|https://cdn.jsdelivr.net/gh/naibabiji/wp-panel@main/install.sh"
+    "GitHub direct|${GITHUB_INSTALL_URL}"
 )
 
 log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
@@ -28,7 +28,7 @@ export WP_PANEL_PREFER_CN_MIRROR=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
 if [[ -n "$SCRIPT_DIR" ]] && [[ -f "$SCRIPT_DIR/install.sh" ]]; then
-    log_info "使用同目录 install.sh，并启用国内优先策略"
+    log_info "Using install.sh from same directory, enabling China-priority strategy"
     exec bash "$SCRIPT_DIR/install.sh" --prefer-cn "$@"
 fi
 
@@ -45,7 +45,7 @@ download_install_script() {
 
 validate_install_script() {
     local content="$1"
-    [[ "$content" == *"WP Panel 安装脚本"* ]] && [[ "$content" == *"部署面板二进制"* ]]
+    [[ "$content" == *"WP Panel install script"* ]] && [[ "$content" == *"Deploy panel binary"* ]]
 }
 
 INSTALL_SCRIPT=""
@@ -53,21 +53,21 @@ for source in "${INSTALL_SCRIPT_SOURCES[@]}"; do
     label="${source%%|*}"
     url="${source#*|}"
 
-    log_info "通过 ${label} 获取主安装脚本..."
+    log_info "Fetching main install script via ${label}..."
     CANDIDATE_SCRIPT="$(download_install_script "$url" || true)"
     if [[ -n "$CANDIDATE_SCRIPT" ]] && validate_install_script "$CANDIDATE_SCRIPT"; then
         INSTALL_SCRIPT="$CANDIDATE_SCRIPT"
-        log_info "主安装脚本获取成功: ${label}"
+        log_info "Main install script fetched successfully: ${label}"
         break
     fi
-    log_warn "${label} 获取失败或内容异常，尝试下一个来源..."
+    log_warn "${label} fetch failed or content abnormal, trying next source..."
 done
 
 if [[ -z "$INSTALL_SCRIPT" ]]; then
-    log_error "无法获取 install.sh。建议方案：
-  1. 检查服务器能否访问 gh.wp-panel.org、cdn.jsdelivr.net 或 GitHub
-  2. 手动下载 install.sh 后执行：bash install.sh --prefer-cn
-  3. 如 GitHub Releases 也不可访问，请同时下载 release 附件 wp-panel，并与 install.sh 放在同一目录后重新运行"
+    log_error "Cannot obtain install.sh. Suggested solutions:
+  1. Check if the server can access gh.wp-panel.org, cdn.jsdelivr.net, or GitHub
+  2. Manually download install.sh and run: bash install.sh --prefer-cn
+  3. If GitHub Releases is also inaccessible, also download the release attachment wp-panel, place it in the same directory as install.sh, and re-run"
 fi
 
 exec bash -s -- --prefer-cn "$@" <<< "$INSTALL_SCRIPT"

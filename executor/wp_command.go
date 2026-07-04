@@ -19,110 +19,110 @@ dim()  { echo -e "\033[2m$*\033[0m"; }
 diag() {
     local issues=0
 
-    # 1. 二进制
+    # 1. Binary
     if [ -x "$BIN" ]; then
-        green "✓ 二进制: $BIN"
+        green "✓ Binary: $BIN"
     elif [ -f "$BIN" ]; then
-        red "✗ 二进制无执行权限: $BIN"
-        echo "   → 修复: chmod +x $BIN"
+        red "✗ Binary is not executable: $BIN"
+        echo "   → Fix: chmod +x $BIN"
         issues=$((issues+1))
     else
-        red "✗ 二进制不存在: $BIN"
-        echo "   → 面板可能未安装或安装不完整，请重新运行 install.sh"
+        red "✗ Binary not found: $BIN"
+        echo "   → Panel may not be installed or installation is incomplete. Please run install.sh again"
         issues=$((issues+1))
         return $issues
     fi
 
-    # 2. 配置文件
+    # 2. Config file
     if [ -f "$CFG" ]; then
         if python3 -c "import json; json.load(open('$CFG'))" 2>/dev/null; then
-            green "✓ 配置文件: $CFG"
+            green "✓ Config file: $CFG"
         else
-            red "✗ 配置文件 JSON 格式错误: $CFG"
-            echo "   → 修复: 检查文件内容或从备份恢复"
+            red "✗ Config file has invalid JSON: $CFG"
+            echo "   → Fix: check file contents or restore from backup"
             issues=$((issues+1))
         fi
     else
-        red "✗ 配置文件不存在: $CFG"
-        echo "   → 面板可能未安装，请重新运行 install.sh"
+        red "✗ Config file not found: $CFG"
+        echo "   → Panel may not be installed. Please run install.sh again"
         issues=$((issues+1))
         return $issues
     fi
 
-    # 3. 数据库
+    # 3. Database
     DB=$(python3 -c "import json; d=json.load(open('$CFG')); print(d.get('sqlite',{}).get('path',''))" 2>/dev/null)
     if [ -n "$DB" ] && [ -f "$DB" ]; then
-        green "✓ 数据库: $DB"
+        green "✓ Database: $DB"
     elif [ -n "$DB" ]; then
-        red "✗ 数据库文件不存在: $DB"
-        echo "   → 数据库文件丢失，检查磁盘空间或从备份恢复"
+        red "✗ Database file not found: $DB"
+        echo "   → Database file is missing. Check disk space or restore from backup"
         issues=$((issues+1))
     else
-        dim "? 未能读取数据库路径"
+        dim "? Could not read database path"
     fi
 
-    # 4. systemd 服务文件
+    # 4. systemd service file
     if [ -f "/etc/systemd/system/${SVC}.service" ]; then
-        green "✓ systemd 服务文件: /etc/systemd/system/${SVC}.service"
+        green "✓ systemd service file: /etc/systemd/system/${SVC}.service"
     else
-        red "✗ systemd 服务文件缺失"
-        echo "   → 修复: 重新运行 install.sh"
+        red "✗ systemd service file missing"
+        echo "   → Fix: run install.sh again"
         issues=$((issues+1))
         return $issues
     fi
 
-    # 5. 端口
+    # 5. Port
     PORT=$(python3 -c "import json; d=json.load(open('$CFG')); print(d['panel'].get('tls_port', d['panel']['port']))" 2>/dev/null)
     if [ -n "$PORT" ]; then
         if ss -tlnp 2>/dev/null | grep -q ":${PORT} "; then
-            green "✓ 端口 ${PORT} 已监听"
+            green "✓ Port ${PORT} is listening"
         else
-            dim "? 端口 ${PORT} 未监听（面板未在运行）"
+            dim "? Port ${PORT} is not listening (panel is not running)"
         fi
     fi
 
-    # 6. systemd 状态
+    # 6. systemd status
     if systemctl is-active --quiet "$SVC"; then
-        green "✓ 服务状态: 运行中"
+        green "✓ Service status: running"
     else
-        red "✗ 服务状态: 未运行"
+        red "✗ Service status: not running"
         issues=$((issues+1))
         echo ""
-        echo "── 最近的错误日志 ──"
+        echo "── Recent error logs ──"
         journalctl -u "$SVC" -n 20 --no-pager --lines=6 2>/dev/null | tail -20
-        echo "── 日志结束 ──"
+        echo "── End of logs ──"
         echo ""
-        echo "→ 查看完整日志: journalctl -u $SVC -n 50 --no-pager"
+        echo "→ View full logs: journalctl -u $SVC -n 50 --no-pager"
     fi
 
     if [ $issues -eq 0 ]; then
         echo ""
-        green "所有检查通过"
+        green "All checks passed"
     else
         echo ""
-        red "发现 ${issues} 个问题"
+        red "Found ${issues} issue(s)"
     fi
 }
 
 case "${1:-}" in
     restart)
-        echo "正在重启面板..."
+        echo "Restarting panel..."
         if systemctl restart "$SVC" 2>/dev/null; then
             sleep 2
             if systemctl is-active --quiet "$SVC"; then
-                green "WP Panel 已重启，运行中"
+                green "WP Panel restarted and running"
             else
-                red "WP Panel 重启后未能启动"
+                red "WP Panel failed to start after restart"
                 echo ""
-                echo "── 最近日志 ──"
+                echo "── Recent logs ──"
                 journalctl -u "$SVC" -n 20 --no-pager 2>/dev/null | tail -20
-                echo "── 结束 ──"
+                echo "── End ──"
                 echo ""
-                echo "→ 运行 'wp status' 进行完整诊断"
+                echo "→ Run 'wp status' for full diagnostics"
             fi
         else
-            red "systemctl restart 失败，服务可能未安装"
-            echo "→ 运行 'wp status' 进行诊断"
+            red "systemctl restart failed. Service may not be installed"
+            echo "→ Run 'wp status' for diagnostics"
         fi
         ;;
     password)
@@ -135,8 +135,8 @@ case "${1:-}" in
         $BIN --unban-all
         ;;
     status|check)
-        echo "WP Panel 诊断检查"
-        echo "=================="
+        echo "WP Panel Diagnostic Check"
+        echo "========================="
         echo ""
         diag
         ;;
@@ -151,23 +151,23 @@ case "${1:-}" in
             SUFFIX=$(python3 -c "import json; d=json.load(open('$CFG')); print(d['panel']['random_suffix'])" 2>/dev/null)
             IP=$(hostname -I 2>/dev/null | awk '{print $1}')
             TLS_PORT=$(python3 -c "import json; d=json.load(open('$CFG')); print(d['panel'].get('tls_port', d['panel']['port']))" 2>/dev/null)
-            [ -n "$TLS_PORT" ] && [ -n "$SUFFIX" ] && [ -n "$IP" ] && echo "面板地址: https://$IP:$TLS_PORT/$SUFFIX"
+            [ -n "$TLS_PORT" ] && [ -n "$SUFFIX" ] && [ -n "$IP" ] && echo "Panel address: https://$IP:$TLS_PORT/$SUFFIX"
         fi
         if systemctl is-active --quiet "$SVC"; then
-            green "运行状态: 运行中"
+            green "Running status: running"
         else
-            red "运行状态: 未运行"
+            red "Running status: not running"
             echo ""
-            echo "── 自动诊断 ──"
+            echo "── Auto diagnostics ──"
             diag
         fi
         echo ""
-        echo "用法: wp <命令>"
-        echo "  wp restart     重启面板"
-        echo "  wp status      完整诊断检查"
-        echo "  wp log [N]     查看最近 N 条日志（默认30）"
-        echo "  wp password    一键重置管理员账号密码"
-        echo "  wp unban       一键清空所有IP封禁"
+        echo "Usage: wp <command>"
+        echo "  wp restart     Restart the panel"
+        echo "  wp status      Full diagnostic check"
+        echo "  wp log [N]     Show last N log entries (default: 30)"
+        echo "  wp password    Reset admin account password"
+        echo "  wp unban       Clear all IP bans"
         ;;
 esac
 `
@@ -175,6 +175,6 @@ esac
 func EnsureWPCommand() {
 	path := "/usr/local/bin/wp"
 	if err := os.WriteFile(path, []byte(wpScript), 0755); err != nil {
-		log.Printf("wp 命令安装失败 (%s): %v", path, err)
+		log.Printf("Failed to install wp command (%s): %v", path, err)
 	}
 }

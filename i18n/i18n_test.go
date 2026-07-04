@@ -25,19 +25,19 @@ func TestTranslateAndFallback(t *testing.T) {
 	if got := T(English, "nav.dashboard"); got != "Dashboard" {
 		t.Fatalf("English dashboard = %q", got)
 	}
-	if got := T("bad", "nav.dashboard"); got != "控制台" {
+	if got := T("bad", "nav.dashboard"); got != "Dashboard" {
 		t.Fatalf("default language dashboard = %q", got)
 	}
 
 	originalMessages := messages
 	messages = map[string]map[string]any{
-		DefaultLang: {"sample": map[string]any{"fallback": "中文回退"}},
+		DefaultLang: {"sample": map[string]any{"fallback": "Chinese fallback"}},
 		English:     {"sample": map[string]any{}},
 	}
 	t.Cleanup(func() {
 		messages = originalMessages
 	})
-	if got := T(English, "sample.fallback"); got != "中文回退" {
+	if got := T(English, "sample.fallback"); got != "Chinese fallback" {
 		t.Fatalf("English missing key fallback = %q", got)
 	}
 	if got := T(English, "missing.key"); got != "missing.key" {
