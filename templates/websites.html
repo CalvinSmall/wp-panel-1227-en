@@ -6,7 +6,7 @@
         <a href="/{{.RandomSuffix}}/websites/new" class="btn-primary">{{t .Lang "website.create_site"}}</a>
     </div>
 
-    <!-- 重装 WordPress 对话框 -->
+    <!-- Reinstall WordPress dialog -->
     <div x-show="reinstallModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="reinstallModal.show = false">
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <h3 class="text-lg font-bold text-white mb-2">

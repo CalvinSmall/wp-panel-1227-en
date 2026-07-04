@@ -27,7 +27,7 @@ func (h *SecurityHandler) GetSettings(c *gin.Context) {
 	db := database.GetDB()
 	rows, err := db.Query("SELECT id, skey, svalue, description, updated_at FROM security_settings")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Query failed"))
 		return
 	}
 	defer rows.Close()
@@ -50,7 +50,7 @@ func (h *SecurityHandler) GetSettings(c *gin.Context) {
 func (h *SecurityHandler) UpdateSettings(c *gin.Context) {
 	var raw map[string]interface{}
 	if err := c.ShouldBindJSON(&raw); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("Invalid parameters"))
 		return
 	}
 
@@ -73,12 +73,12 @@ func (h *SecurityHandler) UpdateSettings(c *gin.Context) {
 	if newVal, ok := normalized["wp_security_log_whitelist"]; ok {
 		_ = db.QueryRow("SELECT svalue FROM security_settings WHERE skey = 'wp_security_log_whitelist'").Scan(&oldWPSecurityWhitelist)
 		if _, err := db.Exec("UPDATE security_settings SET svalue = ?, updated_at = CURRENT_TIMESTAMP WHERE skey = 'wp_security_log_whitelist'", newVal); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("安全设置保存失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to save security settings"))
 			return
 		}
 		if err := executor.EnsureLogMap(); err != nil {
 			_, _ = db.Exec("UPDATE security_settings SET svalue = ?, updated_at = CURRENT_TIMESTAMP WHERE skey = 'wp_security_log_whitelist'", oldWPSecurityWhitelist)
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("Nginx 日志规则应用失败，已回滚白名单设置: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to apply Nginx log rules. Whitelist settings have been rolled back: "+err.Error()))
 			return
 		}
 		delete(normalized, "wp_security_log_whitelist")
@@ -86,25 +86,25 @@ func (h *SecurityHandler) UpdateSettings(c *gin.Context) {
 
 	for key, strVal := range normalized {
 		if _, err := db.Exec("UPDATE security_settings SET svalue = ?, updated_at = CURRENT_TIMESTAMP WHERE skey = ?", strVal, key); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("安全设置保存失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to save security settings"))
 			return
 		}
 	}
 
 	if needsFail2banApply(normalized) {
 		if err := applyFail2banSettings(); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("Fail2ban 配置应用失败: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to apply Fail2ban configuration: "+err.Error()))
 			return
 		}
 	}
 	if needsRateLimitApply(normalized) {
 		if err := applyRateLimit(); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("Nginx 限速配置应用失败: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to apply Nginx rate limit configuration: "+err.Error()))
 			return
 		}
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "安全设置已更新"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Security settings updated"}))
 }
 
 func needsFail2banApply(settings map[string]string) bool {
@@ -128,13 +128,13 @@ func needsRateLimitApply(settings map[string]string) bool {
 func (h *SecurityHandler) RefreshWhitelist(c *gin.Context) {
 	executor.GoSafe(refreshOfficialWhitelist)
 
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "白名单刷新任务已提交"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Whitelist refresh task submitted"}))
 }
 
 func (h *SecurityHandler) ListCDNRealIPGroups(c *gin.Context) {
 	groups, err := executor.ListCDNRealIPGroups()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询 CDN 配置组失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to query CDN configuration groups"))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(groups))
@@ -149,7 +149,7 @@ func (h *SecurityHandler) CreateCDNRealIPGroup(c *gin.Context) {
 		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("Invalid parameters"))
 		return
 	}
 
@@ -161,38 +161,38 @@ func (h *SecurityHandler) CreateCDNRealIPGroup(c *gin.Context) {
 	res, err := database.GetDB().Exec(`INSERT INTO cdn_realip_groups (name, provider, header_name, ip_ranges, builtin, enabled, description)
 		VALUES (?, 'custom', ?, ?, 0, ?, ?)`, name, header, ranges, boolToInt(enabled), desc)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建 CDN 配置组失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to create CDN configuration group"))
 		return
 	}
 	if err := applyFail2banSettings(); err != nil {
 		id, idErr := res.LastInsertId()
 		if idErr != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已创建，但 Fail2ban 白名单应用失败，且数据库回滚失败: "+idErr.Error()+"；原始错误: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group created, but Fail2ban whitelist application failed and database rollback failed: "+idErr.Error()+"；original error: "+err.Error()))
 			return
 		}
 		if _, rollbackErr := database.GetDB().Exec(`DELETE FROM cdn_realip_groups WHERE id = ? AND builtin = 0`, id); rollbackErr != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已创建，但 Fail2ban 白名单应用失败，且数据库回滚失败: "+rollbackErr.Error()+"；原始错误: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group created, but Fail2ban whitelist application failed and database rollback failed: "+rollbackErr.Error()+"；original error: "+err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组未创建，Fail2ban 白名单应用失败，已回滚: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group was not created. Fail2ban whitelist application failed, rolled back: "+err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "CDN 配置组已创建"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "CDN configuration group created"}))
 }
 
 func (h *SecurityHandler) UpdateCDNRealIPGroup(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的配置组ID"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("Invalid configuration group ID"))
 		return
 	}
 	group, err := executor.GetCDNRealIPGroup(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("CDN 配置组不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("CDN configuration group not found"))
 		return
 	}
 	if group.Builtin {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("内置 CDN 配置组不可修改"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("Built-in CDN configuration groups cannot be modified"))
 		return
 	}
 
@@ -204,7 +204,7 @@ func (h *SecurityHandler) UpdateCDNRealIPGroup(c *gin.Context) {
 		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("Invalid parameters"))
 		return
 	}
 	name, header, ranges, enabled, desc, err := normalizeCDNRealIPGroupPayload(req.Name, req.HeaderName, req.IPRanges, req.Enabled, req.Description)
@@ -215,89 +215,89 @@ func (h *SecurityHandler) UpdateCDNRealIPGroup(c *gin.Context) {
 	if _, err := database.GetDB().Exec(`UPDATE cdn_realip_groups
 		SET name = ?, header_name = ?, ip_ranges = ?, enabled = ?, description = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`, name, header, ranges, boolToInt(enabled), desc, id); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存 CDN 配置组失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to save CDN configuration group"))
 		return
 	}
 	if err := applyFail2banSettings(); err != nil {
 		if _, rollbackErr := database.GetDB().Exec(`UPDATE cdn_realip_groups
 			SET name = ?, header_name = ?, ip_ranges = ?, enabled = ?, description = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?`, group.Name, group.HeaderName, group.IPRanges, boolToInt(group.Enabled), group.Description, id); rollbackErr != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已保存，但 Fail2ban 白名单应用失败，且数据库回滚失败: "+rollbackErr.Error()+"；原始错误: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group saved, but Fail2ban whitelist application failed and database rollback failed: "+rollbackErr.Error()+"；original error: "+err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组未生效，Fail2ban 白名单应用失败，已回滚: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group did not take effect. Fail2ban whitelist application failed, rolled back: "+err.Error()))
 		return
 	}
 	if err := regenerateAllSitesNginx(); err != nil {
 		if _, rollbackErr := database.GetDB().Exec(`UPDATE cdn_realip_groups
 			SET name = ?, header_name = ?, ip_ranges = ?, enabled = ?, description = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?`, group.Name, group.HeaderName, group.IPRanges, boolToInt(group.Enabled), group.Description, id); rollbackErr != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已保存，但部分网站 Nginx 配置更新失败，且数据库回滚失败: "+rollbackErr.Error()+"；原始错误: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group saved, but some site Nginx configuration update failed and database rollback failed: "+rollbackErr.Error()+"；original error: "+err.Error()))
 			return
 		}
 		if rollbackErr := reapplyCDNRealIPRuntime(); rollbackErr != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已保存，但部分网站 Nginx 配置更新失败，且回滚失败: "+rollbackErr.Error()+"；原始错误: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group saved, but some site Nginx configuration update failed and rollback also failed: "+rollbackErr.Error()+"；original error: "+err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组未生效，部分网站 Nginx 配置更新失败，已回滚: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group did not take effect. Some site Nginx configuration update failed, rolled back: "+err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "CDN 配置组已保存"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "CDN configuration group saved"}))
 }
 
 func (h *SecurityHandler) DeleteCDNRealIPGroup(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的配置组ID"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("Invalid configuration group ID"))
 		return
 	}
 	group, err := executor.GetCDNRealIPGroup(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("CDN 配置组不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("CDN configuration group not found"))
 		return
 	}
 	if group.Builtin {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("内置 CDN 配置组不可删除"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("Built-in CDN configuration groups cannot be deleted"))
 		return
 	}
 	boundWebsiteIDs, err := websiteIDsForCDNRealIPGroup(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取 CDN 配置组绑定网站失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to read CDN configuration group website bindings"))
 		return
 	}
 	if _, err := database.GetDB().Exec(`DELETE FROM cdn_realip_groups WHERE id = ?`, id); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("删除 CDN 配置组失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to delete CDN configuration group"))
 		return
 	}
 	if err := applyFail2banSettings(); err != nil {
 		if restoreErr := restoreCDNRealIPGroupWithBindings(group, boundWebsiteIDs); restoreErr != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已删除，但 Fail2ban 白名单应用失败，且数据库回滚失败: "+restoreErr.Error()+"；原始错误: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group deleted, but Fail2ban whitelist application failed and database rollback failed: "+restoreErr.Error()+"；original error: "+err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组未删除，Fail2ban 白名单应用失败，已回滚: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group was not deleted. Fail2ban whitelist application failed, rolled back: "+err.Error()))
 		return
 	}
 	if err := regenerateAllSitesNginx(); err != nil {
 		if restoreErr := restoreCDNRealIPGroupWithBindings(group, boundWebsiteIDs); restoreErr != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已删除，但部分网站 Nginx 配置更新失败，且数据库回滚失败: "+restoreErr.Error()+"；原始错误: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group deleted, but some site Nginx configuration update failed and database rollback failed: "+restoreErr.Error()+"；original error: "+err.Error()))
 			return
 		}
 		if rollbackErr := reapplyCDNRealIPRuntime(); rollbackErr != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组已删除，但部分网站 Nginx 配置更新失败，且回滚失败: "+rollbackErr.Error()+"；原始错误: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group deleted, but some site Nginx configuration update failed and rollback also failed: "+rollbackErr.Error()+"；original error: "+err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN 配置组未删除，部分网站 Nginx 配置更新失败，已回滚: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("CDN configuration group was not deleted. Some site Nginx configuration update failed, rolled back: "+err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "CDN 配置组已删除"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "CDN configuration group deleted"}))
 }
 
 func reapplyCDNRealIPRuntime() error {
 	if err := applyFail2banSettings(); err != nil {
-		return fmt.Errorf("Fail2ban 回滚失败: %w", err)
+		return fmt.Errorf("Fail2ban rollback failed: %w", err)
 	}
 	if err := regenerateAllSitesNginx(); err != nil {
-		return fmt.Errorf("Nginx 回滚失败: %w", err)
+		return fmt.Errorf("Nginx rollback failed: %w", err)
 	}
 	return nil
 }
@@ -309,7 +309,7 @@ func refreshOfficialWhitelist() {
 func normalizeCDNRealIPGroupPayload(name, headerName, rawRanges string, enabled *bool, description string) (string, string, string, bool, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || len(name) > 50 || strings.ContainsAny(name, "\r\n\t") {
-		return "", "", "", false, "", fmt.Errorf("CDN 配置组名称格式不正确")
+		return "", "", "", false, "", fmt.Errorf("Invalid CDN configuration group name format")
 	}
 	header, err := executor.NormalizeCDNRealIPHeader(headerName)
 	if err != nil {
@@ -325,7 +325,7 @@ func normalizeCDNRealIPGroupPayload(name, headerName, rawRanges string, enabled 
 	}
 	description = strings.TrimSpace(description)
 	if len(description) > 200 {
-		return "", "", "", false, "", fmt.Errorf("备注过长")
+		return "", "", "", false, "", fmt.Errorf("Description is too long")
 	}
 	return name, header, executor.JoinCDNRealIPRanges(ranges), isEnabled, description, nil
 }
@@ -356,7 +356,7 @@ func normalizeSecuritySetting(key string, val interface{}) (string, bool, error)
 	case "whitelist_ips":
 		v, ok := val.(string)
 		if !ok {
-			return "", false, fmt.Errorf("白名单格式不正确")
+			return "", false, fmt.Errorf("Invalid whitelist format")
 		}
 		v = strings.TrimSpace(v)
 		if err := validateWhitelistIPs(v); err != nil {
@@ -366,7 +366,7 @@ func normalizeSecuritySetting(key string, val interface{}) (string, bool, error)
 	case "wp_security_log_whitelist":
 		v, ok := val.(string)
 		if !ok {
-			return "", false, fmt.Errorf("WordPress安全日志白名单格式不正确")
+			return "", false, fmt.Errorf("WordPress security log whitelist format invalid")
 		}
 		patterns, err := executor.NormalizeWPSecurityLogWhitelist(v)
 		if err != nil {
@@ -381,10 +381,10 @@ func normalizeSecuritySetting(key string, val interface{}) (string, bool, error)
 func normalizeRange(key string, val interface{}, min int, max int) (string, bool, error) {
 	n, err := normalizeInt(val)
 	if err != nil {
-		return "", false, fmt.Errorf("%s 必须是数字", key)
+		return "", false, fmt.Errorf("%s must be a number", key)
 	}
 	if n < min || n > max {
-		return "", false, fmt.Errorf("%s 必须在 %d-%d 之间", key, min, max)
+		return "", false, fmt.Errorf("%s must be between %d and %d", key, min, max)
 	}
 	return strconv.Itoa(n), true, nil
 }
@@ -416,7 +416,7 @@ func normalizeBool(val interface{}) (string, error) {
 			return v, nil
 		}
 	}
-	return "", fmt.Errorf("开关值不正确")
+	return "", fmt.Errorf("Invalid toggle value")
 }
 
 func boolToInt(v bool) int {
@@ -432,7 +432,7 @@ func validateWhitelistIPs(raw string) error {
 	}
 	lines := strings.Split(raw, "\n")
 	if len(lines) > 500 {
-		return fmt.Errorf("白名单数量过大")
+		return fmt.Errorf("Whitelist is too large")
 	}
 	for _, line := range lines {
 		item := strings.TrimSpace(line)
@@ -440,16 +440,16 @@ func validateWhitelistIPs(raw string) error {
 			continue
 		}
 		if strings.ContainsAny(item, " \t\r") {
-			return fmt.Errorf("白名单 %s 格式不正确", item)
+			return fmt.Errorf("Invalid whitelist entry: %s", item)
 		}
 		if strings.Contains(item, "/") {
 			if _, _, err := net.ParseCIDR(item); err != nil {
-				return fmt.Errorf("白名单 %s 格式不正确", item)
+				return fmt.Errorf("Invalid whitelist entry: %s", item)
 			}
 			continue
 		}
 		if net.ParseIP(item) == nil {
-			return fmt.Errorf("白名单 %s 格式不正确", item)
+			return fmt.Errorf("Invalid whitelist entry: %s", item)
 		}
 	}
 	return nil

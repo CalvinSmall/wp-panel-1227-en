@@ -117,7 +117,7 @@ func TestCheckPanelUpdateUsesCachedMessage(t *testing.T) {
 	prevMessage := panelUpdateCache.message
 	panelUpdateCache.lastAt = time.Now()
 	panelUpdateCache.latest = "v1.2.3"
-	panelUpdateCache.message = "面板有新版本 v1.2.3 可用，当前版本 v1.2.2。"
+	panelUpdateCache.message = "Panel has new version v1.2.3 available, current version v1.2.2."
 	panelUpdateCache.mu.Unlock()
 	prevCurrent := panelCurrentVersion
 	panelCurrentVersion = "v1.2.2"
@@ -186,13 +186,13 @@ func TestCheckSitesKeepsCachedFailureWhenCheckIsSkipped(t *testing.T) {
 
 	siteLastCheck["1"] = time.Now()
 	siteFailureCounts["1"] = siteFailureAlertThreshold
-	siteFailureMessages["1"] = "down.example 返回 500"
+	siteFailureMessages["1"] = "down.example returned 500"
 
 	firing, msg := checkSites()
 	if !firing {
 		t.Fatal("cached site failure should keep alert firing while interval skips the check")
 	}
-	if msg != "down.example 返回 500" {
+	if msg != "down.example returned 500" {
 		t.Fatalf("unexpected cached failure message: %q", msg)
 	}
 }

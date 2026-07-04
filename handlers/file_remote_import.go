@@ -312,7 +312,7 @@ func runRemoteImport(taskID, rawURL string, allowInsecureTLS bool, destPath, sit
 	message := i18n.T(taskLang(taskID), "files.remote_import_completed")
 	if siteRoot != "" && systemUser != "" {
 		if err := executor.ChownSitePath(destPath, siteRoot, systemUser); err != nil {
-			log.Printf("远程导入权限设置失败 path=%s user=%s: %v", destPath, systemUser, err)
+			log.Printf("remote import permission fix failed path=%s user=%s: %v", destPath, systemUser, err)
 			message = i18n.T(taskLang(taskID), "files.remote_import_completed_fix_permissions")
 		}
 	}
@@ -326,7 +326,7 @@ func runRemoteImport(taskID, rawURL string, allowInsecureTLS bool, destPath, sit
 }
 
 func failRemoteImportTask(taskID, message string) {
-	log.Printf("远程导入失败 task=%s: %s", taskID, message)
+	log.Printf("remote import failed task=%s: %s", taskID, message)
 	updateRemoteImportTask(taskID, func(t *remoteImportTask) {
 		t.Status = "failed"
 		t.Message = message

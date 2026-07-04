@@ -85,8 +85,8 @@ func writeIPRateLimitConfig(rpm int) error {
 	if rpm <= 0 {
 		rpm = 60
 	}
-	content := fmt.Sprintf(`# WP Panel — 请求频率限制
-# 已登录 WordPress 用户不限速（检测 wordpress_logged_in cookie）
+	content := fmt.Sprintf(`# WP Panel — Request Rate Limiting
+# No rate limit for logged-in WordPress users (detect wordpress_logged_in cookie)
 map $http_cookie $wp_rate_limit_key {
     ~*wordpress_logged_in "";
     default $binary_remote_addr;
@@ -209,12 +209,12 @@ func testAndReloadNginx(backups []rateLimitBackup) error {
 	if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
 		restoreRateLimitFiles(backups)
 		exec.Command("nginx", "-s", "reload").Run()
-		return fmt.Errorf("nginx -t 失败，已回滚: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("nginx -t failed, rolled back: %s", strings.TrimSpace(string(out)))
 	}
 	if out, err := exec.Command("nginx", "-s", "reload").CombinedOutput(); err != nil {
 		restoreRateLimitFiles(backups)
 		exec.Command("nginx", "-s", "reload").Run()
-		return fmt.Errorf("nginx reload 失败，已回滚: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("nginx reload failed, rolled back: %s", strings.TrimSpace(string(out)))
 	}
 	return nil
 }

@@ -22,7 +22,7 @@ func (h *AlertHandler) GetSettings(c *gin.Context) {
 	db := database.GetDB()
 	rows, err := db.Query("SELECT id, skey, svalue, description, updated_at FROM security_settings WHERE skey LIKE 'alert_%' OR skey LIKE 'smtp_%' OR skey = 'admin_email' OR skey LIKE 'webhook_%'")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("query failed"))
 		return
 	}
 	defer rows.Close()
@@ -40,7 +40,7 @@ func (h *AlertHandler) GetSettings(c *gin.Context) {
 func (h *AlertHandler) SaveSettings(c *gin.Context) {
 	var raw map[string]interface{}
 	if err := c.ShouldBindJSON(&raw); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid parameters"))
 		return
 	}
 
@@ -55,11 +55,11 @@ func (h *AlertHandler) SaveSettings(c *gin.Context) {
 			continue
 		}
 		if _, err := db.Exec("INSERT INTO security_settings (skey, svalue, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(skey) DO UPDATE SET svalue = excluded.svalue, updated_at = excluded.updated_at", key, strVal); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("告警设置保存失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to save alert settings"))
 			return
 		}
 	}
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "已保存"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Saved"}))
 }
 
 func normalizeAlertSetting(key string, val interface{}) (string, bool, error) {
@@ -70,7 +70,7 @@ func normalizeAlertSetting(key string, val interface{}) (string, bool, error) {
 			return "", false, err
 		}
 		if strings.EqualFold(v, "true") || strings.EqualFold(v, "false") {
-			return "", false, fmt.Errorf("SMTP 服务器地址不正确")
+			return "", false, fmt.Errorf("incorrect SMTP server address")
 		}
 		return v, true, nil
 	case "smtp_user", "smtp_pass":
@@ -83,7 +83,7 @@ func normalizeAlertSetting(key string, val interface{}) (string, bool, error) {
 		}
 		port, err := strconv.Atoi(v)
 		if err != nil || port < 1 || port > 65535 {
-			return "", false, fmt.Errorf("SMTP 端口不正确")
+			return "", false, fmt.Errorf("incorrect SMTP port")
 		}
 		return v, true, nil
 	case "smtp_encryption":
@@ -92,7 +92,7 @@ func normalizeAlertSetting(key string, val interface{}) (string, bool, error) {
 			return "", false, err
 		}
 		if v != "starttls" && v != "ssl" && v != "none" {
-			return "", false, fmt.Errorf("SMTP 加密方式不正确")
+			return "", false, fmt.Errorf("incorrect SMTP encryption method")
 		}
 		return v, true, nil
 	case "admin_email":
@@ -102,7 +102,7 @@ func normalizeAlertSetting(key string, val interface{}) (string, bool, error) {
 		}
 		if v != "" {
 			if _, err := mail.ParseAddress(v); err != nil {
-				return "", false, fmt.Errorf("管理员邮箱格式不正确")
+				return "", false, fmt.Errorf("incorrect admin email format")
 			}
 		}
 		return v, true, nil
@@ -118,7 +118,7 @@ func normalizeAlertSetting(key string, val interface{}) (string, bool, error) {
 		case "wecom", "dingtalk", "feishu", "serverchan", "bark", "custom":
 			return v, true, nil
 		default:
-			return "", false, fmt.Errorf("Webhook 渠道不正确")
+			return "", false, fmt.Errorf("incorrect webhook channel")
 		}
 	case "webhook_url":
 		v, err := normalizePlainString(val, 1000, key)
@@ -128,7 +128,7 @@ func normalizeAlertSetting(key string, val interface{}) (string, bool, error) {
 		if v != "" {
 			u, err := url.Parse(v)
 			if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-				return "", false, fmt.Errorf("Webhook URL 格式不正确")
+				return "", false, fmt.Errorf("incorrect webhook URL format")
 			}
 		}
 		return v, true, nil
@@ -144,11 +144,11 @@ func normalizeAlertSetting(key string, val interface{}) (string, bool, error) {
 func normalizePlainString(val interface{}, maxLen int, field string) (string, error) {
 	v, ok := val.(string)
 	if !ok {
-		return "", fmt.Errorf("%s 格式不正确", field)
+		return "", fmt.Errorf("incorrect %s format", field)
 	}
 	v = strings.TrimSpace(v)
 	if len(v) > maxLen || strings.ContainsAny(v, "\x00\r\n") {
-		return "", fmt.Errorf("%s 格式不正确", field)
+		return "", fmt.Errorf("incorrect %s format", field)
 	}
 	return v, nil
 }
@@ -165,15 +165,15 @@ func (h *AlertHandler) TestSMTP(c *gin.Context) {
 		}
 	}
 	if req.Email == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请输入测试邮箱"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("please enter a test email"))
 		return
 	}
 	if err := executor.TestSMTP(req.Email); err != nil {
-		log.Printf("SMTP 测试发送失败: %v", err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("发送失败"))
+		log.Printf("SMTP test send failed: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to send"))
 		return
 	}
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "测试邮件已发送至 " + req.Email}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Test email sent to " + req.Email}))
 }
 
 func (h *AlertHandler) TestWebhook(c *gin.Context) {
@@ -183,22 +183,22 @@ func (h *AlertHandler) TestWebhook(c *gin.Context) {
 	}
 	c.ShouldBindJSON(&req)
 	if req.Channel == "" || req.URL == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请填写推送渠道和 Webhook URL"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("please specify channel and Webhook URL"))
 		return
 	}
 	if err := executor.TestWebhook(req.Channel, req.URL); err != nil {
-		log.Printf("Webhook 测试发送失败: %v", err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("发送失败"))
+		log.Printf("Webhook test send failed: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to send"))
 		return
 	}
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "测试消息已发送"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Test message sent"}))
 }
 
 func (h *AlertHandler) GetLog(c *gin.Context) {
 	db := database.GetDB()
 	rows, err := db.Query("SELECT id, alert_type, level, message, resolved, created_at FROM alert_log ORDER BY id DESC LIMIT 30")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("query failed"))
 		return
 	}
 	defer rows.Close()

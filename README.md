@@ -1,284 +1,278 @@
 # WP Panel
 
-WordPress 专用服务器管理面板。一行命令，纯净 Debian 13 变身 WordPress 托管平台。
-
 WordPress server management panel for Debian 13 VPS environments, focused on site isolation, SSL, backups, security, and day-to-day WordPress hosting operations.
-
-## English Documentation
-
-The full English project guide is available here: [README.en.md](README.en.md).
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8.svg)](https://go.dev/)
 
 ---
 
-## 官方来源
+## Official Sources
 
-- 官方网站：<https://wp-panel.org>
-- GitHub 项目地址：<https://github.com/naibabiji/wp-panel>
+- Official website: <https://wp-panel.org>
+- GitHub project: <https://github.com/naibabiji/wp-panel>
 
-除 `wp-panel.org` 和本 GitHub 仓库外，其他域名均不是 WP Panel 官方网站，与本项目无关。
+Other than `wp-panel.org` and this GitHub repository, no other domain names are official WP Panel websites or affiliated with this project.
 
 ---
 
-## 定位
+## Positioning
 
-通用 Linux 面板臃肿、复杂、与 WordPress 无关的功能太多。
+Generic Linux panels are bloated, complex, and full of WordPress-irrelevant features.
 
-WP Panel 只做一件事：**在 VPS 上高效管理 WordPress 网站**。不做 Docker、不做邮件系统、不做 FTP、不做 Java/Python/Node 运行环境。
+WP Panel does one thing: **manage WordPress sites efficiently on a VPS**. No Docker, no mail systems, no FTP, no Java/Python/Node runtimes.
 
-## 功能模块
+## Feature Modules
 
-| 模块 | 说明 |
-|------|------|
-| **网站管理** | 一键建站（自动创建隔离用户/目录/Nginx/PHP-FPM/数据库）、暂停/启用/删除、重装 WordPress |
-| **SSL 证书** | Let's Encrypt 自动申请、到期前 30 天自动续签、手动替换、自签名证书 |
-| **FastCGI 缓存** | Nginx 全站静态化缓存，配套 WordPress 插件一键清除 |
-| **安全防御** | Fail2ban + nftables 双机制渐进封禁、Cloudflare/Google/Bing 官方白名单、全局限速、WordPress 安全事件检测与日志分析 |
-| **数据库管理** | MariaDB 密码修改、数据库备份/恢复/上传恢复/自动备份 |
-| **计划任务** | 可视化 Cron 管理、WP Cron 替代、文件增量备份、系统任务查看 |
-| **文件管理器** | 上传/下载/删除/重命名/压缩/解压/剪切/复制/粘贴/多选、分片上传+断点续传 |
-| **仪表盘** | CPU/内存/磁盘/负载实时监控、24h/7d/15d 历史趋势图 |
-| **AI 诊断** | 站点一键健康分析，支持会话追问和诊断记录，聚焦日志与服务状态线索 |
-| **告警通知** | SMTP 邮件告警、CPU/内存/磁盘/服务/SSL/网站到期/系统更新/面板更新规则独立开关 |
-| **软件管理** | PHP/Nginx/MariaDB/Redis 配置修改、进程守护、日志查看 |
-| **面板安全** | 随机入口 + BasicAuth + Web 双重认证、bcrypt 密码哈希、登录失败封禁 |
-| **版本更新** | 面板内一键检查更新、SHA256 + Ed25519 双重校验、失败自动回滚、国内可配置反代地址 |
-| **可疑访问分析** | WordPress 站点访问日志聚合分析，按风险等级生成建议并提供可疑 IP/路径证据 |
-| **爬虫限速** | Bot-UA 单独限速（RPM/Burst 可配置），降低采集器与脚本高频请求冲击 |
-| **远程备份** | 站点备份支持 rsync/SSH 与 S3 对象存储远端同步，可选保留本地备份副本 |
+| Module | Description |
+|--------|-------------|
+| **Site Management** | One-click site creation (auto-creates isolated user/directory/Nginx/PHP-FPM/database), pause/enable/delete, reinstall WordPress |
+| **SSL Certificates** | Let's Encrypt auto-request, auto-renew 30 days before expiry, manual replacement, self-signed certificates |
+| **FastCGI Cache** | Nginx full-site static caching, companion WordPress plugin for one-click purge |
+| **Security Defense** | Fail2ban + nftables dual-mechanism progressive banning, Cloudflare/Google/Bing official whitelists, global rate limiting, WordPress security event detection and log analysis |
+| **Database Management** | MariaDB password changes, database backup/restore/upload restore/auto backup |
+| **Scheduled Tasks** | Visual Cron management, WP Cron replacement, incremental file backup, system task viewer |
+| **File Manager** | Upload/download/delete/rename/compress/decompress/cut/copy/paste/multi-select, chunked upload with resume |
+| **Dashboard** | Real-time CPU/memory/disk/load monitoring, 24h/7d/15d historical trend charts |
+| **AI Diagnostics** | One-click site health analysis, session-based follow-up questions and diagnostic records, focused on logs and service status clues |
+| **Alert Notifications** | SMTP email alerts, independent on/off switches for CPU/memory/disk/service/SSL/site expiry/system update/panel update rules |
+| **Software Management** | PHP/Nginx/MariaDB/Redis configuration changes, process guarding, log viewing |
+| **Panel Security** | Random entry path + BasicAuth + Web dual authentication, bcrypt password hashing, login failure banning |
+| **Version Updates** | In-panel one-click update checking, SHA256 + Ed25519 dual verification, auto-rollback on failure, configurable reverse proxy for China |
+| **Suspicious Access Analysis** | WordPress site access log aggregation analysis, generates risk-level-based recommendations with suspicious IP/path evidence |
+| **Bot Rate Limiting** | Bot-UA independent rate limiting (configurable RPM/Burst), reduces impact from scrapers and high-frequency script requests |
+| **Remote Backup** | Site backup supports rsync/SSH and S3 object storage remote sync, optional local backup copy retention |
 
-## 一键安装
+## One-Click Installation
 
 ```bash
 apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh | bash
 ```
 
-**国内服务器**：GitHub 无法访问时，使用国内优化版脚本：
+**China servers**: When GitHub is inaccessible, use the China-optimized script:
 
 ```bash
 apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://gh.wp-panel.org/https://raw.githubusercontent.com/naibabiji/wp-panel/main/install-cn.sh | bash
 ```
 
-安装完成后输出面板地址和两层登录凭据（BasicAuth + Web 登录）。
+After installation, the panel address and two-layer login credentials (BasicAuth + Web login) are displayed.
 
-> 自签名证书首次访问浏览器提示不安全，点击「高级」→「继续访问」即可。
+> Self-signed certificates will trigger a browser security warning on first access. Click "Advanced" → "Continue" to proceed.
 
-## 安全性
+## Security
 
-**一句话：只要登录地址和账号密码不泄露，别人进不来。**
+**In short: as long as the login address and credentials are not leaked, no one can get in.**
 
-面板有四层防御：
-- 第零层：**扫描防御** — 非浏览器请求触碰 8443 端口立即被识别，写入 Nftables 网络层封禁 30 天
-- 第一层：随机入口 — 8 位随机 hex 路径（16^8 ≈ 43 亿种组合），扫描器不可能猜到
-- 第二层：BasicAuth — 浏览器弹窗要求输入账号密码
-- 第三层：Web 登录 — 网页表单要求输入面板登录密码
+The panel has four layers of defense:
+- Layer 0: **Scan Defense** — Non-browser requests hitting port 8443 are immediately identified and blocked at the Nftables network layer for 30 days
+- Layer 1: Random Entry Path — 8-character random hex path (16^8 ≈ 4.3 billion combinations), impossible for scanners to guess
+- Layer 2: BasicAuth — Browser popup requesting username and password
+- Layer 3: Web Login — Web form requiring panel login password
 
-四层全通过的人才能进入面板。任何一层失败 5 次即被封禁。
+Only those passing all four layers can access the panel. Any single layer failing 5 times results in a ban.
 
 ---
 
-更详细的安全机制：
+More detailed security mechanisms:
 
-**访问防护**
-- **扫描防御**：面板 8443 端口自动检测非浏览器请求（curl、脚本、扫描器），写入 Nftables 网络层封禁
-- 随机入口地址（16^8 ≈ 43 亿种组合，配合扫描防御不可暴力穷举）
-- BasicAuth + Web 登录双重认证
-- 纯 HTTPS 加密通信，面板仅对外开放 8443 一个端口
-- API 错误信息不泄露内部路径和命令输出
+**Access Protection**
+- **Scan Defense**: Panel port 8443 automatically detects non-browser requests (curl, scripts, scanners), blocking at the Nftables network layer
+- Random entry address (16^8 ≈ 4.3 billion combinations, combined with scan defense makes brute-force infeasible)
+- BasicAuth + Web login dual authentication
+- Pure HTTPS encrypted communication, panel only exposes port 8443
+- API error messages do not leak internal paths or command output
 
-**防爆破**
-- 任一认证层连续 5 次失败 → Nftables 网络层封禁 24 小时
-- 多级渐进封禁：10分钟 → 24小时 → 30天 → 永久
+**Brute-Force Prevention**
+- Any authentication layer failing 5 consecutive times → Nftables network layer ban for 24 hours
+- Progressive multi-level banning: 10 minutes → 24 hours → 30 days → permanent
 
-**站点隔离**
-- 每个网站运行在独立的系统用户和 PHP-FPM Pool 下
-- 每个网站使用独立的 MariaDB 数据库
-- 一个网站出问题不影响其他网站
+**Site Isolation**
+- Each website runs under an isolated system user and PHP-FPM Pool
+- Each website uses an isolated MariaDB database
+- One site's issues do not affect other sites
 
-**WordPress 专项防护**
-- 自动检测并封禁 wp-login.php 暴力破解和 xmlrpc.php 恶意请求
-- 敏感文件扫描检测（.env、.git、压缩包等） → 自动封禁
-- 404 泛滥检测：30 次/60 秒判定为目录扫描
-- Nginx 拒绝未知域名的 HTTPS 连接，避免证书信息泄露
-- 已登录 WordPress 用户自动豁免限速，不影响后台操作
-- **WordPress 可疑访问分析**：按 30s 缓存聚合 `wp-security.log` 与 `error.log`，输出高危/中危/低危事件、命中路径、可疑 IP 与处理建议（默认仅分析，不自动封禁）
-- **运行时安全监测**：检测 `wp-content` 运行目录内新增可疑 PHP 文件与高频访问，形成文件安全事件记录
-- **爬虫限速**：提供 `bot_limit_enabled`/`bot_limit_rpm`/`bot_limit_burst` 独立策略，普通用户流量不受影响，重点限制高频爬虫与扫描行为
+**WordPress-Specific Protection**
+- Auto-detect and ban wp-login.php brute-force and xmlrpc.php malicious requests
+- Sensitive file scanning (.env, .git, archives, etc.) → auto-ban
+- 404 flood detection: 30 requests/60 seconds is considered directory scanning
+- Nginx rejects HTTPS connections from unknown domains to prevent certificate information leakage
+- Logged-in WordPress users are automatically exempt from rate limiting to avoid disrupting backend operations
+- **WordPress Suspicious Access Analysis**: Aggregates `wp-security.log` and `error.log` with 30s cache, outputs high/medium/low-risk events, hit paths, suspicious IPs, and handling recommendations (analysis only by default, no auto-banning)
+- **Runtime Security Monitoring**: Detects new suspicious PHP files and high-frequency access in `wp-content` runtime directory, generating file security event records
+- **Bot Rate Limiting**: Provides independent `bot_limit_enabled`/`bot_limit_rpm`/`bot_limit_burst` policies; normal user traffic is unaffected, focusing on restricting high-frequency crawlers and scanning behavior
 
-**AI 运维诊断**
-- 站点 AI 诊断聚合日志、PHP/数据库/服务状态与运行时上下文，支持分会话追问；仅做读路径分析，不执行文件/数据库变更或修复命令
-- 可用于快速定位异常趋势、提示复现步骤、形成可追溯建议记录
+**AI Operations Diagnostics**
+- Site AI diagnostics aggregate logs, PHP/database/service status, and runtime context, supporting session-based follow-up questions; read-only path analysis only, no file/database modifications or repair commands
+- Useful for quickly identifying anomalous trends, suggesting reproduction steps, and creating traceable recommendation records
 
-**备份与异地归档**
-- 站点备份任务新增 S3 对象存储支持，支持端点连通性探测与回传测试；同步失败可保留本地副本，按配置恢复性清理
+**Backup and Off-Site Archiving**
+- Site backup tasks now support S3 object storage, with endpoint connectivity probing and callback testing; sync failures can retain local copies, with configurable restorative cleanup
 
-**更新安全**
-- 面板更新 SHA256 + Ed25519 双重校验，攻击者即使篡改 GitHub Release 也无法伪造签名
-- 更新失败自动回滚到旧版本，不影响面板正常运行
+**Update Security**
+- Panel updates use SHA256 + Ed25519 dual verification; even if attackers compromise GitHub Releases, they cannot forge signatures
+- Update failures automatically roll back to the old version, keeping the panel operational
 
-**代码透明**
-- 100% 开源（GPL-3.0），代码可审查
-- 不收集敏感业务数据，匿名统计（仅版本号）可在面板中一键关闭
-- 更新检查仅连接 GitHub，不连接其他外部服务
-- 无 Web Shell、无在线代码编辑功能
-- 密码 bcrypt 12 轮哈希存储，不留明文
-- 三轮 AI 安全审计已修复 44 项潜在问题
+**Code Transparency**
+- 100% open source (GPL-3.0), auditable code
+- No sensitive business data collection, anonymous statistics (version number only) can be turned off with one click in the panel
+- Update checks only connect to GitHub, no other external services
+- No Web Shell, no online code editing
+- Passwords stored with bcrypt 12-round hashing, no plaintext stored
+- Three rounds of AI security audits have fixed 44 potential issues
 
-### 📖 安全深度解读
+### Deep Security Analysis
 
-- **[安装脚本安全透明化报告](security/wp-panel-install-security.md)** — 逐段拆解 install.sh，回应"篡改密码、删除 Nginx、黑掉 WordPress"等指控
-- **[运行时安全：多层防护机制](security/wp-panel-runtime-security.md)** — 源码层面解析六层纵深防御、更新签名校验、软件漏洞管理
+- **[Install Script Security Transparency Report](security/wp-panel-install-security.md)** — Step-by-step breakdown of install.sh, addressing allegations of "password tampering, Nginx deletion, WordPress hacking"
+- **[Runtime Security: Multi-Layer Protection Mechanism](security/wp-panel-runtime-security.md)** — Source-level analysis of six-layer defense-in-depth, update signature verification, and software vulnerability management
 
-## 安全测试
+## Security Testing
 
-欢迎白帽和安全研究人员对本项目进行安全测试。如果你发现安全漏洞，请通过以下方式反馈：
+White-hat hackers and security researchers are welcome to test this project. If you find a security vulnerability, please report it via:
 
-- **公开反馈**：提交 [GitHub Issue](https://github.com/naibabiji/wp-panel/issues)，在标题标注 `[安全]`
-- **私下反馈**：通过 GitHub Security 标签页提交 Private Vulnerability Report
-- 有效漏洞会在修复后于 Release Notes 中向报告者致谢
+- **Public feedback**: Submit a [GitHub Issue](https://github.com/naibabiji/wp-panel/issues), tag the title with `[Security]`
+- **Private feedback**: Submit a Private Vulnerability Report through the GitHub Security tab
+- Valid vulnerabilities will be credited to the reporter in Release Notes after a fix
 
-## 系统要求
+## System Requirements
 
-| 项目 | 要求 |
-|------|------|
-| 操作系统 | Debian 13 (Trixie) |
-| CPU | 1 核及以上 |
-| 内存 | 1 GB 及以上（低于自动创建 Swap） |
-| 架构 | x86_64 |
+| Item | Requirement |
+|------|-------------|
+| Operating System | Debian 13 (Trixie) |
+| CPU | 1 core or higher |
+| Memory | 1 GB or higher (Swap auto-created if lower) |
+| Architecture | x86_64 |
 
-> 各云厂商魔改镜像可能导致未知问题。安装遇到困难时，建议使用 [bin456789/reinstall](https://github.com/bin456789/reinstall) 重装为纯净 Debian 13 后重试。
+> Customized images from various cloud providers may cause unexpected issues. If you encounter difficulties installing, it is recommended to reinstall a clean Debian 13 using [bin456789/reinstall](https://github.com/bin456789/reinstall) and try again.
 
-## 为什么选择这些技术方案
+## Why These Technical Choices
 
-**为什么是 Debian 13？**
+**Why Debian 13?**
 
-Debian 是服务器领域稳定性最高的发行版之一。Trixie（Debian 13）在面板开发启动时是最新稳定版，拥有最新内核、较新的软件包版本，同时保持 Debian 一贯的保守稳定策略。选择这个版本意味着面板可以享受长周期的安全更新支持，用户无需频繁升级系统。
+Debian is one of the most stable distributions in the server space. Trixie (Debian 13) was the latest stable release when panel development started, offering the latest kernel and newer package versions while maintaining Debian's traditionally conservative stability policy. Choosing this version means the panel can benefit from long-cycle security update support without users needing to frequently upgrade their system.
 
-**为什么锁定 PHP 8.3？**
+**Why PHP 8.3?**
 
-WordPress 官方推荐 PHP 8.3 或更高版本。8.3 在 WordPress 生态中经过了最广泛的生产环境验证，拥有活跃支持周期，性能与安全性持续改进。固定版本意味着所有用户运行相同的 PHP 环境，问题可复现、可排查，避免因 PHP 版本差异导致的兼容性怪病。
+WordPress officially recommends PHP 8.3 or higher. 8.3 has undergone the most extensive production validation in the WordPress ecosystem, with an active support cycle and continuous performance and security improvements. Locking the version means all users run the same PHP environment, issues are reproducible and debuggable, avoiding compatibility quirks caused by PHP version differences.
 
-**为什么是 MariaDB 而非 MySQL？**
+**Why MariaDB instead of MySQL?**
 
-WordPress 官方推荐 MariaDB 10.6 或更高版本。Debian 12/13 自带的 MariaDB 均满足此要求。Oracle MySQL 存在许可证和功能限制风险，MariaDB 是完全兼容的 GPL 分支，由社区驱动。
-Oracle MySQL 存在许可证和功能限制风险。MariaDB 是 MySQL 的 GPL 分支，完全兼容且由社区驱动。Debian 源自带的 MariaDB LTS 版本提供到 2028 年的安全更新，无需添加第三方仓库。
+WordPress officially recommends MariaDB 10.6 or higher. The MariaDB versions included with Debian 12/13 both meet this requirement. Oracle MySQL carries license and feature restriction risks; MariaDB is a fully compatible GPL fork driven by the community.
+Debian's built-in MariaDB LTS version provides security updates until 2028, with no need for third-party repositories.
 
-**为什么是自己编的 Go 二进制，不用 Docker/PM2？**
+**Why a custom-compiled Go binary instead of Docker/PM2?**
 
-单一二进制文件，0 依赖，`systemd` 守护。占用十几 MB 内存，适合 1G 小 VPS。不与 Nginx 共用端口，各自独立提供 HTTPS。没有容器层，没有运行时开销。
+A single binary file, zero dependencies, managed by `systemd`. Uses only a dozen MB of memory, suitable for 1G small VPS. Does not share ports with Nginx, each providing HTTPS independently. No container layer, no runtime overhead.
 
-## 运行组件
+## Runtime Components
 
-所有组件通过 APT 包管理器安装，面板不自行编译：
+All components are installed via the APT package manager; the panel does not compile anything itself:
 
-| 组件 | 说明 |
-|------|------|
-| PHP 8.3 | Ondřej Surý 源，独立 FPM Pool 隔离 |
-| MariaDB | Debian 自带 LTS 版本 |
-| Nginx | Debian 自带稳定版 |
-| Redis | Debian 自带 |
-| Fail2ban + nftables | Debian 自带 |
+| Component | Description |
+|-----------|-------------|
+| PHP 8.3 | Ondřej Surý source, isolated FPM Pools |
+| MariaDB | Debian built-in LTS version |
+| Nginx | Debian built-in stable version |
+| Redis | Debian built-in |
+| Fail2ban + nftables | Debian built-in |
 
-## 技术架构
+## Technical Architecture
 
-- **后端**：Go + Gin Web 框架，SQLite (WAL 模式)，端口 8443 (HTTPS/TLS)
-- **前端**：HTML 模板 + TailwindCSS + Alpine.js + Chart.js
-- **分发**：单一二进制文件（前端资源通过 `//go:embed` 编译内嵌），约 20 MB
-- **安全**：面板不与 Nginx 反向代理耦合，独立 TLS 加密
+- **Backend**: Go + Gin web framework, SQLite (WAL mode), port 8443 (HTTPS/TLS)
+- **Frontend**: HTML templates + TailwindCSS + Alpine.js + Chart.js
+- **Distribution**: Single binary file (frontend resources embedded via `//go:embed`), approximately 20 MB
+- **Security**: Panel is not coupled with Nginx reverse proxy, with independent TLS encryption
 
-## SSH 管理命令
+## SSH Management Commands
 
-安装后面板提供 `wp` 命令行工具：
+After installation, the panel provides a `wp` command-line tool:
 
-| 命令 | 说明 |
-|------|------|
-| `wp` | 查看面板信息 |
-| `wp restart` | 重启面板 |
-| `wp password` | 一键重置管理员账号密码 |
-| `wp info` | 查看版本/端口/入口 |
-| `wp status` | 查看运行状态 |
-| `wp unban` | 清空所有 IP 封禁（管理员被误封时紧急恢复） |
+| Command | Description |
+|---------|-------------|
+| `wp` | View panel information |
+| `wp restart` | Restart the panel |
+| `wp password` | One-click admin password reset |
+| `wp info` | View version/port/entry path |
+| `wp status` | View running status |
+| `wp unban` | Clear all IP bans (emergency recovery when admin is mistakenly banned) |
 
-## 面板数据库备份与恢复
+## Panel Database Backup and Recovery
 
-面板使用 SQLite 存储数据，每天凌晨 2:30 自动备份到 `/www/server/panel/backups/panel-db/`，保留最近 7 份。
+The panel uses SQLite for data storage, automatically backing up daily at 2:30 AM to `/www/server/panel/backups/panel-db/`, retaining the 7 most recent backups.
 
-### 面板正常时
+### When the Panel is Running Normally
 
-在「面板设置」页面可以：
-- 手动创建备份
-- 下载备份文件到本地
-- 从备份恢复（恢复前自动创建安全备份，恢复后面板自动重启）
-- 删除备份
+On the "Panel Settings" page you can:
+- Manually create backups
+- Download backup files locally
+- Restore from backup (auto-creates a safety backup before restoring, panel auto-restarts after restore)
+- Delete backups
 
-### 面板无法启动时的恢复步骤
+### Recovery Steps When the Panel Cannot Start
 
-如果面板恢复数据库后无法启动，或数据库损坏导致面板无法运行，请通过 SSH 手动恢复：
+If the panel cannot start after database recovery, or the database is corrupted preventing panel operation, manually restore via SSH:
 
 ```bash
-# 1. 查看可用备份
+# 1. View available backups
 ls -lh /www/server/panel/backups/panel-db/
 
-# 2. 停止面板
+# 2. Stop the panel
 systemctl stop wp-panel
 
-# 3. 备份当前损坏的数据库（以防万一）
+# 3. Back up the current corrupted database (just in case)
 cp /www/server/panel/panel.db /www/server/panel/panel.db.broken
 
-# 4. 用备份替换当前数据库（替换为实际的备份文件名）
+# 4. Replace the current database with the backup (use the actual backup filename)
 cp /www/server/panel/backups/panel-db/panel_20260107_023000.db /www/server/panel/panel.db
 
-# 5. 启动面板
+# 5. Start the panel
 systemctl start wp-panel
 
-# 6. 检查是否正常
+# 6. Check if it's working
 systemctl status wp-panel
 journalctl -u wp-panel -n 20
 ```
 
-### 重装面板后导入备份
+### Importing Backups After Reinstalling the Panel
 
-如果需要完全重装面板并恢复数据：
+If you need to completely reinstall the panel and restore data:
 
 ```bash
-# 1. 先保存备份文件到安全位置
+# 1. First save backup files to a safe location
 cp -r /www/server/panel/backups/panel-db/ /root/panel-db-backup/
 
-# 2. 重装面板（选择"卸载后重新安装"，保留网站数据）
+# 2. Reinstall the panel (choose "uninstall and reinstall", keeping site data)
 
-# 3. 安装完成后停止面板
+# 3. Stop the panel after installation completes
 systemctl stop wp-panel
 
-# 4. 用备份替换新数据库
+# 4. Replace the new database with the backup
 cp /root/panel-db-backup/panel_20260107_023000.db /www/server/panel/panel.db
 
-# 5. 启动面板（自动执行数据库升级）
+# 5. Start the panel (auto-runs database upgrades)
 systemctl start wp-panel
 ```
 
-> **注意**：旧版备份可能缺少新版数据库字段，面板启动时会自动通过升级链补齐。
+> **Note**: Older backups may lack newer database fields; the panel will automatically supplement them through the upgrade chain on startup.
 
-## 项目结构
+## Project Structure
 
 ```
-├── main.go               # 程序入口
-├── config/               # 全局配置管理
-├── database/             # SQLite 连接与迁移
-├── models/               # 数据结构
-├── router/               # 路由 + 页面分发
-├── middleware/            # BasicAuth / Session / CSRF / 登录限流
-├── handlers/             # HTTP 处理器
-├── executor/             # 任务执行器
-├── collector/            # 系统指标采集
-├── templates/            # HTML 模板
+├── main.go               # Program entry point
+├── config/               # Global configuration management
+├── database/             # SQLite connection and migration
+├── models/               # Data structures
+├── router/               # Routing + page dispatch
+├── middleware/            # BasicAuth / Session / CSRF / Login rate limiting
+├── handlers/             # HTTP handlers
+├── executor/             # Task executor
+├── collector/            # System metrics collection
+├── templates/            # HTML templates
 ├── static/               # JS
-├── input.css             # TailwindCSS 源文件
-├── install.sh            # 一键安装脚本
-├── install-cn.sh         # 国内优化版安装脚本
-├── security/             # 安全说明文档
-└── wp-panel-optimizer/   # WordPress 配套插件
+├── input.css             # TailwindCSS source file
+├── install.sh            # One-click install script
+├── install-cn.sh         # China-optimized install script
+├── security/             # Security documentation
+└── wp-panel-optimizer/   # WordPress companion plugin
 ```
 
 ## License

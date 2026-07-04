@@ -54,38 +54,38 @@ func ValidateRemoteBackupSettings(host string, port int, username string, authTy
 	remotePath = strings.TrimSpace(remotePath)
 
 	if host == "" {
-		return fmt.Errorf("远程服务器地址不能为空")
+		return fmt.Errorf("Remote server address cannot be empty")
 	}
 	if port < 1 || port > 65535 {
-		return fmt.Errorf("远程端口无效")
+		return fmt.Errorf("Remote port invalid")
 	}
 	if !remoteUsernamePattern.MatchString(username) {
-		return fmt.Errorf("远程用户名格式无效")
+		return fmt.Errorf("Remote username format invalid")
 	}
 	if authType != "password" && authType != "key" {
-		return fmt.Errorf("远程认证方式无效")
+		return fmt.Errorf("Remote authentication method invalid")
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		if strings.Contains(host, ":") {
-			return fmt.Errorf("远程服务器地址暂不支持 IPv6")
+			return fmt.Errorf("Remote server address does not support IPv6")
 		}
 	} else {
 		if !remoteHostPattern.MatchString(host) || strings.Contains(host, "..") || strings.HasPrefix(host, ".") || strings.HasSuffix(host, ".") {
-			return fmt.Errorf("远程服务器地址格式无效")
+			return fmt.Errorf("Remote server address format invalid")
 		}
 		for _, label := range strings.Split(host, ".") {
 			if label == "" || strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
-				return fmt.Errorf("远程服务器地址格式无效")
+				return fmt.Errorf("Remote server address format invalid")
 			}
 		}
 	}
 	if remotePath != "" {
 		if !remotePathPattern.MatchString(remotePath) || strings.Contains(remotePath, "//") {
-			return fmt.Errorf("远程备份目录格式无效")
+			return fmt.Errorf("Remote backup directory format invalid")
 		}
 		for _, part := range strings.Split(remotePath, "/") {
 			if part == ".." {
-				return fmt.Errorf("远程备份目录不能包含 ..")
+				return fmt.Errorf("Remote backup directory cannot contain ..")
 			}
 		}
 	}
@@ -97,7 +97,7 @@ func ValidateRemoteBackupType(backupType string) error {
 	case "", "rsync", "s3":
 		return nil
 	default:
-		return fmt.Errorf("远程备份类型无效")
+		return fmt.Errorf("Remote backup type invalid")
 	}
 }
 
@@ -110,37 +110,37 @@ func ValidateS3BackupSettings(endpoint, bucket, region, accessKeyID, secretKey, 
 	pathPrefix = strings.Trim(strings.TrimSpace(pathPrefix), "/")
 
 	if endpoint == "" {
-		return fmt.Errorf("S3 Endpoint 不能为空")
+		return fmt.Errorf("S3 Endpoint cannot be empty")
 	}
 	u, err := url.Parse(endpoint)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return fmt.Errorf("S3 Endpoint 必须是 HTTPS 地址")
+		return fmt.Errorf("S3 Endpoint must be an HTTPS address")
 	}
 	if strings.ContainsAny(u.Host, "\r\n\t ") {
-		return fmt.Errorf("S3 Endpoint 格式无效")
+		return fmt.Errorf("S3 Endpoint format invalid")
 	}
 	if !s3BucketPattern.MatchString(bucket) || strings.Contains(bucket, "..") || strings.Contains(bucket, ".-") || strings.Contains(bucket, "-.") {
-		return fmt.Errorf("S3 Bucket 名称格式无效")
+		return fmt.Errorf("S3 Bucket name format invalid")
 	}
 	if region == "" {
-		return fmt.Errorf("S3 Region 不能为空")
+		return fmt.Errorf("S3 Region cannot be empty")
 	}
 	if !s3RegionPattern.MatchString(region) {
-		return fmt.Errorf("S3 Region 格式无效")
+		return fmt.Errorf("S3 Region format invalid")
 	}
 	if !s3AccessKeyPattern.MatchString(accessKeyID) {
-		return fmt.Errorf("S3 Access Key ID 格式无效")
+		return fmt.Errorf("S3 Access Key ID format invalid")
 	}
 	if secretKey == "" || strings.ContainsAny(secretKey, "\x00\r\n") {
-		return fmt.Errorf("S3 Secret Access Key 格式无效")
+		return fmt.Errorf("S3 Secret Access Key format invalid")
 	}
 	if pathPrefix != "" {
 		if !s3PathPrefixPattern.MatchString(pathPrefix) || strings.Contains(pathPrefix, "//") {
-			return fmt.Errorf("S3 备份路径前缀格式无效")
+			return fmt.Errorf("S3 backup path prefix format invalid")
 		}
 		for _, part := range strings.Split(pathPrefix, "/") {
 			if part == "." || part == ".." {
-				return fmt.Errorf("S3 备份路径前缀不能包含 . 或 ..")
+				return fmt.Errorf("S3 backup path prefix cannot contain . or ..")
 			}
 		}
 	}
@@ -160,16 +160,16 @@ func localBackupRelPath(localFile string) (string, error) {
 	clean := filepath.Clean(localFile)
 	rel, err := filepath.Rel(base, clean)
 	if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
-		return "", fmt.Errorf("本地备份文件路径非法")
+		return "", fmt.Errorf("Local backup file path invalid")
 	}
 	if strings.ContainsAny(rel, "\x00\r\n") {
-		return "", fmt.Errorf("本地备份文件路径非法")
+		return "", fmt.Errorf("Local backup file path invalid")
 	}
 	return filepath.ToSlash(rel), nil
 }
 
-// SyncBackupToRemote 将单个备份文件同步到远程服务器，保留 domain/db/ 或 domain/files/ 目录结构。
-// 若 keep_local=0，同步成功后删除本地文件。
+// SyncBackupToRemote syncs a single backup file to the remote server, preserving domain/db/ or domain/files/ directory structure.
+// If keep_local=0, deletes the local file after successful sync.
 func SyncBackupToRemote(localFile string) {
 	db := database.GetDB()
 	var enabled, keepLocal, port int
@@ -181,7 +181,7 @@ func SyncBackupToRemote(localFile string) {
 		&enabled, &backupType, &host, &port, &username, &authType, &password, &remotePath, &keepLocal,
 		&s3Endpoint, &s3Bucket, &s3Region, &s3AccessKeyID, &s3SecretKey, &s3PathPrefix)
 	if err != nil {
-		syncLog("", fmt.Sprintf("读取远程备份设置失败: %v", err), "failed")
+		syncLog("", fmt.Sprintf("Failed to read remote backup settings: %v", err), "failed")
 		return
 	}
 	if enabled == 0 {
@@ -203,7 +203,7 @@ func SyncBackupToRemote(localFile string) {
 
 func syncBackupToRsync(localFile string, host string, port int, username string, authType string, password string, remotePath string, keepLocal int) {
 	if host == "" {
-		syncLog("", "远程备份已启用但未填写服务器地址", "failed")
+		syncLog("", "Remote backup enabled but server address not provided", "failed")
 		return
 	}
 	if port == 0 {
@@ -217,7 +217,7 @@ func syncBackupToRsync(localFile string, host string, port int, username string,
 	}
 	remotePath = remoteBackupPath(username, remotePath)
 	if err := ValidateRemoteBackupSettings(host, port, username, authType, remotePath); err != nil {
-		syncLog("", "远程备份设置无效: "+err.Error(), "failed")
+		syncLog("", "Remote backup settings invalid: "+err.Error(), "failed")
 		return
 	}
 	relPath, err := localBackupRelPath(localFile)
@@ -226,7 +226,7 @@ func syncBackupToRsync(localFile string, host string, port int, username string,
 		return
 	}
 
-	// 用 /. 标记分离备份根目录和相对路径，rsync -R 保留 ./ 之后的结构
+	// Use /. to separate backup root from relative path; rsync -R preserves structure after ./
 	src := backupsRoot + "/./" + relPath
 	dest := fmt.Sprintf("%s@%s:%s/", username, host, remotePath)
 
@@ -235,11 +235,11 @@ func syncBackupToRsync(localFile string, host string, port int, username string,
 	if authType == "key" {
 		keyPath := "/www/server/panel/remote_backup_key"
 		if _, err := os.Stat(keyPath); err != nil {
-			syncLog("", "SSH 密钥不存在: "+keyPath, "failed")
+			syncLog("", "SSH key does not exist: "+keyPath, "failed")
 			return
 		}
 		if err := os.Chmod(keyPath, 0600); err != nil {
-			syncLog("", fmt.Sprintf("SSH 密钥权限设置失败: %v", err), "failed")
+			syncLog("", fmt.Sprintf("Failed to set SSH key permissions: %v", err), "failed")
 			return
 		}
 		cmd = exec.Command("rsync", "-avzR",
@@ -247,7 +247,7 @@ func syncBackupToRsync(localFile string, host string, port int, username string,
 			src, dest)
 	} else {
 		if _, err := exec.LookPath("sshpass"); err != nil {
-			syncLog("", "sshpass 未安装", "failed")
+			syncLog("", "sshpass not installed", "failed")
 			return
 		}
 		cmd = exec.Command("sshpass", "-e", "rsync", "-avzR",
@@ -259,10 +259,10 @@ func syncBackupToRsync(localFile string, host string, port int, username string,
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		syncLog(domain, fmt.Sprintf("远程同步失败: %s — %s", relPath, strings.TrimSpace(string(out))), "failed")
+		syncLog(domain, fmt.Sprintf("Remote sync failed: %s — %s", relPath, strings.TrimSpace(string(out))), "failed")
 		return
 	}
-	syncLog(domain, fmt.Sprintf("远程同步成功: %s", relPath), "success")
+	syncLog(domain, fmt.Sprintf("Remote sync succeeded: %s", relPath), "success")
 
 	if keepLocal == 0 {
 		os.Remove(localFile)
@@ -274,7 +274,7 @@ func syncBackupToS3(localFile string, endpoint, bucket, region, accessKeyID, sec
 		region = "auto"
 	}
 	if err := ValidateS3BackupSettings(endpoint, bucket, region, accessKeyID, secretKey, pathPrefix); err != nil {
-		syncLog("", "S3 远程备份设置无效: "+err.Error(), "failed")
+		syncLog("", "S3 Remote backup settings invalid: "+err.Error(), "failed")
 		return
 	}
 	relPath, err := localBackupRelPath(localFile)
@@ -284,18 +284,18 @@ func syncBackupToS3(localFile string, endpoint, bucket, region, accessKeyID, sec
 	}
 	objectKey := s3ObjectKey(pathPrefix, relPath)
 	if objectKey == "" {
-		syncLog("", "S3 对象路径无效", "failed")
+		syncLog("", "S3 object path invalid", "failed")
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s3UploadTimeout)
 	defer cancel()
 	if err := putFileToS3(ctx, endpoint, bucket, region, accessKeyID, secretKey, objectKey, localFile); err != nil {
 		domain, _, _ := strings.Cut(relPath, "/")
-		syncLog(domain, fmt.Sprintf("S3 远程同步失败: %s — %v", relPath, err), "failed")
+		syncLog(domain, fmt.Sprintf("S3 remote sync failed: %s — %v", relPath, err), "failed")
 		return
 	}
 	domain, _, _ := strings.Cut(relPath, "/")
-	syncLog(domain, fmt.Sprintf("S3 远程同步成功: %s", objectKey), "success")
+	syncLog(domain, fmt.Sprintf("S3 Remote sync succeeded: %s", objectKey), "success")
 	if keepLocal == 0 {
 		os.Remove(localFile)
 	}
@@ -331,16 +331,16 @@ func s3ObjectKey(prefix, relPath string) string {
 func putFileToS3(ctx context.Context, endpoint, bucket, region, accessKeyID, secretKey, objectKey, path string) error {
 	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("打开备份文件失败: %w", err)
+		return fmt.Errorf("Failed to open backup file: %w", err)
 	}
 	defer file.Close()
 	info, err := file.Stat()
 	if err != nil {
-		return fmt.Errorf("读取备份文件信息失败: %w", err)
+		return fmt.Errorf("Failed to read backup file info: %w", err)
 	}
 	size := info.Size()
 	if size > s3ObjectMaxSize {
-		return fmt.Errorf("备份文件超过 S3 最大对象限制 5 TiB")
+		return fmt.Errorf("Backup file exceeds S3 maximum object limit of 5 TiB")
 	}
 	if size > s3SinglePutMaxSize || size >= s3MultipartThreshold {
 		return putFileToS3Multipart(ctx, endpoint, bucket, region, accessKeyID, secretKey, objectKey, file, size)
@@ -348,10 +348,10 @@ func putFileToS3(ctx context.Context, endpoint, bucket, region, accessKeyID, sec
 	hash := sha256.New()
 	_, err = io.Copy(hash, file)
 	if err != nil {
-		return fmt.Errorf("计算备份文件校验失败: %w", err)
+		return fmt.Errorf("Failed to compute backup file checksum: %w", err)
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("读取备份文件失败: %w", err)
+		return fmt.Errorf("Failed to read backup file: %w", err)
 	}
 	return doS3Request(ctx, http.MethodPut, endpoint, bucket, region, accessKeyID, secretKey, objectKey, file, size, hex.EncodeToString(hash.Sum(nil)))
 }
@@ -390,7 +390,7 @@ func doS3RequestRawWithHeaders(ctx context.Context, method, endpoint, bucket, re
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
 	if err != nil {
-		return nil, fmt.Errorf("创建 S3 请求失败: %w", err)
+		return nil, fmt.Errorf("Failed to create S3 request: %w", err)
 	}
 	req.ContentLength = size
 	req.Header.Set("x-amz-content-sha256", payloadHash)
@@ -402,7 +402,7 @@ func doS3RequestRawWithHeaders(ctx context.Context, method, endpoint, bucket, re
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("请求 S3 失败: %w", err)
+		return nil, fmt.Errorf("S3 request failed: %w", err)
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return resp, nil
@@ -410,9 +410,9 @@ func doS3RequestRawWithHeaders(ctx context.Context, method, endpoint, bucket, re
 	msg, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 	resp.Body.Close()
 	if len(msg) > 0 {
-		return nil, fmt.Errorf("S3 返回 %s: %s", resp.Status, strings.TrimSpace(string(msg)))
+		return nil, fmt.Errorf("S3 returned %s: %s", resp.Status, strings.TrimSpace(string(msg)))
 	}
-	return nil, fmt.Errorf("S3 返回 %s", resp.Status)
+	return nil, fmt.Errorf("S3 returned %s", resp.Status)
 }
 
 func putFileToS3Multipart(ctx context.Context, endpoint, bucket, region, accessKeyID, secretKey, objectKey string, file *os.File, size int64) error {
@@ -436,7 +436,7 @@ func putFileToS3Multipart(ctx context.Context, endpoint, bucket, region, accessK
 		}
 		etag, err := uploadS3Part(ctx, endpoint, bucket, region, accessKeyID, secretKey, objectKey, uploadID, partNumber, file, offset, currentSize)
 		if err != nil {
-			return fmt.Errorf("上传分片 %d 失败: %w", partNumber, err)
+			return fmt.Errorf("Failed to upload part %d: %w", partNumber, err)
 		}
 		parts = append(parts, s3CompletedPart{PartNumber: partNumber, ETag: etag})
 	}
@@ -463,17 +463,17 @@ func createS3MultipartUpload(ctx context.Context, endpoint, bucket, region, acce
 	emptyHash := sha256.Sum256(nil)
 	resp, err := doS3RequestRaw(ctx, http.MethodPost, endpoint, bucket, region, accessKeyID, secretKey, objectKey, "uploads=", http.NoBody, 0, hex.EncodeToString(emptyHash[:]))
 	if err != nil {
-		return "", fmt.Errorf("创建 S3 分片上传失败: %w", err)
+		return "", fmt.Errorf("Failed to create S3 multipart upload: %w", err)
 	}
 	defer resp.Body.Close()
 	var out struct {
 		UploadID string `xml:"UploadId"`
 	}
 	if err := xml.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&out); err != nil {
-		return "", fmt.Errorf("解析 S3 分片上传响应失败: %w", err)
+		return "", fmt.Errorf("Failed to parse S3 multipart upload response: %w", err)
 	}
 	if out.UploadID == "" {
-		return "", fmt.Errorf("S3 未返回 uploadId")
+		return "", fmt.Errorf("S3 did not return uploadId")
 	}
 	return out.UploadID, nil
 }
@@ -482,10 +482,10 @@ func uploadS3Part(ctx context.Context, endpoint, bucket, region, accessKeyID, se
 	section := io.NewSectionReader(file, offset, size)
 	hash := sha256.New()
 	if _, err := io.Copy(hash, section); err != nil {
-		return "", fmt.Errorf("计算分片校验失败: %w", err)
+		return "", fmt.Errorf("Failed to compute part checksum: %w", err)
 	}
 	if _, err := section.Seek(0, io.SeekStart); err != nil {
-		return "", fmt.Errorf("读取分片失败: %w", err)
+		return "", fmt.Errorf("Failed to read part: %w", err)
 	}
 	query := fmt.Sprintf("partNumber=%d&uploadId=%s", partNumber, awsQueryEscape(uploadID))
 	resp, err := doS3RequestRaw(ctx, http.MethodPut, endpoint, bucket, region, accessKeyID, secretKey, objectKey, query, section, size, hex.EncodeToString(hash.Sum(nil)))
@@ -495,7 +495,7 @@ func uploadS3Part(ctx context.Context, endpoint, bucket, region, accessKeyID, se
 	defer resp.Body.Close()
 	etag := strings.TrimSpace(resp.Header.Get("ETag"))
 	if etag == "" {
-		return "", fmt.Errorf("S3 未返回分片 ETag")
+		return "", fmt.Errorf("S3 did not return part ETag")
 	}
 	return etag, nil
 }
@@ -536,7 +536,7 @@ func abortS3MultipartUpload(ctx context.Context, endpoint, bucket, region, acces
 func s3ObjectURL(endpoint, bucket, objectKey, rawQuery string) (*url.URL, error) {
 	base, err := url.Parse(strings.TrimRight(endpoint, "/"))
 	if err != nil {
-		return nil, fmt.Errorf("S3 Endpoint 格式无效")
+		return nil, fmt.Errorf("S3 Endpoint format invalid")
 	}
 	escapedPath := strings.TrimRight(base.EscapedPath(), "/")
 	escapedPath += "/" + awsPathEscape(bucket) + "/" + awsPathEscape(objectKey)
@@ -635,5 +635,5 @@ func syncLog(domain string, msg string, status string) {
 	if domain == "" {
 		domain = "—"
 	}
-	recordOperationLog("远程备份", domain, status, msg)
+	recordOperationLog("Remote backup", domain, status, msg)
 }

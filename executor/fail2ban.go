@@ -111,7 +111,7 @@ ignoreip = %s
 `, maxRetry, findTime, banTime, webIgnoreIPs, banTime, webIgnoreIPs, maxRetry, findTime, banTime, sshIgnoreIPs)
 
 	if err := os.WriteFile(jailPath, []byte(jailConfig), 0644); err != nil {
-		return rollbackDeploy(fmt.Errorf("写入 jail 配置失败: %w", err))
+		return rollbackDeploy(fmt.Errorf("Failed to write jail config: %w", err))
 	}
 
 	actionConfig := `# WP Panel Generated - DO NOT EDIT MANUALLY
@@ -121,7 +121,7 @@ actionunban = /usr/local/bin/wp-panel --unbanip-nginx <ip>
 `
 
 	if err := os.WriteFile(actionPath, []byte(actionConfig), 0644); err != nil {
-		return rollbackDeploy(fmt.Errorf("写入 nginx action 配置失败: %w", err))
+		return rollbackDeploy(fmt.Errorf("Failed to write nginx action config: %w", err))
 	}
 
 	filterConfig := `# WP Panel Generated — DO NOT EDIT MANUALLY
@@ -135,7 +135,7 @@ ignoreregex =
 `
 
 	if err := os.WriteFile(filterPath, []byte(filterConfig), 0644); err != nil {
-		return rollbackDeploy(fmt.Errorf("写入 filter 配置失败: %w", err))
+		return rollbackDeploy(fmt.Errorf("Failed to write filter config: %w", err))
 	}
 
 	filter404Config := `# WP Panel Generated — DO NOT EDIT MANUALLY
@@ -145,11 +145,11 @@ ignoreregex =
 `
 
 	if err := os.WriteFile(filter404Path, []byte(filter404Config), 0644); err != nil {
-		return rollbackDeploy(fmt.Errorf("写入 404 filter 配置失败: %w", err))
+		return rollbackDeploy(fmt.Errorf("Failed to write 404 filter config: %w", err))
 	}
 
 	if err := reloadOrStartFail2ban(); err != nil {
-		return rollbackDeploy(fmt.Errorf("重载 fail2ban 失败: %w", err))
+		return rollbackDeploy(fmt.Errorf("Failed to reload fail2ban: %w", err))
 	}
 	return nil
 }
@@ -163,7 +163,7 @@ func backupFail2banConfigFiles(paths ...string) ([]fail2banConfigBackup, error) 
 				backups = append(backups, fail2banConfigBackup{path: path})
 				continue
 			}
-			return nil, fmt.Errorf("读取 Fail2ban 配置备份失败: %w", err)
+			return nil, fmt.Errorf("Failed to read Fail2ban config backup: %w", err)
 		}
 		backups = append(backups, fail2banConfigBackup{path: path, data: data, existed: true})
 	}
@@ -209,14 +209,14 @@ func buildFail2banIgnoreIPs(whitelistIPs string) (string, error) {
 			continue
 		}
 		if strings.ContainsAny(ip, " \t\r") {
-			return "", fmt.Errorf("白名单 IP 格式不正确: %s", ip)
+			return "", fmt.Errorf("Whitelist IP format invalid: %s", ip)
 		}
 		if strings.Contains(ip, "/") {
 			if _, _, err := net.ParseCIDR(ip); err != nil {
-				return "", fmt.Errorf("白名单 IP 格式不正确: %s", ip)
+				return "", fmt.Errorf("Whitelist IP format invalid: %s", ip)
 			}
 		} else if net.ParseIP(ip) == nil {
-			return "", fmt.Errorf("白名单 IP 格式不正确: %s", ip)
+			return "", fmt.Errorf("Whitelist IP format invalid: %s", ip)
 		}
 		ignoreIPs += " " + ip
 	}
@@ -283,29 +283,29 @@ func executeRefreshWhitelist(task *Task) TaskResult {
 
 	if cfIPs, err := fetchCloudflareIPs(); err == nil {
 		allIPs = append(allIPs, cfIPs...)
-		details = append(details, fmt.Sprintf("Cloudflare: %d 条", len(cfIPs)))
+		details = append(details, fmt.Sprintf("Cloudflare: %d entries", len(cfIPs)))
 		cacheCloudflareRealIPRanges(cfIPs)
 		if err := DeployCloudflareRealIPConfig(cfIPs); err != nil {
-			details = append(details, "Cloudflare Real IP: 配置失败")
+			details = append(details, "Cloudflare Real IP: configuration failed")
 		} else {
-			details = append(details, "Cloudflare Real IP: 已更新")
+			details = append(details, "Cloudflare Real IP: updated")
 		}
 	} else {
-		details = append(details, "Cloudflare: 获取失败")
+		details = append(details, "Cloudflare: fetch failed")
 	}
 	if googleIPs, err := fetchGooglebotIPs(); err == nil {
 		allIPs = append(allIPs, googleIPs...)
-		details = append(details, fmt.Sprintf("Googlebot: %d 条", len(googleIPs)))
+		details = append(details, fmt.Sprintf("Googlebot: %d entries", len(googleIPs)))
 		cacheSearchBotIPRanges("googlebot_ips", googleIPs)
 	} else {
-		details = append(details, "Googlebot: 获取失败")
+		details = append(details, "Googlebot: fetch failed")
 	}
 	if bingIPs, err := fetchBingbotIPs(); err == nil {
 		allIPs = append(allIPs, bingIPs...)
-		details = append(details, fmt.Sprintf("Bingbot: %d 条", len(bingIPs)))
+		details = append(details, fmt.Sprintf("Bingbot: %d entries", len(bingIPs)))
 		cacheSearchBotIPRanges("bingbot_ips", bingIPs)
 	} else {
-		details = append(details, "Bingbot: 获取失败")
+		details = append(details, "Bingbot: fetch failed")
 	}
 
 	db := database.GetDB()
@@ -319,7 +319,7 @@ func executeRefreshWhitelist(task *Task) TaskResult {
 
 	return TaskResult{
 		Success: true,
-		Message: fmt.Sprintf("共获取 %d 条（%s）", len(allIPs), strings.Join(details, "；")),
+		Message: fmt.Sprintf("Fetched %d entries (%s)", len(allIPs), strings.Join(details, "；")),
 	}
 }
 
@@ -333,7 +333,7 @@ func cacheSearchBotIPRanges(key string, ips []string) {
 	database.GetDB().Exec(`INSERT INTO security_settings (skey, svalue, description, updated_at)
 		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(skey) DO UPDATE SET svalue = excluded.svalue, updated_at = excluded.updated_at`,
-		key, strings.Join(ips, "\n"), key+"官方IP段缓存")
+		key, strings.Join(ips, "\n"), key+"official IP range cache")
 }
 
 func ApplyFail2banSettings() error {
@@ -429,35 +429,35 @@ func SyncFail2banBans() {
 		prevBans, prevMaxLevel := countBanHistory(ip, now)
 		banLevel := 2
 		expiresVal := "datetime('now', '+600 seconds')"
-		reason := "Fail2ban 自动封禁"
+		reason := "Fail2ban auto-ban"
 		if jail == "wppanel-404" {
-			reason = "404 泛滥检测"
+			reason = "404 flood detection"
 		}
 		if jail == "wppanel-sshd" {
-			reason = "SSH 暴力破解"
+			reason = "SSH brute force"
 		}
 
 		if prevMaxLevel >= 2 || prevBans > 0 {
 			banLevel = 3
 			expiresVal = "datetime('now', '+86400 seconds')"
-			reason = "Fail2ban 自动封禁（24h内重复违规，升级至24小时）"
+			reason = "Fail2ban auto-ban (repeat violation within 24h, escalated to 24 hours)"
 			if jail == "wppanel-404" {
-				reason = "404 泛滥检测（24h内重复违规，升级至24小时）"
+				reason = "404 flood detection (repeat violation within 24h, escalated to 24 hours)"
 			}
 			if jail == "wppanel-sshd" {
-				reason = "SSH 暴力破解（24h内重复违规，升级至24小时）"
+				reason = "SSH brute force (repeat violation within 24h, escalated to 24 hours)"
 			}
 
 			l3Count := countLevel3(ip)
 			if l3Count >= 2 {
 				banLevel = 5
 				expiresVal = "NULL"
-				reason = "Fail2ban 自动封禁（高危：累计3次严重违规，永久封禁）"
+				reason = "Fail2ban auto-ban (high risk: 3 serious violations, permanent ban)"
 				if jail == "wppanel-404" {
-					reason = "404 泛滥检测（高危：累计3次严重违规，永久封禁）"
+					reason = "404 flood detection (high risk: 3 serious violations, permanent ban)"
 				}
 				if jail == "wppanel-sshd" {
-					reason = "SSH 暴力破解（高危：累计3次严重违规，永久封禁）"
+					reason = "SSH brute force (high risk: 3 serious violations, permanent ban)"
 				}
 			}
 		}
@@ -565,26 +565,26 @@ func RecordFail2banBan(ip, jail string) error {
 
 	banLevel := 2
 	expiresVal := "datetime('now', '+600 seconds')"
-	reason := "Fail2ban 自动封禁"
+	reason := "Fail2ban auto-ban"
 	if jail == "wppanel-404" {
-		reason = "404 泛滥检测"
+		reason = "404 flood detection"
 	}
 
 	if prevMaxLevel >= 2 || prevBans > 0 {
 		banLevel = 3
 		expiresVal = "datetime('now', '+86400 seconds')"
-		reason = "Fail2ban 自动封禁（24h内重复违规，升级至24小时）"
+		reason = "Fail2ban auto-ban (repeat violation within 24h, escalated to 24 hours)"
 		if jail == "wppanel-404" {
-			reason = "404 泛滥检测（24h内重复违规，升级至24小时）"
+			reason = "404 flood detection (repeat violation within 24h, escalated to 24 hours)"
 		}
 
 		l3Count := countLevel3(ip)
 		if l3Count >= 2 {
 			banLevel = 5
 			expiresVal = "NULL"
-			reason = "Fail2ban 自动封禁（高危：累计3次严重违规，永久封禁）"
+			reason = "Fail2ban auto-ban (high risk: 3 serious violations, permanent ban)"
 			if jail == "wppanel-404" {
-				reason = "404 泛滥检测（高危：累计3次严重违规，永久封禁）"
+				reason = "404 flood detection (high risk: 3 serious violations, permanent ban)"
 			}
 		}
 	}
@@ -731,7 +731,7 @@ func fetchCloudflareIPs() ([]string, error) {
 		}
 	}
 	if len(ips) == 0 {
-		return nil, fmt.Errorf("无法获取 Cloudflare IP 段")
+		return nil, fmt.Errorf("Cannot fetch Cloudflare IP ranges")
 	}
 	return ips, nil
 }
@@ -791,16 +791,16 @@ func fetchBingbotIPs() ([]string, error) {
 func executeManualBan(task *Task) TaskResult {
 	payload, ok := task.Payload.(*ManualBanPayload)
 	if !ok {
-		return TaskResult{Success: false, Message: "任务参数类型错误"}
+		return TaskResult{Success: false, Message: "Invalid task parameter type"}
 	}
 
 	ip := strings.TrimSpace(payload.IP)
 	if ip == "" {
-		return TaskResult{Success: false, Message: "IP 地址不能为空"}
+		return TaskResult{Success: false, Message: "IP address cannot be empty"}
 	}
 
 	if net.ParseIP(ip) == nil {
-		return TaskResult{Success: false, Message: "IP 地址格式不正确"}
+		return TaskResult{Success: false, Message: "IP address format invalid"}
 	}
 
 	db := database.GetDB()
@@ -830,29 +830,29 @@ func executeManualBan(task *Task) TaskResult {
 	}
 
 	if err := manualAddNginxBan(ip); err != nil {
-		return TaskResult{Success: false, Message: "封禁失败: " + err.Error()}
+		return TaskResult{Success: false, Message: "Ban failed: " + err.Error()}
 	}
 
 	if _, err := db.Exec(
 		`INSERT INTO firewall_bans (ip_address, ban_level, reason, source_jail, is_manual, ban_count, expires_at)
-		 VALUES (?, ?, '管理员手动封禁', ?, 1, 1, ?)`,
+		 VALUES (?, ?, 'Admin manual ban', ?, 1, 1, ?)`,
 		ip, banLevel, jail, expires,
 	); err != nil {
 		_ = manualRemoveNginxBan(ip)
-		return TaskResult{Success: false, Message: "封禁记录写入失败"}
+		return TaskResult{Success: false, Message: "Failed to write ban record"}
 	}
 
 	if banLevel >= 3 {
 		AddPersistBan(ip)
 	}
 
-	msg := fmt.Sprintf("IP %s 已封禁", ip)
+	msg := fmt.Sprintf("IP %s has been banned", ip)
 	if payload.Duration == 0 {
-		msg += "（永久）"
+		msg += " (permanent)"
 	} else if payload.Duration >= 3600 {
-		msg += fmt.Sprintf("（%d 小时）", payload.Duration/3600)
+		msg += fmt.Sprintf(" (%d hours)", payload.Duration/3600)
 	} else {
-		msg += fmt.Sprintf("（%d 分钟）", payload.Duration/60)
+		msg += fmt.Sprintf(" (%d minutes)", payload.Duration/60)
 	}
 
 	return TaskResult{Success: true, Message: msg}
@@ -918,7 +918,7 @@ func UnbanAllIPs() string {
 		}
 	}
 
-	return fmt.Sprintf("已清空所有封禁规则，共解封 %d 条记录", unbanCount)
+	return fmt.Sprintf("Cleared all ban rules, unbanned %d records", unbanCount)
 }
 
 func CleanExpiredBans() {

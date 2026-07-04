@@ -158,9 +158,9 @@ func readWPSecurityLog(site wpSecuritySite, path string, aggregates map[string]*
 		status, _ := strconv.Atoi(m[5])
 		seen := parseNginxAccessTime(m[2])
 		uri := normalizeLoggedURI(m[4])
-		reason := "WordPress 异常文件路径访问"
+		reason := "Unusual file path access"
 		if strings.HasSuffix(strings.ToLower(uri), ".php") && status == 404 {
-			reason = "不存在 PHP 文件探测"
+			reason = "Non-existent PHP file probing"
 		}
 		addWPSecurityEvent(aggregates, site.Domain, strings.TrimSpace(m[1]), seen, m[3], uri, status, reason)
 	}
@@ -175,9 +175,9 @@ func readNginxErrorLog(site wpSecuritySite, path string, aggregates map[string]*
 		reason := ""
 		switch {
 		case strings.Contains(line, "Primary script unknown"):
-			reason = "Primary script unknown：不存在 PHP 文件进入 PHP-FPM"
+			reason = "Primary script unknown: non-existent PHP file accessed by PHP-FPM"
 		case strings.Contains(line, "open()") && strings.Contains(line, "failed (2: No such file or directory)"):
-			reason = "open() failed：不存在文件访问"
+			reason = "open() failed: non-existent file access"
 		default:
 			continue
 		}
@@ -211,7 +211,7 @@ func addWPSecurityEvent(aggregates map[string]*wpSecurityAggregate, domain, ip s
 	}
 	agg.paths[method+" "+uri]++
 	if status > 0 {
-		agg.evidence[fmt.Sprintf("%s（HTTP %d）", reason, status)] = true
+		agg.evidence[fmt.Sprintf("%s (HTTP %d)", reason, status)] = true
 	} else {
 		agg.evidence[reason] = true
 	}
@@ -238,41 +238,41 @@ func buildWPSecurityReportItem(agg *wpSecurityAggregate) WPSecurityReportItem {
 
 func classifyWPSecurityRisk(agg *wpSecurityAggregate, paths, evidence []string) string {
 	if agg.events >= 10 || hasHighSignalPath(paths) || hasEvidence(evidence, "Primary script unknown") {
-		return "高"
+		return "High"
 	}
 	if agg.events >= 3 {
-		return "中"
+		return "Medium"
 	}
-	return "低"
+	return "Low"
 }
 
 func recommendationForRisk(risk string) string {
 	switch risk {
-	case "高":
-		return "建议管理员结合 IP 来源确认后手动封禁"
-	case "中":
-		return "建议观察或结合 IP 信息判断"
+	case "High":
+		return "Recommend manual block after verifying IP source"
+	case "Medium":
+		return "Recommend monitoring or further IP-based analysis"
 	default:
-		return "建议先观察"
+		return "Recommend observation"
 	}
 }
 
 func buildWPSecurityCopyText(item WPSecurityReportItem) string {
 	return fmt.Sprintf(`IP: %s
-站点: %s
-时间: %s - %s
-事件次数: %d
-风险等级: %s
-访问路径样本:
+Site: %s
+Time: %s - %s
+Event count: %d
+Risk level: %s
+Sample paths:
 %s
-错误/证据:
+Errors / Evidence:
 %s
-面板建议: %s
-说明: 面板仅做本地日志统计，未自动封禁。请管理员结合 IP 来源、业务访问情况和 AI/IP 查询工具综合判断。`,
+Panel recommendation: %s
+Note: The panel only performs local log analysis and does not auto-block. Please assess based on IP source, access patterns, and AI/IP lookup tools.`,
 		item.IPAddress,
 		item.Domain,
-		defaultIfEmpty(item.FirstSeen, "未知"),
-		defaultIfEmpty(item.LastSeen, "未知"),
+		defaultIfEmpty(item.FirstSeen, "Unknown"),
+		defaultIfEmpty(item.LastSeen, "Unknown"),
 		item.EventCount,
 		item.RiskLevel,
 		formatReportList(item.SamplePaths),
@@ -410,7 +410,7 @@ func formatReportTime(t time.Time) string {
 
 func formatReportList(items []string) string {
 	if len(items) == 0 {
-		return "- 无"
+		return "- None"
 	}
 	return "- " + strings.Join(items, "\n- ")
 }
@@ -424,9 +424,9 @@ func defaultIfEmpty(value, fallback string) string {
 
 func riskWeight(risk string) int {
 	switch risk {
-	case "高":
+	case "High":
 		return 3
-	case "中":
+	case "Medium":
 		return 2
 	default:
 		return 1

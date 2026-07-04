@@ -203,10 +203,10 @@ func logIncident(s *GuardService, event string) {
 	}
 	_, err := db.Exec(
 		"INSERT INTO process_guard_incidents (service, event, message) VALUES (?, ?, ?)",
-		s.Name, event, s.Name+" 进程异常退出，已自动重启",
+		s.Name, event, s.Name+" process exited abnormally, auto-restarted",
 	)
 	if err != nil {
-		log.Printf("记录进程守护事件失败: %v", err)
+		log.Printf("Failed to record process guard event: %v", err)
 	}
 	pruneIncidents(db)
 }

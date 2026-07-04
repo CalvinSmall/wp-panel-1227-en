@@ -77,7 +77,7 @@ func (t *LoginAttemptTracker) banIP(ip string, attemptType string) {
 		return
 	}
 
-	reason := fmt.Sprintf("panel_%s: 连续%d次认证失败", attemptType, t.MaxAttempts)
+	reason := fmt.Sprintf("panel_%s: %d consecutive authentication failures", attemptType, t.MaxAttempts)
 	expiresAt := time.Now().UTC().Add(time.Duration(t.BanDurationHours) * time.Hour).Format("2006-01-02 15:04:05")
 
 	_, _ = t.DB.Exec(

@@ -1,184 +1,184 @@
-# 安装完成后，WP Panel 如何通过多层机制保护你的服务器
+# After Installation, How WP Panel Protects Your Server Through Multi-Layer Mechanisms
 
-> **副标题**：回应"面板会偷偷改密码、植入木马吗？"以及"服务器没泄露时面板安全吗？"
-
----
-
-## 一、前言
-
-第一篇我们证明了：WP Panel 的安装脚本是透明的，它不会篡改你的服务器密码、不会黑掉 WordPress、不会删除 Nginx。但安装完成后，新的问题自然浮现：
-
-- **面板运行后，会不会偷偷改我的密码？**
-- **面板有自动更新，会不会被劫持植入木马？**
-- **我的 SSH 密码没泄露，面板本身够安全吗？**
-
-本文将从**源码层面**拆解 WP Panel 安装完成后的所有运行时行为，说明它的**每一层防护**如何工作，以及为什么在没有服务器密码泄露的情况下，攻击者几乎不可能通过面板入侵你的服务器。
+> **Subtitle**: Addressing "Will the panel secretly change passwords or plant trojans?" and "Is the panel secure when server passwords aren't leaked?"
 
 ---
 
-## 二、面板会不会偷偷改密码？
+## 1. Preface
 
-### 2.1 密码存储：连面板自己都看不到明文
+In the first article, we proved: WP Panel's install script is transparent — it won't tamper with your server passwords, hack WordPress, or delete Nginx. But after installation, new questions naturally arise:
 
-WP Panel 使用两层认证体系：
+- **After the panel is running, will it secretly change my password?**
+- **The panel has auto-updates — could it be hijacked to plant trojans?**
+- **My SSH password hasn't leaked — is the panel itself secure enough?**
 
-| 层级 | 用途 | 存储方式 |
-|------|------|----------|
-| 第 1 层 — BasicAuth | 浏览器弹窗，拦截第一层扫描 | bcrypt 哈希存储在 `config.json` |
-| 第 2 层 — Web 登录 | 面板内表单登录 | bcrypt 哈希存储在 SQLite 数据库 |
+This article will break down all of WP Panel's post-installation runtime behavior from a **source code perspective**, explaining how each layer of protection works, and why — when server passwords aren't leaked — it's nearly impossible for attackers to compromise your server through the panel.
 
-**bcrypt 是什么？** 它是一种**单向密码哈希算法**。你输入的密码经过计算后变成一个以 `$2a$12$` 开头的字符串，这个过程**不可逆**——即使有人拿到了数据库和配置文件，也**无法反推出你的原始密码**。
+---
 
-面板在验证登录时，只做一件事：
+## 2. Will the Panel Secretly Change Passwords?
+
+### 2.1 Password Storage: Even the Panel Itself Can't See Plaintext
+
+WP Panel uses a two-layer authentication system:
+
+| Layer | Purpose | Storage Method |
+|-------|---------|----------------|
+| Layer 1 — BasicAuth | Browser popup, intercepts first layer of scanning | bcrypt hash stored in `config.json` |
+| Layer 2 — Web Login | Panel form login | bcrypt hash stored in SQLite database |
+
+**What is bcrypt?** It's a **one-way password hashing algorithm**. Your entered password is transformed into a string starting with `$2a$12$` — this process is **irreversible** — even if someone obtains the database and config file, they **cannot reverse-engineer your original password**.
+
+When verifying login, the panel does only one thing:
 
 ```go
-bcrypt.CompareHashAndPassword([]byte(存着的哈希), []byte(你输入的密码))
+bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(yourPassword))
 ```
 
-匹配就通过，不匹配就拒绝。**面板从不保存、从不打印、从不传输你的明文密码。**
+Match → pass; no match → reject. **The panel never saves, never prints, never transmits your plaintext password.**
 
-### 2.2 密码在什么情况下会被修改？
+### 2.2 Under What Circumstances Are Passwords Changed?
 
-代码中唯一能修改密码的路径只有以下**三种**，全部需要**你主动触发**：
+The only code paths that can modify passwords are the following **three**, all requiring **your manual trigger**:
 
-| 方式 | 触发条件 | 谁可以执行 |
-|------|----------|------------|
-| 面板设置页修改 | 登录面板 → 设置 → 修改密码 | 已知当前密码的管理员 |
-| CLI 一键重置 | 服务器 SSH 执行 `wp password` | 服务器 root 用户 |
-| CLI 只改密码保留用户名 | 服务器 SSH 执行 `wp-panel --passwd="新密码"` | 服务器 root 用户 |
+| Method | Trigger Condition | Who Can Execute |
+|--------|------------------|-----------------|
+| Panel settings page change | Login to panel → Settings → Change Password | Administrator who knows the current password |
+| CLI one-click reset | Server SSH: `wp password` | Server root user |
+| CLI password-only change | Server SSH: `wp-panel --passwd="newpassword"` | Server root user |
 
-**为什么输入 `wp password`，实际执行的却是另一套命令？**
+**Why does entering `wp password` actually execute a different set of commands?**
 
-`wp` 是面板安装时创建的一个**命令封装脚本**（存放在 `/usr/local/bin/wp`），它的作用是把复杂的底层命令包装成好记的日常指令。对应关系如下：
+`wp` is a **command wrapper script** created during panel installation (stored at `/usr/local/bin/wp`), designed to package complex underlying commands into easy-to-remember daily commands. The mapping is as follows:
 
-| 你输入的命令 | 实际底层执行的命令 | 效果区别 |
-|-------------|-------------------|----------|
-| `wp password` | `wp-panel --reset-admin` | **用户名和密码一起重置**（用户名恢复为 `wpadmin`，密码随机生成） |
-| `wp-panel --passwd="xxx"` | `wp-panel --passwd="xxx"` | **只改密码，保留当前用户名** |
+| Your Command | Actual Underlying Command | Effect Difference |
+|-------------|--------------------------|-------------------|
+| `wp password` | `wp-panel --reset-admin` | **Resets both username and password** (username reverts to `wpadmin`, password randomly generated) |
+| `wp-panel --passwd="xxx"` | `wp-panel --passwd="xxx"` | **Changes password only, retains current username** |
 
-也就是说，`wp password` 更适合"我被锁在外面了，一键恢复"的紧急情况；而 `wp-panel --passwd="xxx"` 适合"我知道当前用户名，只想换个密码"的场景。两者都是真实存在的，只是一个是给人类用的快捷方式，一个是给需要精细控制的人用的底层接口。
+In other words, `wp password` is more suitable for "I'm locked out, one-click recovery" emergencies; while `wp-panel --passwd="xxx"` is for "I know the current username and just want to change the password" scenarios. Both exist — one is a human-friendly shortcut, the other a low-level interface for precise control.
 
-**关键结论**：
-- 没有定时任务会在半夜自动改密码。
-- 没有远程指令可以隔空修改你的密码。
-- 没有"后门密码"或"通用密钥"。
-- 面板**不向任何服务器发送**你的密码或密码哈希。
+**Key conclusions**:
+- No scheduled task automatically changes passwords at midnight.
+- No remote command can remotely modify your password.
+- There is no "backdoor password" or "generic key".
+- The panel **does not send your password or password hash to any server**.
 
-### 2.3 如果密码真的被改了，原因更可能是……
+### 2.3 If Passwords Were Really Changed, More Likely Causes...
 
-如果你的服务器密码在安装面板后被修改，排查顺序应该是：
+If your server password was modified after installing the panel, the investigation order should be:
 
-1. **SSH 密钥是否泄露** —— 检查 `~/.ssh/authorized_keys` 是否有陌生公钥
-2. **是否使用了弱密码** —— 服务器 root 密码是否在字典中
-3. **是否安装了其他软件** —— 面板之外是否有可疑进程
-4. **云服务商控制台是否被盗** —— 通过 VNC/控制台重置密码不留痕迹
+1. **Were SSH keys leaked** — Check `~/.ssh/authorized_keys` for unknown public keys
+2. **Were weak passwords used** — Is the server root password in a dictionary
+3. **Was other software installed** — Are there suspicious processes outside the panel
+4. **Was the cloud provider console compromised** — Password resets via VNC/console leave no traces
 
-> 面板代码中**没有任何一行**涉及修改 `/etc/shadow`、`/etc/passwd` 或 SSH 配置。这是可以通过全文搜索验证的。
+> There is **not a single line** in the panel code that modifies `/etc/shadow`, `/etc/passwd`, or SSH configuration. This can be verified through full-text search.
 
 ---
 
-## 三、面板会不会植入病毒或木马？
+## 3. Will the Panel Plant Viruses or Trojans?
 
-这是最关键也最合理的担忧。一个常驻后台的程序，如果有自动更新能力，理论上确实存在被利用的风险。我们需要从**更新机制**和**运行时约束**两个维度来分析。
+This is the most critical and reasonable concern. A program running in the background with auto-update capability theoretically does carry exploitation risk. We need to analyze this from two dimensions: **update mechanism** and **runtime constraints**.
 
-### 3.1 自动更新机制：三重独立验证
+### 3.1 Auto-Update Mechanism: Triple Independent Verification
 
-WP Panel 的更新功能在 `handlers/update.go` 中实现，流程如下：
+WP Panel's update functionality is implemented in `handlers/update.go`, with the following flow:
 
 ```
-用户点击"更新面板" → 下载新二进制 → SHA256校验 → Ed25519签名校验 → 预检执行 → 备份旧版 → 替换 → 重启
+User clicks "Update Panel" → Download new binary → SHA256 verification → Ed25519 signature verification → Preflight check → Backup old version → Replace → Restart
 ```
 
-#### 第一重：SHA256 完整性校验
+#### First Layer: SHA256 Integrity Verification
 
-下载完成后，面板会同时下载一个 `.sha256` 文件，其中记录了正确的哈希值。面板会重新计算下载文件的 SHA256，**不匹配就直接终止**。
+After download, the panel also downloads a `.sha256` file containing the correct hash. The panel recomputes the downloaded file's SHA256 and **terminates immediately if it doesn't match**.
 
 ```go
 if err := verifySHA256(newBinary, shaFile); err != nil {
-    fail(http.StatusInternalServerError, "校验失败")
+    fail(http.StatusInternalServerError, "Verification failed")
     return
 }
 ```
 
-这确保了文件在传输过程中没有被中间人篡改或损坏。
+This ensures the file was not tampered with or corrupted during transmission.
 
-#### 第二重：Ed25519 数字签名
+#### Second Layer: Ed25519 Digital Signature
 
-SHA256 只能保证文件完整性，但不能证明文件来源。因此面板还引入了 **Ed25519 非对称签名**：
+SHA256 only guarantees file integrity, but cannot prove file origin. Therefore, the panel also introduces **Ed25519 asymmetric signatures**:
 
-- **公钥**硬编码在面板源码中（`releasePubKeyHex = "ee8ec641..."`）
-- **私钥**由作者离线保管，不在 GitHub、CI 或任何服务器上
-- 每次发布时，作者用私钥对 `.sha256` 文件签名，生成 `.sha256.sig`
-- 面板用内置公钥验证签名，**验证失败就终止更新**
+- **Public key** is hardcoded in the panel source code (`releasePubKeyHex = "ee8ec641..."`)
+- **Private key** is held offline by the author, not on GitHub, CI, or any server
+- During each release, the author signs the `.sha256` file with the private key, generating `.sha256.sig`
+- The panel verifies the signature with the built-in public key; **verification failure terminates the update**
 
 ```go
 if err := verifyEd25519(shaFile, sigFile); err != nil {
-    fail(http.StatusInternalServerError, "签名校验失败")
+    fail(http.StatusInternalServerError, "Signature verification failed")
     return
 }
 ```
 
-**这意味着什么？** 即使攻击者劫持了 GitHub Releases，上传了恶意二进制，由于他没有作者的私钥，**无法生成有效的 Ed25519 签名**，面板会拒绝安装。
+**What does this mean?** Even if an attacker hijacks GitHub Releases and uploads a malicious binary, since they don't have the author's private key, they **cannot generate a valid Ed25519 signature**, and the panel will refuse installation.
 
-#### 第三重：预检（Preflight）
+#### Third Layer: Preflight Check
 
-即使通过了前两重校验，面板在替换前还会执行一个**预检**：
+Even after passing the first two verifications, the panel runs a **preflight** before replacement:
 
 ```go
 if err := preflightBinary(newBinary); err != nil {
-    fail(http.StatusInternalServerError, "新版本预检失败")
+    fail(http.StatusInternalServerError, "New version preflight failed")
     return
 }
 ```
 
-预检会运行新二进制附带的 `--info` 参数，确认它能正常启动、不会一运行就崩溃。如果新二进制被篡改为无法正常执行的垃圾文件，这一步会拦截。
+The preflight runs the new binary's `--info` parameter to confirm it can start normally and won't crash immediately. If the new binary was tampered into a non-executable garbage file, this step will catch it.
 
-#### 备份与回滚
+#### Backup and Rollback
 
-在上述所有验证通过后，面板才会执行替换，而且替换前**必定备份**：
+Only after all verifications above pass does the panel perform replacement, and **always backs up first**:
 
 ```go
 backupPath := versionedBackupPath(h.CurrentVersion)  // /usr/local/bin/wp-panel.bak.v1.2.3.20240101-120000
 if err := copyFile(installPath, backupPath, 0755); err != nil {
-    fail(http.StatusInternalServerError, "备份旧版本失败")
+    fail(http.StatusInternalServerError, "Failed to backup old version")
     return
 }
 ```
 
-如果替换后发现权限设置失败，面板会**自动回滚**：
+If permission setting fails after replacement, the panel **auto-rolls back**:
 
 ```go
 if err := os.Chmod(installPath, 0755); err != nil {
     if rbErr := copyFile(backupPath, installPath, 0755); rbErr != nil {
-        fail(http.StatusInternalServerError, "替换后权限设置失败，且自动回滚失败")
+        fail(http.StatusInternalServerError, "Permission setting failed after replacement, and auto-rollback failed")
         return
     }
-    fail(http.StatusInternalServerError, "替换后权限设置失败，已回滚")
+    fail(http.StatusInternalServerError, "Permission setting failed after replacement, rolled back")
     return
 }
 ```
 
-### 3.2 面板没有"远程代码执行"能力
+### 3.2 The Panel Has No "Remote Code Execution" Capability
 
-WP Panel 是用 **Go 语言**编写的**静态编译二进制**，这意味着：
+WP Panel is written in **Go** and compiled into a **static binary**, which means:
 
-- 它不依赖运行时解释器（如 PHP、Python、Node.js），无法被"注入脚本"
-- 它没有 `eval()`、`system()` 这类可以执行任意字符串的函数
-- 所有的系统命令调用都走 `executor/commander.go` 的**白名单机制**
+- It doesn't depend on runtime interpreters (like PHP, Python, Node.js) and cannot be "injected with scripts"
+- It has no `eval()`, `system()` or similar functions that can execute arbitrary strings
+- All system command invocations go through `executor/commander.go`'s **whitelist mechanism**
 
-白名单机制有多严格？以下是部分代表性命令（完整白名单包含 20+ 个系统命令）：
+How strict is the whitelist? Here are some representative commands (the complete whitelist contains 20+ system commands):
 
-| 允许执行的命令 | 允许使用的参数 |
-|---------------|---------------|
+| Allowed Commands | Allowed Parameters |
+|-----------------|-------------------|
 | `systemctl` | start, stop, reload, restart, enable, disable... |
 | `nginx` | -t, -s, -c |
 | `mysql` | -u, -p, -e, -h, -P |
-| `wget` | -q, -O, -T, -t（且 URL 必须是 HTTPS + 白名单域名） |
-| `curl` | -s, -o, -f, -L, -X, -H, -d（且 URL 必须是 HTTPS + 白名单域名） |
+| `wget` | -q, -O, -T, -t (and URLs must be HTTPS + whitelist domains) |
+| `curl` | -s, -o, -f, -L, -X, -H, -d (and URLs must be HTTPS + whitelist domains) |
 | `unzip` | -o, -q, -d |
 | `fail2ban-client` | set, unban, status, banip... |
 
-**危险字符被全局过滤**：`;`, `|`, `&`, `` ` ``, `$`, `<`, `>` 等任何可能拼接出 shell 注入的字符，都会直接拒绝。
+**Dangerous characters are globally filtered**: `;`, `|`, `&`, `` ` ``, `$`, `<`, `>` and any characters that could compose shell injection are directly rejected.
 
 ```go
 func hasUnsafeArgs(binary string, args []string) bool {
@@ -186,54 +186,54 @@ func hasUnsafeArgs(binary string, args []string) bool {
         if strings.ContainsAny(arg, ";|&`$<>") {
             return true
         }
-        // wget/curl 的 URL 必须是 HTTPS 且来自白名单域名
+        // wget/curl URLs must be HTTPS and from whitelist domains
     }
 }
 ```
 
-### 3.3 文件管理有"牢笼"
+### 3.3 File Management Has a "Cage"
 
-面板提供了文件管理器，但所有文件操作都被限制在**网站根目录**内：
+The panel provides a file manager, but all file operations are restricted within **website root directories**:
 
 ```go
 func isPathWithin(basePath, targetPath string) bool {
-    // 解析符号链接，防止用软链接跳出目录
+    // Resolve symlinks to prevent directory escapes via soft links
     base, _ := filepath.EvalSymlinks(filepath.Clean(basePath))
     target, _ := resolvePathForAccess(targetPath)
     
-    // 计算相对路径，确保目标在 base 之内
+    // Calculate relative path, ensure target is within base
     rel, _ := filepath.Rel(base, target)
     return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 ```
 
-**安全要点**：
-- 即使你通过面板登录，也**无法访问** `/etc/shadow`、`/root/.ssh/`、`/www/server/panel/config.json` 等敏感路径
-- 上传、下载、删除、解压等操作都会先经过 `isPathWithin()` 检查，**越权直接返回 403**
-- 符号链接会被 `EvalSymlinks` 解析到真实路径，**无法用软链接绕过目录限制**
+**Security points**:
+- Even if you log in through the panel, you **cannot access** sensitive paths like `/etc/shadow`, `/root/.ssh/`, `/www/server/panel/config.json`
+- Upload, download, delete, decompress and other operations all go through `isPathWithin()` checks; **unauthorized access directly returns 403**
+- Symlinks are resolved to real paths by `EvalSymlinks`, **cannot be bypassed via soft links**
 
-### 3.3.1 文件锁定（File Lock）
+### 3.3.1 File Lock
 
-文件锁定是在网站级别启用的“文件写保护增强”。它要求 WordPress 站点满足 `site_type = wordpress`，并在数据库 `websites` 表写入 `file_lock_enabled` 与 `file_lock_enabled_at`。
+File Lock is a "file write protection enhancement" enabled at the website level. It requires WordPress sites to have `site_type = wordpress`, with `file_lock_enabled` and `file_lock_enabled_at` written to the database `websites` table.
 
-#### 锁定时写入范围（运行时）
+#### Write Scope During Lock (Runtime)
 
-启用锁定后，路径写入不仅要通过 `isPathWithin()` 根目录判断，还要满足额外规则：
+When lock is enabled, path writes must pass both the `isPathWithin()` root directory check and additional rules:
 
-- 允许写入：`/www/wwwroot/<site>/wp-content/...` 下的运行目录数据
-- 禁止写入：
+- Allowed writes: Runtime data under `/www/wwwroot/<site>/wp-content/...`
+- Forbidden writes:
   - `wp-content/plugins`
   - `wp-content/themes`
   - `wp-content/mu-plugins`
   - `wp-content/upgrade`
   - `wp-content/upgrade-temp-backup`
-- 禁止改写配置文件：`wp-config.php`、`.user.ini`、`.htaccess`（站点根目录）以及 `php.ini`、`wordfence-waf.php`
-- 默认禁止新建/修改 PHP 可执行类文件（`.php`、`.phtml`、`.phar`）
-- 文件锁定设置时会拒绝 `wp-config.php` 已存在 `DISALLOW_FILE_MODS = false` 的站点手工配置，避免和面板行为冲突
+- Forbidden config file modifications: `wp-config.php`, `.user.ini`, `.htaccess` (site root), and `php.ini`, `wordfence-waf.php`
+- Default forbidden: creating/modifying PHP executable files (`.php`, `.phtml`, `.phar`)
+- File lock settings reject sites where `wp-config.php` already has `DISALLOW_FILE_MODS = false`, avoiding conflicts with panel behavior
 
-#### 文件锁定对接口的直接拦截
+#### File Lock Direct API Interception
 
-锁定后会拒绝 `423 (Locked)` 的维护入口包括：
+When locked, the following maintenance endpoints return `423 (Locked)`:
 
 - `POST /websites/:id/db-password`
 - `POST /websites/:id/fix-wp-config`
@@ -242,31 +242,31 @@ func isPathWithin(basePath, targetPath string) bool {
 - `POST /websites/:id/reinstall`
 - `POST /api/cache/helper/optimizer-settings`
 
-返回文案与前端文案一致：
+Returned text matches frontend text:
 
-> 该站点已开启文件锁定，请先解除文件锁定后再执行此维护操作
+> This site has file lock enabled. Please disable file lock before performing this maintenance operation.
 
-#### 文件管理的联动
+#### File Manager Integration
 
-锁定状态下，文件管理写动作（上传、上传分片完成、删除、重命名、建目录、压缩、解压、复制、移动、归档导入等）会统一走 `checkFileLockWrite`。
+In locked state, file manager write actions (upload, upload chunk completion, delete, rename, create directory, compress, decompress, copy, move, archive import, etc.) all go through `checkFileLockWrite`.
 
-当目标写路径不满足规则时，返回：
+When the target write path doesn't satisfy rules, it returns:
 
-> 该站点已开启文件锁定，仅允许写入 wp-content 下的运行数据目录，且禁止写入 PHP 可执行文件
+> This site has file lock enabled. Only runtime data directories under wp-content are allowed for writes, and PHP executable files are forbidden.
 
-这意味着：文件锁定是对“路径隔离”之外的**写行为再加一层限制**，不是替代。
+This means: file lock is an **additional write behavior restriction** beyond "path isolation", not a replacement.
 
-#### 代码层实现
+#### Code Layer Implementation
 
-- 启用时在 `wp-config.php` 写入托管块（`WP Panel File Lock`）
+- When enabled, writes a managed block (`WP Panel File Lock`) to `wp-config.php`
   - `define('DISALLOW_FILE_MODS', true);`
   - `define('FS_METHOD', 'direct');`
-- 关闭时移除托管块并恢复正常权限模型
-- 启用/关闭同时触发网站权限重刷，并校验关键路径（如 `wp-config.php`、`wp-content/{plugins,themes,mu-plugins}`）不存在可疑符号链接
+- When disabled, removes the managed block and restores the normal permission model
+- Enable/disable also triggers website permission refresh, verifying critical paths (e.g., `wp-config.php`, `wp-content/{plugins,themes,mu-plugins}`) have no suspicious symlinks
 
-### 3.4 下载来源被锁死
+### 3.4 Download Sources Are Locked Down
 
-面板中所有涉及下载的地方（WordPress 核心、插件、主题、更新包），URL 都被限制在**白名单域名**：
+All download-related areas in the panel (WordPress core, plugins, themes, update packages) have URLs restricted to **whitelisted domains**:
 
 ```go
 func isAllowedDownloadURL(raw string) bool {
@@ -284,50 +284,50 @@ func isAllowedDownloadURL(raw string) bool {
 }
 ```
 
-- 必须走 **HTTPS**
-- 不允许用户名密码嵌入 URL（`u.User != nil`）
-- 不在白名单的域名**一律拒绝**
+- Must use **HTTPS**
+- No username/password embedded in URLs (`u.User != nil`)
+- Domains not on the whitelist are **all rejected**
 
 ---
 
-## 四、服务器密码没泄露时，面板有多安全？
+## 4. When Server Passwords Aren't Leaked, How Secure Is the Panel?
 
-假设你的 SSH root 密码、密钥、云服务商控制台都没有泄露，攻击者只能通过网络访问你的服务器。WP Panel 在这类场景下构建了**六层纵深防御**。
+Assuming your SSH root password, keys, and cloud provider console haven't been leaked, attackers can only access your server over the network. WP Panel builds **six layers of defense-in-depth** for this scenario.
 
-### 4.1 隐蔽层：让攻击者找不到门
+### 4.1 Covert Layer: Making Attackers Unable to Find the Door
 
-#### 随机入口路径
+#### Random Entry Path
 
-安装时，面板会生成一个 **8 位随机后缀**（如 `a3b9c2d1`），面板地址变成：
+During installation, the panel generates an **8-character random suffix** (e.g., `a3b9c2d1`), making the panel address:
 
 ```
-https://你的IP:8443/a3b9c2d1/login
+https://your-ip:8443/a3b9c2d1/login
 ```
 
-如果不带这个后缀访问，直接返回 404。攻击者想暴力猜测这个路径：
+Without this suffix, access directly returns 404. For attackers trying to brute-force this path:
 
-- 后缀由 SHA256 哈希生成，每位取 0-9 a-f 共 16 种可能
-- 8 位组合总数 = 16^8 ≈ **43 亿**
-- 纯数学上每秒 1 万次扫描约需 5 天穷举——但扫描防御在第一次非浏览器请求时即封禁 IP 30 天，实际攻击不可行。
+- The suffix is generated from SHA256 hash, each character has 16 possibilities (0-9, a-f)
+- Total 8-character combinations = 16^8 ≈ **4.3 billion**
+- Pure math: at 10,000 scans per second, about 5 days to exhaust — but scan defense bans IPs for 30 days on the first non-browser request, making actual attacks infeasible.
 
-#### 8443 非标准端口
+#### 8443 Non-Standard Port
 
-面板使用 8443 端口而非常见的 80/443/8080/8888，这本身就能过滤掉 99% 的互联网批量扫描器。
+The panel uses port 8443 instead of common 80/443/8080/8888, which itself filters out 99% of internet batch scanners.
 
-#### 扫描防御：非浏览器直接封禁 30 天
+#### Scan Defense: Non-Browser Immediately Banned for 30 Days
 
-如果有人尝试用脚本扫描 8443 端口，面板的第一道防线不是登录验证，而是 **`middleware/scan_defense.go`**：
+If someone attempts to scan port 8443 with a script, the panel's first defense is not login verification, but **`middleware/scan_defense.go`**:
 
 ```go
 func ScanDefense(db *sql.DB, randomSuffix string) gin.HandlerFunc {
     return func(c *gin.Context) {
         path := c.Request.URL.Path
-        // 如果路径不是以随机后缀开头
+        // If path doesn't start with random suffix
         if !strings.HasPrefix(path, legitPrefix) {
-            // 检查 User-Agent 是否是浏览器
+            // Check if User-Agent is a browser
             if !isBrowserLike(c) {
-                // 不是浏览器？直接封禁 IP 720 小时（30 天）
-                banScanIP(db, c.ClientIP(), "高危扫描: 非浏览器特征探测面板端口", 720)
+                // Not a browser? Directly ban IP for 720 hours (30 days)
+                banScanIP(db, c.ClientIP(), "High-risk scan: non-browser characteristic probe on panel port", 720)
                 c.AbortWithStatus(http.StatusForbidden)
                 return
             }
@@ -337,57 +337,57 @@ func ScanDefense(db *sql.DB, randomSuffix string) gin.HandlerFunc {
 }
 ```
 
-**这意味着什么？** 攻击者用 Nmap、Dirbuster、Python 脚本扫描你的面板端口，User-Agent 里没有 `Mozilla`、`Chrome`、`Safari` 等浏览器标识，**IP 会立即被写入防火墙黑名单，封禁 30 天**。
+**What does this mean?** If attackers use Nmap, Dirbuster, or Python scripts to scan your panel port, and the User-Agent lacks `Mozilla`, `Chrome`, `Safari` or other browser identifiers, **the IP is immediately written to the firewall blacklist and banned for 30 days**.
 
-### 4.2 认证层：两道密码门
+### 4.2 Authentication Layer: Two Password Doors
 
-即使攻击者知道了你的随机入口，还需要连续突破两层认证：
+Even if attackers know your random entry path, they still need to break through two consecutive authentication layers:
 
-**第 1 层 — BasicAuth（浏览器弹窗）**
-- 用户名/密码使用 bcrypt 比对
-- 连续失败 5 次，IP 被封禁 24 小时
-- 失败记录写入数据库，由 fail2ban 同步到系统防火墙
+**Layer 1 — BasicAuth (Browser Popup)**
+- Username/password compared using bcrypt
+- 5 consecutive failures → IP banned for 24 hours
+- Failure records written to database, synced to system firewall by fail2ban
 
-**第 2 层 — Web 登录（面板内表单）**
-- 独立的另一套用户名/密码
-- 同样使用 bcrypt 比对
-- 同样有 5 次失败封禁机制
-- 通过后才获得 Session
+**Layer 2 — Web Login (Panel Form)**
+- Independent second set of username/password
+- Also uses bcrypt comparison
+- Also has 5-failure ban mechanism
+- Session only granted after passing
 
-**为什么设计两层？** 即使 BasicAuth 的密码因某种原因泄露（比如浏览器记住了密码被旁边的人看到），攻击者仍然需要第二层密码才能进入面板。这不是过度设计，而是**纵深防御**。
+**Why two layers?** Even if BasicAuth's password leaks for some reason (e.g., browser saved the password and someone next to you saw it), attackers still need a second password to enter the panel. This isn't over-engineering — it's **defense-in-depth**.
 
-### 4.3 会话层：偷到 Cookie 也没用
+### 4.3 Session Layer: Stealing the Cookie Is Useless
 
-登录成功后，面板会下发一个 Session Cookie：
+After successful login, the panel issues a Session Cookie:
 
 ```go
 http.SetCookie(c.Writer, &http.Cookie{
     Name:     "wp_session",
-    Value:    session.Token,     // UUID 随机字符串
-    MaxAge:   1800,              // 30 分钟
+    Value:    session.Token,     // UUID random string
+    MaxAge:   1800,              // 30 minutes
     Path:     "/",
-    HttpOnly: true,              // JavaScript 无法读取
-    Secure:   true,              // 仅 HTTPS 传输
+    HttpOnly: true,              // JavaScript cannot read
+    Secure:   true,              // HTTPS only transmission
     SameSite: http.SameSiteLaxMode,
 })
 ```
 
-**安全特性**：
-- **HttpOnly**：即使网站有 XSS 漏洞，JavaScript 也读不到这个 Cookie
-- **Secure**：只会通过 HTTPS 加密传输，不会被中间人明文截获
-- **滑动续期**：每次访问有效页面，有效期自动延长 30 分钟
-- **服务端存储**：Session 存储在面板内存中，**没有持久化到磁盘**，重启面板后所有 Session 失效，需要重新登录
+**Security features**:
+- **HttpOnly**: Even if the website has XSS vulnerabilities, JavaScript cannot read this Cookie
+- **Secure**: Only transmitted via HTTPS encryption, cannot be intercepted in plaintext by man-in-the-middle
+- **Sliding renewal**: Validity automatically extended by 30 minutes on each valid page access
+- **Server-side storage**: Sessions stored in panel memory, **not persisted to disk**; all sessions expire after panel restart, requiring re-login
 
-此外，所有**写操作**（修改配置、删除文件、创建网站等）还必须携带 **CSRF Token**：
+Additionally, all **write operations** (modifying configuration, deleting files, creating websites, etc.) must also carry a **CSRF Token**:
 
 ```go
 func CSRF() gin.HandlerFunc {
     return func(c *gin.Context) {
-        // 读取 Header 中的 X-CSRF-Token
+        // Read X-CSRF-Token from Header
         headerToken := c.GetHeader("X-CSRF-Token")
-        // 读取 Cookie 中的 csrf_token
+        // Read csrf_token from Cookie
         cookieToken, _ := c.Cookie("csrf_token")
-        // 两者必须一致
+        // Both must match
         if headerToken != cookieToken {
             c.AbortWithStatusJSON(http.StatusForbidden, ...)
             return
@@ -397,345 +397,345 @@ func CSRF() gin.HandlerFunc {
 }
 ```
 
-这防止了**跨站请求伪造攻击**——攻击者诱导你点击恶意链接，却无法伪造出正确的 CSRF Token。
+This prevents **cross-site request forgery attacks** — attackers can trick you into clicking malicious links but cannot forge a correct CSRF Token.
 
-### 4.4 传输层：加密 + 安全响应头
+### 4.4 Transport Layer: Encryption + Secure Response Headers
 
-面板强制使用 **HTTPS**（8443 端口），并发送以下安全响应头：
+The panel enforces **HTTPS** (port 8443) and sends the following security response headers:
 
-| 响应头 | 作用 |
-|--------|------|
-| `Strict-Transport-Security: max-age=31536000; includeSubDomains` | 告诉浏览器未来一年内只用 HTTPS 连接 |
-| `X-Frame-Options: DENY` | 禁止页面被嵌入到 iframe，防止点击劫持 |
-| `X-Content-Type-Options: nosniff` | 禁止浏览器猜测文件类型 |
-| `Referrer-Policy: no-referrer` | 不泄露来源页面地址 |
+| Response Header | Purpose |
+|----------------|---------|
+| `Strict-Transport-Security: max-age=31536000; includeSubDomains` | Tells browser to use HTTPS only for the next year |
+| `X-Frame-Options: DENY` | Prevents page from being embedded in iframes, preventing clickjacking |
+| `X-Content-Type-Options: nosniff` | Prevents browser from guessing file types |
+| `Referrer-Policy: no-referrer` | Does not leak source page address |
 
-### 4.5 操作层：即使进了面板，也干不了坏事
+### 4.5 Operation Layer: Even Inside the Panel, Can't Do Harm
 
-假设极端情况：攻击者通过了所有认证，进入了面板。他能做什么？
+In an extreme scenario: attacker passes all authentication and enters the panel. What can they do?
 
-**文件管理**：只能操作 `/www/wwwroot/` 下的网站文件，以及 `/www/server/panel/backups` 备份目录，**无法越权访问**系统配置文件、其他用户数据、面板自身配置。
+**File Management**: Can only operate website files under `/www/wwwroot/` and the `/www/server/panel/backups` backup directory, **cannot access** system configuration files, other users' data, or the panel's own configuration.
 
-**命令执行**：面板没有"终端"功能，所有系统操作都通过封装好的 API 执行，底层走 `executor/commander.go` 的白名单。**不存在输入任意命令的入口**。
+**Command Execution**: The panel has no "terminal" function; all system operations are executed through wrapped APIs, with the underlying layer going through `executor/commander.go`'s whitelist. **There is no entry point for arbitrary command input**.
 
-**数据库**：面板自身使用 SQLite 存储配置和日志；对 MariaDB 的管理则通过命令行 `mysql` 客户端执行（带 `MYSQL_PWD` 环境变量），MariaDB root 密码只存在 `config.json`（权限 600）中。攻击者通过面板只能管理**网站对应的数据库**，无法直接拿到 MariaDB root 密码。
+**Database**: The panel itself uses SQLite for configuration and logs; MariaDB management is executed through the command-line `mysql` client (with `MYSQL_PWD` environment variable), and the MariaDB root password only exists in `config.json` (permission 600). Attackers through the panel can only manage **databases corresponding to websites**, not directly obtain the MariaDB root password.
 
-### 4.6 网络层：防火墙 + 速率限制 + 入侵检测
+### 4.6 Network Layer: Firewall + Rate Limiting + Intrusion Detection
 
-**Nginx 速率限制**：
-- 未登录 WordPress 用户限速 **60 请求/分钟**
-- 已登录用户不限速（避免误伤正常用户）
+**Nginx Rate Limiting**:
+- Unlogged WordPress users rate-limited to **60 requests/minute**
+- Logged-in users are not rate-limited (to avoid disrupting normal users)
 
-**fail2ban 集成**：
-- SSH 暴力破解 → 自动封禁
-- 面板登录失败 → 自动封禁
-- 404 扫描 → 自动封禁
+**fail2ban Integration**:
+- SSH brute-force → auto-ban
+- Panel login failure → auto-ban
+- 404 scanning → auto-ban
 
-**nftables 防火墙**：
-- 面板自身的扫描防御和手动封禁会直接写入 nftables，在系统层面阻断连接
+**nftables Firewall**:
+- The panel's own scan defense and manual bans are directly written to nftables, blocking connections at the system level
 
 ---
 
-## 五、面板安装的软件本身安全吗？——软件层面的安全防护
+## 5. Is the Software Installed by the Panel Itself Secure? — Software-Level Security Protection
 
-前面的章节证明了面板自身不会作恶。但另一个合理的担忧是：**面板安装的那些软件（Nginx、MariaDB、Redis、PHP-FPM 等）本身可能带有漏洞，面板有没有做什么？**
+The previous sections proved the panel itself won't do harm. But another reasonable concern is: **the software the panel installs (Nginx, MariaDB, Redis, PHP-FPM, etc.) might have vulnerabilities — has the panel done anything about this?**
 
-要回答这个问题，首先需要理解一个核心概念——
+To answer this question, we first need to understand a core concept —
 
-### 5.1 先说人话：为什么"更新软件"等于"修漏洞"？
+### 5.1 Plain Language: Why "Updating Software" Equals "Fixing Vulnerabilities"
 
-你可以把你的服务器想象成一座房子，每一个运行的软件（Nginx、PHP、数据库等）就是房子的一扇门或一扇窗。**软件的漏洞就是窗户上没关严的缝**——黑客通过这些缝钻进你的房子。
+Imagine your server is a house, and each running piece of software (Nginx, PHP, database, etc.) is a door or window. **Software vulnerabilities are gaps in windows that aren't fully closed** — hackers sneak into your house through these gaps.
 
-关键点在于：
+The key point is:
 
-> **黑客知道的漏洞，软件厂商也知道。厂商发布的每一次"更新"，就是在修补这些被发现的门窗。**
+> **Hackers know about vulnerabilities, and so do software vendors. Every "update" the vendor releases is fixing these discovered doors and windows.**
 
-打个比方：
+An analogy:
 
-| 日常场景 | 服务器场景 |
-|----------|-----------|
-| 你家装的某品牌智能门锁被发现一个安全缺陷 | 你服务器上运行的 Nginx 被发现一个远程代码执行漏洞（CVE） |
-| 厂商发布新固件修复了这个缺陷 | Debian/Nginx 官方发布新版本修复了这个漏洞 |
-| 你更新门锁固件 → 门重新安全了 | 你执行 `apt upgrade nginx` → 漏洞被堵上了 |
-| 你一直不更新 → 小偷知道这个型号有缺陷，专门找你这种门锁下手 | 你不更新 → 黑客用扫描器全网搜这个版本的 Nginx，轻松入侵 |
+| Everyday Scenario | Server Scenario |
+|-------------------|-----------------|
+| A smart door lock from a certain brand is found to have a security defect | Nginx running on your server is found to have a remote code execution vulnerability (CVE) |
+| Vendor releases new firmware fixing the defect | Debian/Nginx official releases new version fixing the vulnerability |
+| You update door lock firmware → door is secure again | You run `apt upgrade nginx` → vulnerability is patched |
+| You never update → thief knows this model has a defect, specifically targets your lock | You don't update → hackers scan the entire internet for this version of Nginx, easily compromise |
 
-**真相是：绝大多数被黑掉的网站不是因为黑客有多厉害，而是因为站长没有及时更新软件。** 2023 年 Wordfence 报告显示，WordPress 生态中被入侵的站点中，超过 60% 是因为已知漏洞未修补——换句话说，只要按时更新就不会被黑。
+**The truth is: most hacked websites aren't because hackers are so skilled, but because site owners didn't update software promptly.** The 2023 Wordfence report showed that over 60% of compromised WordPress sites had known, unpatched vulnerabilities — in other words, updating on time would have prevented the hack.
 
-了解了这个基本逻辑，你再来看 WP Panel 做了什么，就非常清楚了。
+Understanding this basic logic, you can clearly see what WP Panel does.
 
-### 5.2 面板的"系统更新"到底是什么？
+### 5.2 What Exactly Is the Panel's "System Update"?
 
-当你打开 WP Panel 的"系统更新"页面时，面板在后台执行了这样一个检查：
+When you open WP Panel's "System Update" page, the panel performs this check in the background:
 
 ```
-问系统："我们装的所有软件（nginx、php、mariadb、redis...），有没有新版本？"
+Asking the system: "Are there new versions for all installed software (nginx, php, mariadb, redis...)?"
 ```
 
-系统回答：
-- 没有新版本 → 显示"系统已是最新"
-- 有新版本 → 列出可更新的软件和版本号，例如：
-  - nginx 1.24.0 → 1.26.0（修复了 2 个安全问题）
-  - php8.3-fpm 8.3.6 → 8.3.8（修复了 1 个安全问题）
+The system answers:
+- No new versions → displays "System is up to date"
+- New versions available → lists updatable software and version numbers, e.g.:
+  - nginx 1.24.0 → 1.26.0 (fixed 2 security issues)
+  - php8.3-fpm 8.3.6 → 8.3.8 (fixed 1 security issue)
   - mariadb-server 10.11.6 → 10.11.8
 
-技术上说，面板底层调用的是 Debian 系统的 `apt list --upgradable` 命令（源码 `handlers/system_update.go`），它去 Debian 官方软件仓库查询每个软件包的最新版本，跟你手机上 App Store 检查应用更新的原理一模一样。
+Technically, the panel's underlying call is Debian's `apt list --upgradable` command (source `handlers/system_update.go`), which queries each package's latest version from the Debian official software repository — exactly the same principle as your phone's App Store checking for app updates.
 
-### 5.3 一键更新：不用学命令行，点一下就行
+### 5.3 One-Click Update: No Command Line Knowledge Needed
 
-传统做法是：SSH 登录服务器 → 敲 `apt update` → 敲 `apt upgrade -y` → 看着屏幕等结果。
+The traditional approach: SSH into server → type `apt update` → type `apt upgrade -y` → watch the screen wait for results.
 
-WP Panel 把这三步变成**一个按钮**（源码 `handlers/system_update.go:56-80`）。你只需要打开面板，点"系统更新"，面板自动完成所有操作。对不懂命令行的站长来说，**不需要学任何 Linux 知识就能保持服务器安全**。
+WP Panel turns these three steps into **one button** (source `handlers/system_update.go:56-80`). You just need to open the panel, click "System Update", and the panel automatically completes all operations. For site owners unfamiliar with the command line, **no Linux knowledge is needed to keep the server secure**.
 
-### 5.4 自动告警：你忘了，面板替你记着
+### 5.4 Automatic Alerts: You Forget, the Panel Remembers
 
-这是最关键也最容易被忽略的能力。人会忘，面板不会。
+This is the most critical and easily overlooked capability. Humans forget; the panel doesn't.
 
-WP Panel 的告警系统（`executor/alert_monitor.go`）每 24 小时自动检查一次：
+WP Panel's alert system (`executor/alert_monitor.go`) automatically checks every 24 hours:
 
-- **系统软件更新告警**：当前服务器的 nginx、php、mariadb、redis 等有没有新版本？有就提醒你。
-- **面板自身更新告警**：WP Panel 自己有没有新版本？有也提醒你。
+- **System software update alerts**: Are there new versions for nginx, php, mariadb, redis on the current server? If so, it notifies you.
+- **Panel self-update alerts**: Does WP Panel itself have a new version? If so, it also notifies you.
 
-如果你配置了邮箱通知，你会收到类似这样的邮件：
+If you've configured email notifications, you'll receive emails like:
 
-> ⚠️ 您的服务器有 12 个可用安全更新：
-> nginx、mariadb-server、php8.3-fpm、php8.3-cli、redis-server、openssl、libssl3...
+> Warning: Your server has 12 available security updates:
+> nginx, mariadb-server, php8.3-fpm, php8.3-cli, redis-server, openssl, libssl3...
 
-**这意味着：** 你不需要主动去 CVE 数据库查"我用的 nginx 版本有没有漏洞"——Debian 安全团队已经替你查过了，他们把修复放进了 apt 更新里，面板告诉你"有更新了"，你点一下就行。
+**This means:** You don't need to proactively check CVE databases for "does my nginx version have vulnerabilities" — the Debian security team has already checked for you, put fixes into apt updates, and the panel tells you "updates available", you just click one button.
 
-### 5.5 真实案例：如果 Log4j 级别的漏洞发生在你的服务器组件上
+### 5.5 Real-World Example: If a Log4j-Level Vulnerability Hit Your Server Components
 
-2021 年底，Log4j 漏洞（Log4Shell）曝光，影响全球数百万台服务器。受影响的公司必须在**几小时内**找到所有受影响系统并更新——晚一天就可能被入侵。
+At the end of 2021, the Log4j vulnerability (Log4Shell) was exposed, affecting millions of servers worldwide. Affected companies had to find all impacted systems and update within **hours** — one day late could mean compromise.
 
-如果你的服务器组件（比如 Nginx 或 PHP）出现同等严重的漏洞，WP Panel 的流程是这样的：
+If a similarly severe vulnerability hit your server components (like Nginx or PHP), WP Panel's process would be:
 
 ```
-漏洞公开 → Debian 安全团队发布修复包 → 面板告警系统检测到可更新 →
-→ 发送邮件/Webhook 通知你 → 你打开面板 → 点"系统更新" → 漏洞修复完成
+Vulnerability disclosed → Debian security team releases fix package → Panel alert system detects available update →
+→ Sends email/Webhook notification → You open panel → Click "System Update" → Vulnerability fixed
 ```
 
-对比没有面板的情况：
+Compare with no panel:
 ```
-漏洞公开 → 你完全不知道 → 几周后你的站被黑了 → 你才发现
+Vulnerability disclosed → You have no idea → Weeks later your site is hacked → You finally discover
 ```
 
-**区别就在于"知不知道有更新"和"更新操作有多简单"。**
+**The difference lies in "knowing updates exist" and "how simple the update operation is."**
 
-### 5.6 进程守护（ProcessGuard）：软件崩了自动拉起来
+### 5.6 Process Guard (ProcessGuard): Auto-Restarts Crashed Software
 
-除了漏洞，软件还有**运行稳定性**问题。面板的 ProcessGuard（`executor/process_guard.go`）每 30 秒检查以下六个关键服务是否活着：
+Beyond vulnerabilities, software also has **runtime stability** issues. The panel's ProcessGuard (`executor/process_guard.go`) checks whether the following six critical services are alive every 30 seconds:
 
-| 服务 | 如果挂了 |
-|------|---------|
-| Nginx | 网站打不开 → ProcessGuard 自动重启 |
-| PHP-FPM | 网站白屏/报错 → ProcessGuard 自动重启 |
-| MariaDB | 数据库不可用 → ProcessGuard 自动重启 |
-| Redis | 缓存失效，网站变慢 → ProcessGuard 自动重启 |
-| nftables | 防火墙失效 → ProcessGuard 自动重启 |
-| Fail2ban | 暴力破解防护失效 → ProcessGuard 自动重启 |
+| Service | If It Crashes |
+|---------|--------------|
+| Nginx | Website inaccessible → ProcessGuard auto-restarts |
+| PHP-FPM | Website white screen/errors → ProcessGuard auto-restarts |
+| MariaDB | Database unavailable → ProcessGuard auto-restarts |
+| Redis | Cache unavailable, website slows down → ProcessGuard auto-restarts |
+| nftables | Firewall unavailable → ProcessGuard auto-restarts |
+| Fail2ban | Brute-force protection unavailable → ProcessGuard auto-restarts |
 
-对小白来说，**你甚至不需要知道这些服务叫什么名字**——面板在后台默默地守护着它们。你可以在面板的"系统守护"页面看到每个服务的状态：绿灯=正常，红灯=已自动重启。
+For beginners, **you don't even need to know what these services are called** — the panel silently guards them in the background. You can see each service's status on the panel's "System Guard" page: green = normal, red = auto-restarted.
 
-### 5.7 软件版本透明可见
+### 5.7 Software Versions Transparently Visible
 
-面板在"软件管理"页面展示每个已安装软件的精确版本号（`handlers/software.go`）。万一某天爆出一个严重漏洞，你可以立刻确认自己的服务器是否受影响：
+The panel displays each installed software's exact version number on the "Software Management" page (`handlers/software.go`). If a serious vulnerability is ever discovered, you can immediately check whether your server is affected:
 
-- CVE 公告说"Nginx 1.24.0 之前版本受影响"→ 你看面板：我的是 1.26.0 → 不受影响，放心
-- CVE 公告说"PHP 8.3.0-8.3.7 受影响"→ 你看面板：我的是 8.3.1 → 受影响 → 马上一键更新
+- CVE announcement says "Versions before Nginx 1.24.0 are affected" → Check panel: mine is 1.26.0 → Not affected, relax
+- CVE announcement says "PHP 8.3.0-8.3.7 affected" → Check panel: mine is 8.3.1 → Affected → Update immediately with one click
 
-不需要敲命令查版本，不需要记住软件路径，一个页面全看到。
+No need to type commands to check versions, no need to remember software paths — see everything on one page.
 
-### 5.8 这些软件来源可靠吗？
+### 5.8 Are These Software Sources Reliable?
 
-WP Panel 安装的所有软件都来自 **Debian 官方仓库**或 **Ondřej Surý PHP 官方源**（源码 `install.sh:549-568`），不是面板自己打包的：
+All software installed by WP Panel comes from the **Debian official repository** or **Ondřej Surý PHP official source** (source `install.sh:549-568`), not packaged by the panel itself:
 
 ```
 apt-get install -y nginx mariadb-server redis-server fail2ban nftables php8.3-fpm ...
 ```
 
-- **Debian 官方仓库**由 Debian 安全团队维护，每个软件包都有 GPG 数字签名，确保没被篡改
-- **Ondřej Surý PHP 源**是 PHP 在 Debian 生态中最权威的第三方源，同样有 GPG 签名验证
+- **Debian official repository** is maintained by the Debian security team, with each package having a GPG digital signature to ensure no tampering
+- **Ondřej Surý PHP source** is the most authoritative third-party PHP source in the Debian ecosystem, also with GPG signature verification
 
-面板的角色不是"提供软件"，而是"帮你管理这些官方软件，在它们出安全更新时第一时间告诉你"。
+The panel's role is not "providing software" but "helping you manage these official software packages and notifying you at the first sign of security updates."
 
-### 5.9 一句话总结
+### 5.9 One-Sentence Summary
 
-| 你的担忧 | 实际情况 |
-|----------|---------|
-| "面板装的 Nginx 有漏洞怎么办？" | 有漏洞 → Debian 官方发布更新 → 面板自动检测到 → 发邮件/Webhook 通知你 → 你点一键更新 → 漏洞修复。你不需要懂技术。 |
-| "我不知道什么时候该更新" | 面板帮你知道。每 24 小时自动检查，有更新就通知。 |
-| "我不知道怎么更新" | 面板帮你操作。一个按钮，不需要命令行。 |
-| "软件崩了怎么办" | 面板帮你重启。30 秒内自动恢复，你甚至可能察觉不到。 |
+| Your Concern | Actual Situation |
+|-------------|-----------------|
+| "What if the Nginx installed by the panel has vulnerabilities?" | Vulnerability exists → Debian official releases update → Panel auto-detects → Sends email/Webhook notification → You click one-click update → Vulnerability fixed. You don't need to be technical. |
+| "I don't know when to update" | The panel helps you know. Auto-checks every 24 hours, notifies you when updates are available. |
+| "I don't know how to update" | The panel helps you operate. One button, no command line needed. |
+| "What if software crashes" | The panel helps you restart. Auto-recovers within 30 seconds, you might not even notice. |
 
-WP Panel 不会给软件引入新的漏洞——它从官方源安装软件，每个包都有签名验证。面板做的事是**让你比手动管理时更快知道有漏洞、更简单地修复漏洞**。
+WP Panel doesn't introduce new vulnerabilities to software — it installs software from official sources, with each package having signature verification. What the panel does is **let you know about vulnerabilities faster and fix them more simply than manual management**.
 
 ---
 
-## 六、常见攻击场景模拟
+## 6. Common Attack Scenario Simulation
 
-为了更直观地理解安全性，我们模拟几种常见攻击手段：
+To better understand security intuitively, we simulate several common attack methods:
 
-### 场景 1：暴力破解面板登录
+### Scenario 1: Brute-Forcing Panel Login
 
-**攻击者做法**：用字典攻击 `https://IP:8443/随机后缀/login`
+**Attacker's approach**: Dictionary attack on `https://IP:8443/random-suffix/login`
 
-**结果**：
-- 不知道随机后缀 → 访问 `/` 直接 404，触发扫描防御后 IP 被封 30 天
-- 知道随机后缀但不知道 BasicAuth 密码 → 5 次失败后 IP 被封 24 小时
-- 突破了 BasicAuth 但不知道 Web 密码 → 再 5 次失败后继续封 24 小时
-- 按每秒 1 次尝试计算，破解一个 16 位随机密码需要**数亿年**
+**Result**:
+- Don't know random suffix → Access `/` directly gets 404, triggers scan defense, IP banned for 30 days
+- Know random suffix but not BasicAuth password → 5 failures → IP banned for 24 hours
+- Break through BasicAuth but don't know web password → Another 5 failures → continue banned for 24 hours
+- At 1 attempt per second, cracking a 16-character random password would take **hundreds of millions of years**
 
-**结论**：纯网络暴力破解**不可行**。
+**Conclusion**: Pure network brute-forcing is **infeasible**.
 
-### 场景 2：SQL 注入
+### Scenario 2: SQL Injection
 
-**攻击者做法**：在登录框输入 `' OR '1'='1`
+**Attacker's approach**: Enter `' OR '1'='1` in login form
 
-**结果**：面板使用参数化查询：
+**Result**: Panel uses parameterized queries:
 
 ```go
 db.QueryRow("SELECT password_hash FROM admin_users WHERE username = ?", req.Username)
 ```
 
-用户输入被当作**纯文本参数**处理，不会被解析为 SQL 语句。
+User input is treated as **plain text parameters**, not parsed as SQL statements.
 
-**结论**：SQL 注入**不可行**。
+**Conclusion**: SQL injection is **infeasible**.
 
-### 场景 3：路径穿越（下载 `/etc/passwd`）
+### Scenario 3: Path Traversal (Download `/etc/passwd`)
 
-**攻击者做法**：通过文件管理 API 访问 `../../../etc/passwd`
+**Attacker's approach**: Access `../../../etc/passwd` through file management API
 
-**结果**：`isPathWithin()` 函数会计算相对路径，发现目标跳出网站根目录，直接返回 **403 路径越权**。
+**Result**: `isPathWithin()` function calculates relative paths, finds target escapes website root directory, directly returns **403 path unauthorized**.
 
-**结论**：路径穿越**不可行**。
+**Conclusion**: Path traversal is **infeasible**.
 
-### 场景 4：命令注入（在域名输入框写 `; rm -rf /`）
+### Scenario 4: Command Injection (Write `; rm -rf /` in domain input)
 
-**攻击者做法**：在创建网站时输入恶意域名
+**Attacker's approach**: Enter malicious domain when creating a website
 
-**结果**：所有涉及系统命令的操作都经过 `executor/commander.go` 过滤：
-- 命令必须是白名单内的
-- 参数不能包含 `;|&\`$<>`
-- `bash -c` 这种可以执行任意字符串的模式**根本不存在**
+**Result**: All system command operations go through `executor/commander.go` filtering:
+- Commands must be on the whitelist
+- Parameters cannot contain `;|&\`$<>`
+- Patterns like `bash -c` that can execute arbitrary strings **simply don't exist**
 
-**结论**：命令注入**不可行**。
+**Conclusion**: Command injection is **infeasible**.
 
-### 场景 5：XSS（跨站脚本）
+### Scenario 5: XSS (Cross-Site Scripting)
 
-**攻击者做法**：在"面板设置"中把面板标题改成 `<script>alert(1)</script>`
+**Attacker's approach**: Change panel title to `<script>alert(1)</script>` in "Panel Settings"
 
-**结果**：
-- 后端模板使用 Go 的 `html/template`，**自动转义** HTML 特殊字符，`<script>` 会被渲染为纯文本而不是可执行脚本
-- 前端数据通过 API JSON 传输，浏览器按文本渲染
-- 即使绕过前端，Cookie 是 HttpOnly，JS 读不到 Session
+**Result**:
+- Backend templates use Go's `html/template`, **auto-escaping** HTML special characters; `<script>` is rendered as plain text, not executable script
+- Frontend data transmitted via API JSON, browser renders as text
+- Even if frontend is bypassed, Cookie is HttpOnly, JS cannot read Session
 
-**结论**：XSS 无法窃取登录凭证。
+**Conclusion**: XSS cannot steal login credentials.
 
 ---
 
-## 七、面板真的不会"偷偷联系外部"吗？
+## 7. Does the Panel Really Not "Secretly Contact External Services"?
 
-### 7.1 遥测上报：内容透明，可关闭
+### 7.1 Telemetry Reporting: Transparent Content, Disablable
 
-面板会每 24 小时发送一次"心跳"到 `stats.wp-panel.org`，但内容只有：
+The panel sends a "heartbeat" to `stats.wp-panel.org` every 24 hours, but the content is only:
 
 ```json
 {
-  "anonymous_id": "a1b2c3d4e5f67890",  // /etc/machine-id 的 SHA256 前 16 字节
-  "version": "1.0.0"                     // 面板版本号
+  "anonymous_id": "a1b2c3d4e5f67890",  // First 16 bytes of SHA256 of /etc/machine-id
+  "version": "1.0.0"                     // Panel version number
 }
 ```
 
-**不包含**：IP 地址、域名、网站数量、密码、任何业务数据。
+**Does not include**: IP addresses, domain names, website counts, passwords, any business data.
 
-**可关闭**：在面板"安全设置"中关闭"匿名统计"，或在数据库中将 `telemetry_enabled` 设为 `false`。
+**Disablable**: Turn off "anonymous statistics" in the panel's security settings, or set `telemetry_enabled` to `false` in the database.
 
-### 7.2 告警通知：只发给你自己
+### 7.2 Alert Notifications: Only Sent to You
 
-面板的告警（CPU 过高、SSL 到期、备份失败等）只会发送到你**主动配置的**邮箱或 Webhook。如果你没配置 SMTP 或 Webhook，告警只记录在本地数据库，**不会外发**。
+The panel's alerts (CPU high, SSL expiry, backup failure, etc.) are only sent to your **proactively configured** email or Webhook. If you haven't configured SMTP or Webhook, alerts are only recorded in the local database, **not sent externally**.
 
-### 7.3 更新检查：只访问 GitHub
+### 7.3 Update Check: Only Visits GitHub
 
-面板检查更新时只访问 `api.github.com` 获取 Release 信息。**不会下载**任何更新文件，除非你在面板上**手动点击"立即更新"**。
+When the panel checks for updates, it only visits `api.github.com` to get Release information. It **does not download** any update files unless you **manually click "Update Now"** in the panel.
 
 ---
 
-## 八、你能验证什么
+## 8. What You Can Verify
 
-如果你仍然担心，可以通过以下方法自行审计：
+If you're still concerned, you can audit through the following methods:
 
-### 8.1 检查面板的网络连接
+### 8.1 Check Panel Network Connections
 
 ```bash
-# 查看 wp-panel 进程建立了哪些网络连接
+# View what network connections wp-panel process has established
 ss -tpn | grep wp-panel
 
-# 或查看实时网络活动
+# Or view real-time network activity
 lsof -i -a -c wp-panel
 ```
 
-正常情况应该只看到：
-- 本地 8443 端口的 HTTPS 监听
-- 偶尔连接到 `api.github.com`（检查更新）
-- 如果开启了遥测，每天一次到 `stats.wp-panel.org`
+Normal should only show:
+- Local port 8443 HTTPS listening
+- Occasional connections to `api.github.com` (checking updates)
+- If telemetry is enabled, once daily to `stats.wp-panel.org`
 
-**不会看到**：连接到你的陌生 IP、上传大量数据、持续的异常连接。
+**Will not show**: Connections to unfamiliar IPs, uploading large amounts of data, persistent abnormal connections.
 
-### 8.2 检查系统定时任务
+### 8.2 Check System Scheduled Tasks
 
 ```bash
-# 查看面板创建的 cron 任务
+# View cron tasks created by the panel
 cat /etc/cron.d/wp_panel_cron
 
-# 查看系统级定时任务
+# View system-level scheduled tasks
 crontab -l
 ls /etc/cron.d/
 ```
 
-面板只会在你**主动创建计划任务**时写入 cron 文件，内容完全透明可读。
+The panel only writes cron files when you **proactively create scheduled tasks**, with content completely transparent and readable.
 
-### 8.3 验证二进制文件是否被篡改
+### 8.3 Verify Binary File Integrity
 
 ```bash
-# 计算当前面板的 SHA256
+# Calculate current panel's SHA256
 sha256sum /usr/local/bin/wp-panel
 
-# 与 GitHub Release 上的校验值对比
+# Compare with checksum from GitHub Release
 # https://github.com/naibabiji/wp-panel/releases
 ```
 
-### 8.4 查看面板操作日志
+### 8.4 View Panel Operation Logs
 
-面板的**后台任务队列**（备份、SSL 续期、防火墙封禁、计划任务执行等）会记录在 `operation_logs` 表中，你可以在"面板设置 → 操作日志"中查看。此外，登录尝试、系统告警等也有独立的记录表。
+The panel's **background task queue** (backups, SSL renewal, firewall bans, scheduled task execution, etc.) is recorded in the `operation_logs` table, viewable in "Panel Settings → Operation Logs". Additionally, login attempts, system alerts, etc. also have independent record tables.
 
-### 8.5 关闭遥测
+### 8.5 Disable Telemetry
 
 ```bash
-# 进入 SQLite 数据库
+# Enter SQLite database
 sqlite3 /www/server/panel/panel.db
 
-# 关闭遥测
+# Disable telemetry
 UPDATE security_settings SET svalue = 'false' WHERE skey = 'telemetry_enabled';
 .quit
 
-# 重启面板
+# Restart panel
 systemctl restart wp-panel
 ```
 
 ---
 
-## 九、总结
+## 9. Summary
 
-| 担忧 | 事实 |
-|------|------|
-| 面板会偷偷改密码吗？ | ❌ **不会**。密码修改只能通过面板设置页（需已知密码）或服务器 CLI（需 root）。没有自动改密码的机制。 |
-| 自动更新会植入木马吗？ | ❌ **不可能**。更新需 SHA256 + Ed25519 签名 + 预检三重验证，来源必须是 GitHub Releases。 |
-| 服务器没泄露时安全吗？ | ✅ **非常安全**。六层纵深防御：隐蔽层 + 双层认证 + Session/CSRF + HTTPS + 操作隔离 + 防火墙。 |
-| 面板会偷偷外传数据吗？ | ❌ **不会**。遥测仅含匿名 ID + 版本号，可关闭；无其他隐藏网络行为。 |
+| Concern | Fact |
+|---------|------|
+| Will the panel secretly change passwords? | ❌ **No**. Password changes only through panel settings page (requires known password) or server CLI (requires root). No automatic password change mechanism. |
+| Will auto-update plant trojans? | ❌ **Impossible**. Updates require triple verification: SHA256 + Ed25519 signature + preflight; source must be GitHub Releases. |
+| Is the panel secure when server isn't leaked? | ✅ **Very secure**. Six-layer defense-in-depth: covert layer + dual authentication + Session/CSRF + HTTPS + operation isolation + firewall. |
+| Will the panel secretly transmit data? | ❌ **No**. Telemetry contains only anonymous ID + version number, disablable; no other hidden network behavior. |
 
-WP Panel 的安全设计遵循一个核心原则：**纵深防御（Defense in Depth）**。没有单一防线，而是多层叠加——攻击者需要连续突破随机路径、浏览器检测、BasicAuth、Web 登录、Session、CSRF、路径隔离、命令白名单、防火墙……每一层都极难绕过，组合在一起形成了极高的安全门槛。
+WP Panel's security design follows one core principle: **Defense in Depth**. No single defense line, but layered accumulation — attackers need to break through random path, browser detection, BasicAuth, web login, Session, CSRF, path isolation, command whitelist, firewall in sequence... Each layer is extremely difficult to bypass, and together they form an extremely high security threshold.
 
-更重要的是，所有代码**开源可审计**。任何声称"面板不安全"的指控，都应该具体到代码的某一行、某一个函数、某一条网络连接。泛泛而谈的"感觉不安全"，在可验证的源码面前站不住脚。
+More importantly, all code is **open source and auditable**. Any claim that "the panel is insecure" should be specific to a certain line of code, a certain function, a certain network connection. Vague claims of "feeling insecure" cannot stand against verifiable source code.
 
 ---
 
-*本文基于 WP Panel 开源仓库的 Go 源码撰写，所有引用的代码片段和文件路径均可公开验证。*
+*This article is based on the Go source code from the WP Panel open-source repository. All referenced code snippets and file paths are publicly verifiable.*

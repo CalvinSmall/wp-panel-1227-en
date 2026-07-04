@@ -19,33 +19,33 @@ func TestFriendlySSLError(t *testing.T) {
 		},
 		{
 			name: "http 404 challenge",
-			err:  errors.New("获取证书失败: invalid authorization: Invalid response from http://example.com/.well-known/acme-challenge/token: 404"),
+			err:  errors.New("Certificate retrieval failed: invalid authorization: Invalid response from http://example.com/.well-known/acme-challenge/token: 404"),
 			want: []string{"HTTP-01", "A/AAAA", "CDN"},
 		},
 		{
 			name: "dns nxdomain",
 			err:  errors.New("NXDOMAIN looking up A for example.com"),
-			want: []string{"解析", "A/AAAA"},
+			want: []string{"DNS", "A/AAAA"},
 		},
 		{
 			name: "connection refused",
 			err:  errors.New("connect: connection refused"),
-			want: []string{"80", "防火墙"},
+			want: []string{"80", "firewall"},
 		},
 		{
 			name: "timeout",
 			err:  errors.New("context deadline exceeded"),
-			want: []string{"超时", "80"},
+			want: []string{"timed out", "80"},
 		},
 		{
 			name: "unauthorized",
 			err:  errors.New("urn:ietf:params:acme:error:unauthorized"),
-			want: []string{"验证未通过", "CDN"},
+			want: []string{"verification failed", "CDN"},
 		},
 		{
 			name: "default",
 			err:  errors.New("unexpected acme failure"),
-			want: []string{"申请 Let's Encrypt 证书失败", "unexpected acme failure"},
+			want: []string{"Let's Encrypt certificate request failed", "unexpected acme failure"},
 		},
 	}
 

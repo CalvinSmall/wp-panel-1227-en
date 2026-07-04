@@ -271,11 +271,11 @@ func ChownSitePath(path, allowedRoot, systemUser string) error {
 func executeSetFileLock(task *Task) TaskResult {
 	payload, ok := task.Payload.(*SetFileLockPayload)
 	if !ok || payload.Site == nil {
-		return TaskResult{Success: false, Message: "任务参数类型错误"}
+		return TaskResult{Success: false, Message: "Invalid task parameter type"}
 	}
 	site := payload.Site
 	if site.SiteType != "" && site.SiteType != "wordpress" {
-		return TaskResult{Success: false, Message: "只有 WordPress 站点支持文件锁定"}
+		return TaskResult{Success: false, Message: "Only WordPress sites support file locking"}
 	}
 
 	var err error
@@ -285,24 +285,24 @@ func executeSetFileLock(task *Task) TaskResult {
 		err = ApplySiteUnlockedPermissions(site)
 	}
 	if err != nil {
-		return taskFailure("文件锁定设置失败", err)
+		return taskFailure("File locking setup failed", err)
 	}
 
 	enabled := 0
 	lockEnabledAt := ""
-	message := "文件锁定已关闭"
+	message := "File locking disabled"
 	if payload.Enabled {
 		enabled = 1
 		lockEnabledAt = formatEventTime(time.Now())
-		message = "文件锁定已开启"
+		message = "File locking enabled"
 	} else if wpConfigHasUserFileModsLock(site.WebRoot) {
-		message = "文件锁定已关闭，但 wp-config.php 中仍存在用户自定义 DISALLOW_FILE_MODS=true，WordPress 后台文件修改仍会被禁止"
+		message = "File locking disabled, but wp-config.php still contains user-defined DISALLOW_FILE_MODS=true, WordPress file modifications will still be blocked"
 	}
 	if _, err := database.GetDB().Exec(
 		"UPDATE websites SET file_lock_enabled = ?, file_lock_enabled_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
 		enabled, lockEnabledAt, site.ID,
 	); err != nil {
-		return taskFailure("保存文件锁定状态失败", err)
+		return taskFailure("Failed to save file locking status", err)
 	}
 	site.FileLockEnabled = payload.Enabled
 
@@ -566,31 +566,31 @@ func init() {
 	database.RegisterUpgrade("1.0.4", HardenSiteUnixIsolation)
 }
 
-// HardenSiteUnixIsolation 对所有已有站点执行 Unix 用户组隔离和敏感文件权限加固（升级迁移用）。
+// HardenSiteUnixIsolation performs Unix user/group isolation and sensitive file permission hardening for all existing sites (for upgrade migration).
 func HardenSiteUnixIsolation() error {
 	db := database.GetDB()
 	rows, err := db.Query("SELECT domain, web_root, system_user FROM websites")
 	if err != nil {
-		return fmt.Errorf("查询网站列表失败: %w", err)
+		return fmt.Errorf("Failed to query site list: %w", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var domain, webRoot, systemUser string
 		if err := rows.Scan(&domain, &webRoot, &systemUser); err != nil {
-			log.Printf("[权限加固] 读取网站数据失败: %v", err)
+			log.Printf("[Permission Hardening] Failed to read site data: %v", err)
 			continue
 		}
 		if err := HardenSiteSensitivePermissions(domain, webRoot, systemUser); err != nil {
-			log.Printf("[权限加固] %s: 安全权限设置失败: %v", domain, err)
+			log.Printf("[Permission Hardening] %s: Failed to set secure permissions: %v", domain, err)
 		}
 	}
 
 	return rows.Err()
 }
 
-// InstallPluginPermissions 安装插件时设置插件目录和密钥目录权限。
-// 与 HardenSiteSensitivePermissions 不同，此函数不 chown 整站，且所有错误静默忽略（不阻断插件安装）。
+// InstallPluginPermissions sets plugin directory and key directory permissions during plugin installation.
+// Unlike HardenSiteSensitivePermissions, this function does not chown the entire site, and all errors are silently ignored (does not block plugin installation).
 func InstallPluginPermissions(domain, systemUser, pluginDir string) {
 	systemUser = strings.TrimSpace(systemUser)
 	if systemUser == "" {

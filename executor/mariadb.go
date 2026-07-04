@@ -53,7 +53,7 @@ func createMariaDBDatabase(dbName, dbUser, dbPassword string, cfg *config.Config
 		return err
 	}
 
-	// DROP + CREATE 确保密码始终一致，避免 IF NOT EXISTS 下旧用户密码不更新的问题
+	// DROP + CREATE ensures password is always consistent, avoiding old user password not updating under IF NOT EXISTS
 	runMySQL(cfg.MariaDB.RootPassword, "-u", cfg.MariaDB.RootUser, "-e",
 		fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", dbUser))
 	if err := runMySQL(cfg.MariaDB.RootPassword, "-u", cfg.MariaDB.RootUser, "-e",
@@ -84,7 +84,7 @@ func changeMariaDBPassword(dbUser, newPassword string, cfg *config.Config) error
 
 	if err := runMySQL(cfg.MariaDB.RootPassword, "-u", cfg.MariaDB.RootUser, "-e",
 		fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, newPassword)); err != nil {
-		return fmt.Errorf("修改数据库密码失败: %w", err)
+		return fmt.Errorf("Failed to change database password: %w", err)
 	}
 
 	return runMySQL(cfg.MariaDB.RootPassword, "-u", cfg.MariaDB.RootUser, "-e", "FLUSH PRIVILEGES")
@@ -93,7 +93,7 @@ func changeMariaDBPassword(dbUser, newPassword string, cfg *config.Config) error
 func executeChangeDBPassword(task *Task) TaskResult {
 	payload, ok := task.Payload.(*ChangeDBPasswordPayload)
 	if !ok {
-		return TaskResult{Success: false, Message: "任务参数类型错误"}
+		return TaskResult{Success: false, Message: "Invalid task parameter type"}
 	}
 
 	site := payload.Site
@@ -106,15 +106,15 @@ func executeChangeDBPassword(task *Task) TaskResult {
 
 	if site.SiteType == "php" {
 		if err := changeMariaDBPassword(site.DBUser, newPassword, cfg); err != nil {
-			log.Printf("MariaDB 操作失败: %v", err)
-			return TaskResult{Success: false, Message: "MariaDB 操作失败"}
+			log.Printf("MariaDB operation failed: %v", err)
+			return TaskResult{Success: false, Message: "MariaDB operation failed"}
 		}
 		db := database.GetDB()
 		db.Exec("UPDATE websites SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", site.ID)
 		masked := maskPassword(newPassword)
 		return TaskResult{
 			Success: true,
-			Message: "数据库密码已更新",
+			Message: "Database password updated",
 			Data:    map[string]interface{}{"new_password": masked},
 		}
 	}
@@ -122,8 +122,8 @@ func executeChangeDBPassword(task *Task) TaskResult {
 	configPath := filepath.Join(site.WebRoot, "wp-config.php")
 	content, err := os.ReadFile(configPath)
 	if err != nil {
-		log.Printf("读取 wp-config.php 失败: %v", err)
-		return TaskResult{Success: false, Message: "读取 wp-config.php 失败"}
+		log.Printf("Failed to read wp-config.php: %v", err)
+		return TaskResult{Success: false, Message: "Failed to read wp-config.php"}
 	}
 
 	re := regexp.MustCompile(`define\(\s*'DB_PASSWORD'\s*,\s*'[^']*'\s*\)`)
@@ -131,18 +131,18 @@ func executeChangeDBPassword(task *Task) TaskResult {
 		fmt.Sprintf("define('DB_PASSWORD', '%s')", phpSingleQuoteEscape(newPassword)))
 
 	if newContent == string(content) {
-		return TaskResult{Success: false, Message: "未找到 DB_PASSWORD 定义，wp-config.php 可能格式异常"}
+		return TaskResult{Success: false, Message: "DB_PASSWORD definition not found, wp-config.php may be malformed"}
 	}
 
 	if err := os.WriteFile(configPath, []byte(newContent), 0600); err != nil {
-		log.Printf("更新 wp-config.php 失败: %v", err)
-		return TaskResult{Success: false, Message: "更新 wp-config.php 失败"}
+		log.Printf("Failed to update wp-config.php: %v", err)
+		return TaskResult{Success: false, Message: "Failed to update wp-config.php"}
 	}
 
 	if err := changeMariaDBPassword(site.DBUser, newPassword, cfg); err != nil {
 		os.WriteFile(configPath, content, 0600)
-		log.Printf("MariaDB 操作失败，已回滚 wp-config.php: %v", err)
-		return TaskResult{Success: false, Message: "MariaDB 操作失败"}
+		log.Printf("MariaDB operation failed, wp-config.php rolled back: %v", err)
+		return TaskResult{Success: false, Message: "MariaDB operation failed"}
 	}
 
 	masked := maskPassword(newPassword)
@@ -152,13 +152,13 @@ func executeChangeDBPassword(task *Task) TaskResult {
 
 	return TaskResult{
 		Success: true,
-		Message: "数据库密码已更新",
+		Message: "Database password updated",
 		Data:    map[string]interface{}{"new_password": masked},
 	}
 }
 
-// DetectDBTablePrefix 查询数据库中实际的 WordPress 表前缀
-// 返回推荐前缀、所有候选前缀列表、错误
+// DetectDBTablePrefix queries the actual WordPress table prefix in the database
+// Returns recommended prefix, all candidate prefixes, error
 func DetectDBTablePrefix(dbName string, cfg *config.Config) (string, []string, error) {
 	if !isValidMySQLIdentifier(dbName) {
 		return "", nil, fmt.Errorf("invalid database name")
@@ -170,12 +170,12 @@ func DetectDBTablePrefix(dbName string, cfg *config.Config) (string, []string, e
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return "", nil, fmt.Errorf("查询失败: %s", strings.TrimSpace(stderr.String()))
+		return "", nil, fmt.Errorf("Query failed: %s", strings.TrimSpace(stderr.String()))
 	}
 
 	output := strings.TrimSpace(stdout.String())
 	if output == "" {
-		return "", nil, fmt.Errorf("未找到 options 表，数据库可能为空或不是 WordPress 数据库")
+		return "", nil, fmt.Errorf("options table not found, database may be empty or not a WordPress database")
 	}
 
 	prefixSet := make(map[string]struct{})
@@ -187,7 +187,7 @@ func DetectDBTablePrefix(dbName string, cfg *config.Config) (string, []string, e
 	}
 
 	if len(prefixSet) == 0 {
-		return "", nil, fmt.Errorf("无法解析表前缀")
+		return "", nil, fmt.Errorf("Cannot parse table prefix")
 	}
 
 	var candidates []string
@@ -210,7 +210,7 @@ func tablePrefixFromOptionsTable(tableName string) (string, bool) {
 	return prefix, true
 }
 
-// ReadWPSiteURLs 从 wp_options 读取 siteurl 和 home
+// ReadWPSiteURLs reads siteurl and home from wp_options
 func ReadWPSiteURLs(dbName, tablePrefix string, cfg *config.Config) (siteURL, homeURL string, err error) {
 	if !isValidMySQLIdentifier(dbName) {
 		return "", "", fmt.Errorf("invalid database name")
@@ -228,7 +228,7 @@ func ReadWPSiteURLs(dbName, tablePrefix string, cfg *config.Config) (siteURL, ho
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return "", "", fmt.Errorf("查询失败: %s", strings.TrimSpace(stderr.String()))
+		return "", "", fmt.Errorf("Query failed: %s", strings.TrimSpace(stderr.String()))
 	}
 
 	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
@@ -252,7 +252,7 @@ func ReadWPSiteURLs(dbName, tablePrefix string, cfg *config.Config) (siteURL, ho
 
 func ReadWPDiagnosticOptions(dbName, tablePrefix string, cfg *config.Config) (map[string]string, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("面板配置未初始化")
+		return nil, fmt.Errorf("Panel configuration not initialized")
 	}
 	if !isValidMySQLIdentifier(dbName) {
 		return nil, fmt.Errorf("invalid database name")
@@ -270,7 +270,7 @@ func ReadWPDiagnosticOptions(dbName, tablePrefix string, cfg *config.Config) (ma
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("查询失败: %s", strings.TrimSpace(stderr.String()))
+		return nil, fmt.Errorf("Query failed: %s", strings.TrimSpace(stderr.String()))
 	}
 
 	result := map[string]string{}
@@ -291,10 +291,10 @@ func ReadWPDiagnosticOptions(dbName, tablePrefix string, cfg *config.Config) (ma
 	return result, nil
 }
 
-// UpdateWPSiteURLs 更新 wp_options 中的 siteurl 和 home（仅更新非空字段）
+// UpdateWPSiteURLs updates siteurl and home in wp_options (only non-empty fields)
 func UpdateWPSiteURLs(dbName, tablePrefix, newSiteURL, newHomeURL string, cfg *config.Config) error {
 	if newSiteURL == "" && newHomeURL == "" {
-		return fmt.Errorf("至少需要提供一个 URL")
+		return fmt.Errorf("At least one URL must be provided")
 	}
 	if !isValidMySQLIdentifier(dbName) {
 		return fmt.Errorf("invalid database name")
@@ -310,7 +310,7 @@ func UpdateWPSiteURLs(dbName, tablePrefix, newSiteURL, newHomeURL string, cfg *c
 			"UPDATE `%s`.`%s` SET option_value = '%s' WHERE option_name = 'siteurl'",
 			dbName, tableName, escURL)
 		if err := runMySQL(cfg.MariaDB.RootPassword, "-u", cfg.MariaDB.RootUser, "-e", query); err != nil {
-			return fmt.Errorf("更新 siteurl 失败: %w", err)
+			return fmt.Errorf("Failed to update siteurl: %w", err)
 		}
 	}
 
@@ -320,7 +320,7 @@ func UpdateWPSiteURLs(dbName, tablePrefix, newSiteURL, newHomeURL string, cfg *c
 			"UPDATE `%s`.`%s` SET option_value = '%s' WHERE option_name = 'home'",
 			dbName, tableName, escURL)
 		if err := runMySQL(cfg.MariaDB.RootPassword, "-u", cfg.MariaDB.RootUser, "-e", query); err != nil {
-			return fmt.Errorf("更新 home 失败: %w", err)
+			return fmt.Errorf("Failed to update home: %w", err)
 		}
 	}
 

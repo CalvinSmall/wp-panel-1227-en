@@ -22,7 +22,7 @@ const cacheConfPath = "/etc/nginx/conf.d/wppanel-cache.conf"
 
 func EnsureFastCGICacheConfig() {
 	os.MkdirAll("/var/cache/nginx/fastcgi", 0755)
-	content := `# WP Panel — FastCGI 缓存
+	content := `# WP Panel — FastCGI Cache
 fastcgi_cache_path /var/cache/nginx/fastcgi levels=1:2 keys_zone=WP_CACHE:200m inactive=60m max_size=2g;
 `
 	os.WriteFile(cacheConfPath, []byte(content), 0644)
@@ -38,7 +38,7 @@ func EnsureCacheHelperPlugin(pluginFS embed.FS) {
 		return
 	}
 
-	// 仅在内容发生变更时才写入文件，避免每次启动都重写文件导致修改时间被更新
+	// Only write to file when content changes to avoid rewriting on every startup which updates modification time
 	if existing, err := os.ReadFile(dst); err == nil && bytes.Equal(existing, data) {
 		return
 	}
@@ -46,9 +46,9 @@ func EnsureCacheHelperPlugin(pluginFS embed.FS) {
 	os.WriteFile(dst, data, 0644)
 }
 
-// AutoDeployPluginUpdates 扫描所有已安装配套插件的 WordPress 站点，
-// 若 plugin_api_key 非空且站点上的插件版本落后于面板内置版本（通过内容/修改时间比对判断），则自动更新。
-// 每次面板启动时调用，实现插件无感自动升级。
+// AutoDeployPluginUpdates scans all WordPress sites with companion plugins installed,
+// and if plugin_api_key is non-empty and the site plugin version is behind the built-in version (determined by content/modification time comparison), automatically updates.
+// Called on each panel startup for seamless plugin auto-upgrade.
 func AutoDeployPluginUpdates(pluginFS embed.FS) {
 	srcData, err := pluginFS.ReadFile("wp-panel-optimizer/wp-panel-optimizer.php")
 	if err != nil {
@@ -82,29 +82,29 @@ func AutoDeployPluginUpdates(pluginFS embed.FS) {
 		pluginDir := filepath.Join(webRoot, "wp-content", "plugins", "wp-panel-optimizer")
 		dstPath := filepath.Join(pluginDir, "wp-panel-optimizer.php")
 
-		// 优先对比内容，内容一致直接跳过，最安全且避免多余的系统权限调用（chown/chmod）
+		// Prefer content comparison; skip if content matches — safest and avoids unnecessary system permission calls (chown/chmod)
 		if dstData, err := os.ReadFile(dstPath); err == nil && bytes.Equal(dstData, srcData) {
 			continue
 		}
 
-		// 兜底比对修改时间（以防有其他判断逻辑依赖）
+		// Fallback to modification time comparison (in case other logic depends on it)
 		if dstInfo, err := os.Stat(dstPath); err == nil && !dstInfo.ModTime().Before(srcInfo.ModTime()) {
 			continue
 		}
 
 		if err := os.MkdirAll(pluginDir, 0755); err != nil {
-			log.Printf("[插件自动更新] 创建目录失败 site=%d: %v", id, err)
+			log.Printf("[Plugin Auto-Update] Failed to create directory site=%d: %v", id, err)
 			continue
 		}
 		if err := os.WriteFile(dstPath, srcData, 0644); err != nil {
-			log.Printf("[插件自动更新] 写入失败 site=%d: %v", id, err)
+			log.Printf("[Plugin Auto-Update] Write failed site=%d: %v", id, err)
 			continue
 		}
 		InstallPluginPermissions(domain, systemUser, pluginDir)
 		updated++
 	}
 	if updated > 0 {
-		log.Printf("[插件自动更新] 已更新 %d 个站点的配套插件", updated)
+		log.Printf("[Plugin Auto-Update] Updated companion plugins for %d sites", updated)
 	}
 }
 
@@ -125,14 +125,14 @@ func ClearSiteCache(siteID int) {
 	key := NewCacheKey()
 	db.Exec("UPDATE websites SET fastcgi_cache_key = ? WHERE id = ?", key, siteID)
 	if err := RegenerateSiteNginx(siteID); err != nil {
-		log.Printf("刷新站点 Nginx 配置失败 site=%d: %v", siteID, err)
+		log.Printf("Failed to refresh site Nginx config site=%d: %v", siteID, err)
 	}
 }
 
 func ClearWPSiteRuntimeCaches(siteID int, domain, webRoot string) {
 	ClearSiteCache(siteID)
 	if err := ClearWPRedisObjectCache(domain, webRoot); err != nil {
-		log.Printf("清理 Redis Object Cache 失败 domain=%s: %v", domain, err)
+		log.Printf("Failed to clear Redis Object Cache domain=%s: %v", domain, err)
 	}
 }
 
@@ -224,9 +224,9 @@ func RegenerateSiteNginx(siteID int) error {
 	).Scan(&domain, &aliases, &siteType, &systemUser, &webRoot, &documentRootSubdir, &logDir, &sslEnabled, &accessLogMode, &fCacheEnabled, &fCacheTTL, &cacheKey, &sslCertPath, &sslKeyPath, &templateVer, &xmlrpcEnabled, &phpPoolPath, &nginxConfPath, &cdnRealIPEnabled)
 	if err != nil || domain == "" {
 		if err != nil {
-			return fmt.Errorf("查询站点失败(site %d): %w", siteID, err)
+			return fmt.Errorf("Failed to query site (site %d): %w", siteID, err)
 		}
-		return fmt.Errorf("站点域名为空(site %d)", siteID)
+		return fmt.Errorf("Site domain is empty (site %d)", siteID)
 	}
 
 	if templateVer == "" {
@@ -266,7 +266,7 @@ func RegenerateSiteNginx(siteID int) error {
 		groups, _ := GetWebsiteCDNRealIPGroups(siteID)
 		runtime, err := ResolveCDNRealIPRuntime(&models.Website{ID: siteID, CDNRealIPEnabled: true, CDNRealIPGroups: groups})
 		if err != nil {
-			return fmt.Errorf("CDN Real IP 配置无效(site %d): %w", siteID, err)
+			return fmt.Errorf("CDN Real IP config invalid (site %d): %w", siteID, err)
 		}
 		if runtime.Enabled {
 			data.CDNRealIPEnabled = true
@@ -282,21 +282,21 @@ func RegenerateSiteNginx(siteID int) error {
 
 	config, err := engine.RenderNginxConfig(data)
 	if err != nil {
-		return fmt.Errorf("渲染 Nginx 配置失败(site %d): %w", siteID, err)
+		return fmt.Errorf("Failed to render Nginx config (site %d): %w", siteID, err)
 	}
 
 	if err := engine.ApplyNginxConfig(config, nginxConfPath, nginxEnabledPath(cfg, nginxConfPath, domain)); err != nil {
-		return fmt.Errorf("应用 Nginx 配置失败(site %d): %w", siteID, err)
+		return fmt.Errorf("Failed to apply Nginx config (site %d): %w", siteID, err)
 	}
 	return nil
 }
 
-// RegenerateAllSitesNginx 重建全部网站的 Nginx 配置，用于模板更新后批量刷新。
+// RegenerateAllSitesNginx rebuilds Nginx config for all sites, used for batch refresh after template updates.
 func RegenerateAllSitesNginx() error {
 	db := database.GetDB()
 	rows, err := db.Query("SELECT id FROM websites")
 	if err != nil {
-		log.Printf("[Nginx重建] 查询网站列表失败: %v", err)
+		log.Printf("[Nginx-Rebuild] Failed to query site list: %v", err)
 		return err
 	}
 	defer rows.Close()
@@ -309,7 +309,7 @@ func RegenerateAllSitesNginx() error {
 			continue
 		}
 		if err := RegenerateSiteNginx(siteID); err != nil {
-			log.Printf("[Nginx重建] 站点 %d 更新失败: %v", siteID, err)
+			log.Printf("[Nginx-Rebuild] Site %d update failed: %v", siteID, err)
 			failures = append(failures, err.Error())
 		}
 	}
@@ -317,19 +317,19 @@ func RegenerateAllSitesNginx() error {
 		failures = append(failures, err.Error())
 	}
 	if len(failures) > 0 {
-		return fmt.Errorf("部分站点 Nginx 配置更新失败: %s", strings.Join(failures, "; "))
+		return fmt.Errorf("Failed to update Nginx config for some sites: %s", strings.Join(failures, "; "))
 	}
-	log.Printf("[Nginx重建] 全部网站 Nginx 配置已更新")
+	log.Printf("[Nginx-Rebuild] Nginx config updated for all sites")
 	return nil
 }
 
-// RegenerateAllSitesFPM 重建全部网站的 PHP-FPM pool 配置，
-// 用于 open_basedir 等模板变更后批量刷新旧站点。
+// RegenerateAllSitesFPM rebuilds PHP-FPM pool config for all sites,
+// used for batch refresh of old sites after open_basedir and other template changes.
 func RegenerateAllSitesFPM() error {
 	db := database.GetDB()
 	rows, err := db.Query("SELECT id, domain, system_user, web_root, log_dir, php_pool_path FROM websites")
 	if err != nil {
-		log.Printf("[FPM重建] 查询网站列表失败: %v", err)
+		log.Printf("[FPM-Rebuild] Failed to query site list: %v", err)
 		return err
 	}
 	defer rows.Close()
@@ -346,7 +346,7 @@ func RegenerateAllSitesFPM() error {
 			continue
 		}
 		if err := ensureSitePrimaryGroup(systemUser); err != nil {
-			log.Printf("[FPM重建] %s: 站点用户组检查失败: %v", domain, err)
+			log.Printf("[FPM-Rebuild] %s: Site user group check failed: %v", domain, err)
 			failures = append(failures, fmt.Sprintf("%s: %v", domain, err))
 			continue
 		}
@@ -362,23 +362,23 @@ func RegenerateAllSitesFPM() error {
 		}
 		phpConfig, err := engine.RenderPHPFPMPool(phpData)
 		if err != nil {
-			log.Printf("[FPM重建] %s: 渲染配置失败: %v", domain, err)
+			log.Printf("[FPM-Rebuild] %s: Failed to render config: %v", domain, err)
 			failures = append(failures, fmt.Sprintf("%s: %v", domain, err))
 			continue
 		}
 
 		if err := engine.ApplyPHPFPMPool(phpConfig, phpPoolPath, logDir); err != nil {
-			log.Printf("[FPM重建] %s: 应用配置失败: %v", domain, err)
+			log.Printf("[FPM-Rebuild] %s: Failed to apply config: %v", domain, err)
 			failures = append(failures, fmt.Sprintf("%s: %v", domain, err))
 			continue
 		}
 	}
-	log.Printf("[FPM重建] 全部网站 PHP-FPM pool 配置已更新")
+	log.Printf("[FPM-Rebuild] PHP-FPM pool config updated for all sites")
 	if err := rows.Err(); err != nil {
 		return err
 	}
 	if len(failures) > 0 {
-		return fmt.Errorf("部分站点 PHP-FPM Pool 重建失败: %s", strings.Join(failures, "; "))
+		return fmt.Errorf("Failed to rebuild PHP-FPM Pool for some sites: %s", strings.Join(failures, "; "))
 	}
 	return nil
 }

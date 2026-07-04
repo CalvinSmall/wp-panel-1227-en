@@ -38,7 +38,7 @@ func (u *acmeUser) GetPrivateKey() crypto.PrivateKey        { return u.key }
 func executeEnableSSL(task *Task) TaskResult {
 	payload, ok := task.Payload.(*EnableSSLPayload)
 	if !ok {
-		return TaskResult{Success: false, Message: "任务参数类型错误"}
+		return TaskResult{Success: false, Message: "Invalid task parameter type"}
 	}
 
 	site := payload.Site
@@ -49,8 +49,8 @@ func executeEnableSSL(task *Task) TaskResult {
 
 	os.RemoveAll(certDir)
 	if err := os.MkdirAll(certDir, 0700); err != nil {
-		log.Printf("创建证书目录失败: %v", err)
-		return TaskResult{Success: false, Message: "创建证书目录失败"}
+		log.Printf("Failed to create certificate directory: %v", err)
+		return TaskResult{Success: false, Message: "Failed to create certificate directory"}
 	}
 
 	var expiry time.Time
@@ -58,33 +58,33 @@ func executeEnableSSL(task *Task) TaskResult {
 
 	if payload.Mode == "manual" {
 		if payload.Certificate == "" || payload.PrivateKey == "" {
-			return TaskResult{Success: false, Message: "证书内容和私钥不能为空"}
+			return TaskResult{Success: false, Message: "Certificate content and private key cannot be empty"}
 		}
 		if err := os.WriteFile(certPath, []byte(payload.Certificate), 0644); err != nil {
-			log.Printf("写入证书文件失败: %v", err)
-			return TaskResult{Success: false, Message: "写入证书文件失败"}
+			log.Printf("Failed to write certificate file: %v", err)
+			return TaskResult{Success: false, Message: "Failed to write certificate file"}
 		}
 		if err := os.WriteFile(keyPath, []byte(payload.PrivateKey), 0600); err != nil {
 			os.Remove(certPath)
-			log.Printf("写入私钥文件失败: %v", err)
-			return TaskResult{Success: false, Message: "写入私钥文件失败"}
+			log.Printf("Failed to write private key file: %v", err)
+			return TaskResult{Success: false, Message: "Failed to write private key file"}
 		}
 		expiry, applyErr = validateCertificate(certPath, site.Domain)
 		if applyErr != nil {
 			os.Remove(certPath)
 			os.Remove(keyPath)
-			log.Printf("证书验证失败: %v", applyErr)
-			return TaskResult{Success: false, Message: "证书验证失败"}
+			log.Printf("Certificate verification failed: %v", applyErr)
+			return TaskResult{Success: false, Message: "Certificate verification failed"}
 		}
 	} else {
 		documentRoot, err := EnsureEffectiveDocumentRoot(site.WebRoot, site.SiteType, site.DocumentRootSubdir, site.SystemUser)
 		if err != nil {
-			return taskFailure("准备SSL验证目录失败", err)
+			return taskFailure("Failed to prepare SSL verification directory", err)
 		}
 		expiry, applyErr = obtainLegoCert(site.Domain, site.Aliases,
 			documentRoot, certDir)
 		if applyErr != nil {
-			log.Printf("申请 Let's Encrypt 证书失败: %v", applyErr)
+			log.Printf("Let's Encrypt certificate request failed: %v", applyErr)
 			os.RemoveAll(certDir)
 			msg := FriendlySSLError(applyErr)
 			database.GetDB().Exec("UPDATE websites SET ssl_last_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", msg, site.ID)
@@ -94,13 +94,13 @@ func executeEnableSSL(task *Task) TaskResult {
 
 	if applyErr = applySSLToSite(site, certPath, keyPath, expiry); applyErr != nil {
 		os.RemoveAll(certDir)
-		log.Printf("应用SSL配置失败: %v", applyErr)
-		return taskFailure("应用SSL配置失败", applyErr)
+		log.Printf("Failed to apply SSL config: %v", applyErr)
+		return taskFailure("Failed to apply SSL config", applyErr)
 	}
 
 	return TaskResult{
 		Success: true,
-		Message: fmt.Sprintf("网站 %s SSL 已启用（到期: %s）", site.Domain, expiry.Format("2006-01-02")),
+		Message: fmt.Sprintf("Site %s SSL enabled (expires: %s)", site.Domain, expiry.Format("2006-01-02")),
 	}
 }
 
@@ -112,24 +112,24 @@ func FriendlySSLError(err error) string {
 	lower := strings.ToLower(raw)
 	switch {
 	case strings.Contains(lower, "invalid response from http://") && strings.Contains(lower, ": 404"):
-		return "Let's Encrypt 访问 HTTP-01 验证文件返回 404。请检查域名 A/AAAA 是否指向当前服务器；如果使用 CDN，请确认 CDN 正确回源，并且未缓存、重写或拦截 /.well-known/acme-challenge/。"
+		return "Let's Encrypt HTTP-01 verification file returned 404. Check if domain A/AAAA points to this server; if using CDN, confirm CDN is correctly sourcing and has not cached, rewritten, or blocked /.well-known/acme-challenge/."
 	case strings.Contains(lower, "no valid a records found") || strings.Contains(lower, "no valid aaaa records found") || strings.Contains(lower, "nxdomain"):
-		return "域名解析记录无效或尚未生效。请检查主域名和附加域名的 A/AAAA 记录后重试。"
+		return "Domain DNS records invalid or not yet propagated. Check main and alias domain A/AAAA records and retry."
 	case strings.Contains(lower, "connection refused"):
-		return "Let's Encrypt 无法连接网站 80 端口。请确认域名已指向当前服务器，并且防火墙、CDN、Nginx 没有拦截 HTTP 访问。"
+		return "Let's Encrypt cannot connect to site port 80. Confirm domain points to this server, and firewall, CDN, Nginx are not blocking HTTP access."
 	case strings.Contains(lower, "timeout") || strings.Contains(lower, "i/o timeout") || strings.Contains(lower, "context deadline exceeded"):
-		return "Let's Encrypt 访问验证文件超时。请检查域名解析、80 端口连通性，以及 CDN 回源配置。"
+		return "Let's Encrypt verification file access timed out. Check DNS resolution, port 80 connectivity, and CDN origin configuration."
 	case strings.Contains(lower, "unauthorized"):
-		return "Let's Encrypt 验证未通过。请检查域名是否解析到当前服务器；如果使用 CDN，请确认 CDN 放行 /.well-known/acme-challenge/ 并正确回源。"
+		return "Let's Encrypt verification failed. Check if domain resolves to this server; if using CDN, confirm CDN allows /.well-known/acme-challenge/ and correctly sources."
 	default:
-		return "申请 Let's Encrypt 证书失败：" + raw
+		return "Let's Encrypt certificate request failed: " + raw
 	}
 }
 
 func executeRemoveSSL(task *Task) TaskResult {
 	payload, ok := task.Payload.(*RemoveSSLPayload)
 	if !ok {
-		return TaskResult{Success: false, Message: "任务参数类型错误"}
+		return TaskResult{Success: false, Message: "Invalid task parameter type"}
 	}
 
 	site := payload.Site
@@ -141,7 +141,7 @@ func executeRemoveSSL(task *Task) TaskResult {
 	engine := NewTemplateEngine(cfg.Panel.BackupDir)
 	nginxData, err := nginxDataFromSiteChecked(site)
 	if err != nil {
-		return taskFailure("CDN 真实 IP 配置无效", err)
+		return taskFailure("CDN Real IP config invalid", err)
 	}
 	nginxData.UseSSL = false
 	nginxData.SSLCertPath = ""
@@ -149,20 +149,20 @@ func executeRemoveSSL(task *Task) TaskResult {
 
 	nginxConfig, err := engine.RenderNginxConfig(nginxData)
 	if err != nil {
-		log.Printf("渲染 HTTP 配置失败: %v", err)
-		return taskFailure("渲染 HTTP 配置失败", err)
+		log.Printf("Failed to render HTTP config: %v", err)
+		return taskFailure("Failed to render HTTP config", err)
 	}
 
 	if err := engine.ApplyNginxConfig(nginxConfig, site.NginxConfPath,
 		nginxEnabledPath(cfg, site.NginxConfPath, site.Domain)); err != nil {
-		log.Printf("应用 HTTP 配置失败: %v", err)
-		return taskFailure("应用 HTTP 配置失败", err)
+		log.Printf("Failed to apply HTTP config: %v", err)
+		return taskFailure("Failed to apply HTTP config", err)
 	}
 
 	db := database.GetDB()
 	db.Exec(`UPDATE websites SET ssl_enabled = 0, ssl_cert_path = '', ssl_key_path = '', ssl_expires_at = NULL, ssl_last_error = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, site.ID)
 
-	return TaskResult{Success: true, Message: "网站 " + site.Domain + " SSL 证书已删除，已恢复为 HTTP"}
+	return TaskResult{Success: true, Message: "Site " + site.Domain + " SSL certificate removed, reverted to HTTP"}
 }
 
 const acmeAccountDir = "/www/server/panel/acme"
@@ -177,7 +177,7 @@ func newACMEClient(user *acmeUser, caDirURL string) (*lego.Client, error) {
 
 	client, err := lego.NewClient(legoCfg)
 	if err != nil {
-		return nil, fmt.Errorf("创建lego客户端失败: %w", err)
+		return nil, fmt.Errorf("Failed to create lego client: %w", err)
 	}
 	return client, nil
 }
@@ -206,7 +206,7 @@ func loadACMERegistration(path string) (*registration.Resource, error) {
 
 func saveACMERegistration(path string, reg *registration.Resource) error {
 	if reg == nil || strings.TrimSpace(reg.URI) == "" {
-		return fmt.Errorf("ACME账户注册信息为空")
+		return fmt.Errorf("ACME account registration info is empty")
 	}
 	data, err := json.MarshalIndent(acmeAccountMetadata{Registration: reg}, "", "  ")
 	if err != nil {
@@ -217,7 +217,7 @@ func saveACMERegistration(path string, reg *registration.Resource) error {
 
 func getOrCreateACMEClient(email string, caDirURL string) (*lego.Client, error) {
 	if err := os.MkdirAll(acmeAccountDir, 0700); err != nil {
-		return nil, fmt.Errorf("创建ACME目录失败: %w", err)
+		return nil, fmt.Errorf("Failed to create ACME directory: %w", err)
 	}
 
 	accountKeyPath := filepath.Join(acmeAccountDir, "account.key")
@@ -231,7 +231,7 @@ func getOrCreateACMEClient(email string, caDirURL string) (*lego.Client, error) 
 		if block != nil {
 			privateKey, err = x509.ParseECPrivateKey(block.Bytes)
 			if err != nil {
-				return nil, fmt.Errorf("解析ACME账户私钥失败: %w", err)
+				return nil, fmt.Errorf("Failed to parse ACME account private key: %w", err)
 			}
 		}
 	}
@@ -239,18 +239,18 @@ func getOrCreateACMEClient(email string, caDirURL string) (*lego.Client, error) 
 	if privateKey == nil {
 		privateKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			return nil, fmt.Errorf("生成ACME账户私钥失败: %w", err)
+			return nil, fmt.Errorf("Failed to generate ACME account private key: %w", err)
 		}
 		keyBytes, _ := x509.MarshalECPrivateKey(privateKey.(*ecdsa.PrivateKey))
 		pemData := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 		if err := os.WriteFile(accountKeyPath, pemData, 0600); err != nil {
-			return nil, fmt.Errorf("保存ACME账户私钥失败: %w", err)
+			return nil, fmt.Errorf("Failed to save ACME account private key: %w", err)
 		}
 	}
 
 	user := &acmeUser{Email: email, key: privateKey}
 	if reg, loadErr := loadACMERegistration(accountMetaPath); loadErr != nil {
-		return nil, fmt.Errorf("读取ACME账户信息失败: %w", loadErr)
+		return nil, fmt.Errorf("Failed to read ACME account info: %w", loadErr)
 	} else if reg != nil {
 		user.Registration = reg
 	}
@@ -265,12 +265,12 @@ func getOrCreateACMEClient(email string, caDirURL string) (*lego.Client, error) 
 		if resolveErr != nil {
 			reg, err = client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
 			if err != nil {
-				return nil, fmt.Errorf("注册ACME账户失败: %w", err)
+				return nil, fmt.Errorf("Failed to register ACME account: %w", err)
 			}
 		}
 		user.Registration = reg
 		if err := saveACMERegistration(accountMetaPath, reg); err != nil {
-			return nil, fmt.Errorf("保存ACME账户信息失败: %w", err)
+			return nil, fmt.Errorf("Failed to save ACME account info: %w", err)
 		}
 		client, err = newACMEClient(user, caDirURL)
 		if err != nil {
@@ -298,7 +298,7 @@ func obtainLegoCert(domain string, aliases string, webRoot string, certDir strin
 
 	provider := &webrootProvider{webroot: webRoot}
 	if err := client.Challenge.SetHTTP01Provider(provider); err != nil {
-		return time.Time{}, fmt.Errorf("设置HTTP-01验证提供者失败: %w", err)
+		return time.Time{}, fmt.Errorf("Failed to set HTTP-01 validation provider: %w", err)
 	}
 
 	domains := []string{domain}
@@ -318,27 +318,27 @@ func obtainLegoCert(domain string, aliases string, webRoot string, certDir strin
 
 	certRes, err := client.Certificate.Obtain(req)
 	if err != nil && isTransientACMEOrderError(err) {
-		log.Printf("ACME订单临时错误，准备重试 domain=%s: %v", domain, err)
+		log.Printf("ACME order temporary error, preparing retry domain=%s: %v", domain, err)
 		time.Sleep(3 * time.Second)
 		certRes, err = client.Certificate.Obtain(req)
 	}
 	if err != nil {
-		return time.Time{}, fmt.Errorf("获取证书失败: %w", err)
+		return time.Time{}, fmt.Errorf("Failed to obtain certificate: %w", err)
 	}
 
 	certPath := filepath.Join(certDir, "fullchain.pem")
 	keyPath := filepath.Join(certDir, "privkey.pem")
 
 	if err := os.WriteFile(certPath, certRes.Certificate, 0644); err != nil {
-		return time.Time{}, fmt.Errorf("保存证书失败: %w", err)
+		return time.Time{}, fmt.Errorf("Failed to save certificate: %w", err)
 	}
 	if err := os.WriteFile(keyPath, certRes.PrivateKey, 0600); err != nil {
-		return time.Time{}, fmt.Errorf("保存私钥失败: %w", err)
+		return time.Time{}, fmt.Errorf("Failed to save private key: %w", err)
 	}
 
 	expiry, err := validateCertificate(certPath, domain)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("验证签发证书失败: %w", err)
+		return time.Time{}, fmt.Errorf("Failed to verify issued certificate: %w", err)
 	}
 
 	return expiry, nil
@@ -368,7 +368,7 @@ func applySSLToSite(site *models.Website, certPath, keyPath string, expiry time.
 	engine := NewTemplateEngine(cfg.Panel.BackupDir)
 	nginxData, err := nginxDataFromSiteChecked(site)
 	if err != nil {
-		return fmt.Errorf("CDN 真实 IP 配置无效: %w", err)
+		return fmt.Errorf("CDN Real IP config invalid: %w", err)
 	}
 	nginxData.UseSSL = true
 	nginxData.SSLCertPath = certPath
@@ -376,12 +376,12 @@ func applySSLToSite(site *models.Website, certPath, keyPath string, expiry time.
 
 	nginxConfig, err := engine.RenderNginxConfig(nginxData)
 	if err != nil {
-		return fmt.Errorf("渲染 Nginx 配置失败: %w", err)
+		return fmt.Errorf("Failed to render Nginx config: %w", err)
 	}
 
 	if err := engine.ApplyNginxConfig(nginxConfig, site.NginxConfPath,
 		nginxEnabledPath(cfg, site.NginxConfPath, site.Domain)); err != nil {
-		return fmt.Errorf("应用 Nginx 配置失败: %w", err)
+		return fmt.Errorf("Failed to apply Nginx config: %w", err)
 	}
 
 	db := database.GetDB()
@@ -395,7 +395,7 @@ func applySSLToSite(site *models.Website, certPath, keyPath string, expiry time.
 func validateCertificate(certPath string, domain string) (time.Time, error) {
 	data, err := os.ReadFile(certPath)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("读取证书文件失败: %w", err)
+		return time.Time{}, fmt.Errorf("Failed to read certificate file: %w", err)
 	}
 
 	var expiry time.Time
@@ -416,10 +416,10 @@ func validateCertificate(certPath string, domain string) (time.Time, error) {
 			if !cert.IsCA {
 				now := time.Now()
 				if now.After(cert.NotAfter) {
-					return time.Time{}, fmt.Errorf("证书已过期（到期: %s）", cert.NotAfter.Format("2006-01-02"))
+					return time.Time{}, fmt.Errorf("Certificate expired (expired: %s)", cert.NotAfter.Format("2006-01-02"))
 				}
 				if now.Before(cert.NotBefore) {
-					return time.Time{}, fmt.Errorf("证书尚未生效（生效: %s）", cert.NotBefore.Format("2006-01-02"))
+					return time.Time{}, fmt.Errorf("Certificate not yet valid (valid from: %s)", cert.NotBefore.Format("2006-01-02"))
 				}
 				if err := cert.VerifyHostname(domain); err != nil {
 					matched := false
@@ -436,9 +436,9 @@ func validateCertificate(certPath string, domain string) (time.Time, error) {
 					if !matched {
 						hint := strings.Join(certDomains, ", ")
 						if hint == "" {
-							hint = "(证书未包含任何域名)"
+							hint = "(certificate does not contain any domains)"
 						}
-						return time.Time{}, fmt.Errorf("证书与域名 %s 不匹配，证书包含的域名: %s", domain, hint)
+						return time.Time{}, fmt.Errorf("Certificate does not match domain %s, certificate contains domains: %s", domain, hint)
 					}
 				}
 				expiry = cert.NotAfter
@@ -448,7 +448,7 @@ func validateCertificate(certPath string, domain string) (time.Time, error) {
 	}
 
 	if !found {
-		return time.Time{}, fmt.Errorf("未找到有效的证书内容")
+		return time.Time{}, fmt.Errorf("No valid certificate content found")
 	}
 
 	return expiry, nil
@@ -465,8 +465,8 @@ func executeRenewSSL(task *Task) TaskResult {
 		 FROM websites WHERE ssl_enabled = 1 AND ssl_cert_path != ''`,
 	)
 	if err != nil {
-		log.Printf("查询SSL站点失败: %v", err)
-		return TaskResult{Success: false, Message: "查询SSL站点失败"}
+		log.Printf("Failed to query SSL sites: %v", err)
+		return TaskResult{Success: false, Message: "Failed to query SSL sites"}
 	}
 	defer rows.Close()
 
@@ -487,7 +487,7 @@ func executeRenewSSL(task *Task) TaskResult {
 			&w.NginxConfPath, &w.SiteType, &sslEnabled, &w.SSLCertPath, &w.SSLKeyPath,
 			&w.TemplateVersion, &sslExpiresAt,
 		); scanErr != nil {
-			failed = append(failed, w.Domain+"(读取失败)")
+			failed = append(failed, w.Domain+"(read failed)")
 			continue
 		}
 		w.Aliases = aliases
@@ -497,8 +497,8 @@ func executeRenewSSL(task *Task) TaskResult {
 
 		expiry, certErr := validateCertificate(w.SSLCertPath, w.Domain)
 		if certErr != nil {
-			log.Printf("SSL证书异常 domain=%s: %v", w.Domain, certErr)
-			failed = append(failed, w.Domain+"(证书异常)")
+			log.Printf("SSL certificate abnormal domain=%s: %v", w.Domain, certErr)
+			failed = append(failed, w.Domain+"(certificate abnormal)")
 			continue
 		}
 
@@ -507,22 +507,22 @@ func executeRenewSSL(task *Task) TaskResult {
 		}
 
 		if expiry.Before(now) {
-			failed = append(failed, w.Domain+"(证书已过期)")
+			failed = append(failed, w.Domain+"(certificate expired)")
 			continue
 		}
 
 		documentRoot, docRootErr := EnsureEffectiveDocumentRoot(w.WebRoot, w.SiteType, w.DocumentRootSubdir, w.SystemUser)
 		if docRootErr != nil {
-			log.Printf("SSL续期准备验证目录失败 domain=%s: %v", w.Domain, docRootErr)
-			failed = append(failed, w.Domain+"(验证目录失败)")
+			log.Printf("SSL renewal failed to prepare verification directory domain=%s: %v", w.Domain, docRootErr)
+			failed = append(failed, w.Domain+"(verification directory failed)")
 			continue
 		}
 
 		newExpiry, renewErr := obtainLegoCert(w.Domain, w.Aliases, documentRoot,
 			filepath.Join(cfg.Paths.Certificates, w.Domain))
 		if renewErr != nil {
-			log.Printf("SSL续期失败 domain=%s: %v", w.Domain, renewErr)
-			failed = append(failed, w.Domain+"(续期失败)")
+			log.Printf("SSL renewal failed domain=%s: %v", w.Domain, renewErr)
+			failed = append(failed, w.Domain+"(renewal failed)")
 			continue
 		}
 
@@ -536,13 +536,13 @@ func executeRenewSSL(task *Task) TaskResult {
 		exec.Command("nginx", "-s", "reload").Run()
 	}
 
-	msg := fmt.Sprintf("续期完成。成功: %d", len(renewed))
+	msg := fmt.Sprintf("Renewal completed. Succeeded: %d", len(renewed))
 	if len(failed) > 0 {
-		msg += "; 失败: " + strings.Join(failed, ", ")
+		msg += "; Failed: " + strings.Join(failed, ", ")
 	}
 
 	if len(renewed) > 0 {
-		log.Printf("SSL 自动续期: %s", msg)
+		log.Printf("SSL auto-renewal: %s", msg)
 	}
 
 	return TaskResult{Success: true, Message: msg, Data: map[string]interface{}{"renewed": renewed, "failed": failed}}

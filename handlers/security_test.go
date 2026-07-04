@@ -38,7 +38,7 @@ func TestUpdateCDNRealIPGroupFail2banFailureRollsBackDB(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
 	resp := decodeAPIResponse(t, rec)
-	if !strings.Contains(resp.Message, "未生效") || !strings.Contains(resp.Message, "已回滚") {
+	if !strings.Contains(resp.Message, "did not take effect") || !strings.Contains(resp.Message, "rolled back") {
 		t.Fatalf("unexpected message: %s", resp.Message)
 	}
 
@@ -71,7 +71,7 @@ func TestCreateCDNRealIPGroupFail2banFailureDeletesGroup(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
 	resp := decodeAPIResponse(t, rec)
-	if !strings.Contains(resp.Message, "未创建") || !strings.Contains(resp.Message, "已回滚") {
+	if !strings.Contains(resp.Message, "was not created") || !strings.Contains(resp.Message, "rolled back") {
 		t.Fatalf("unexpected message: %s", resp.Message)
 	}
 
@@ -263,7 +263,7 @@ func TestDeleteCDNRealIPGroupReportsRestoreFailure(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
 	resp := decodeAPIResponse(t, rec)
-	if !strings.Contains(resp.Message, "数据库回滚失败") || !strings.Contains(resp.Message, "原始错误") {
+	if !strings.Contains(resp.Message, "database rollback failed") || !strings.Contains(resp.Message, "original error") {
 		t.Fatalf("unexpected message: %s", resp.Message)
 	}
 }

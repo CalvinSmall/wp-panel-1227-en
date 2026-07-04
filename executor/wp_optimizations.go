@@ -8,15 +8,15 @@ import (
 	"strings"
 )
 
-// validMemoryLimit 匹配合法的 PHP 内存限制值，如 128M、256M、1G、512K 或纯数字字节数。
+// validMemoryLimit matches valid PHP memory limit values like 128M, 256M, 1G, 512K, or raw byte counts.
 var validMemoryLimit = regexp.MustCompile(`^\d+[KMG]?$`)
 
 type WPOptimizations struct {
 	DisableUpdates     bool
 	DisableFileEditing bool
 	WPDebug            bool
-	WPPostRevisions    int    // -1 = 不设置, >=0 = define 的值
-	WPMemoryLimit      string // 空 = 不设置, 如 "128M"
+	WPPostRevisions    int    // -1 = don't set, >=0 = define value
+	WPMemoryLimit      string // empty = don't set, e.g. "128M"
 }
 
 func ApplyWPOptimizations(webRoot string, opts WPOptimizations) error {
@@ -28,11 +28,11 @@ func ApplyWPOptimizations(webRoot string, opts WPOptimizations) error {
 
 	content := string(data)
 
-	// 布尔常量：开启时插入，关闭时移除
+	// Boolean constants: insert when enabled, remove when disabled
 	content = applyBoolConstant(content, "AUTOMATIC_UPDATER_DISABLED", opts.DisableUpdates)
 	content = applyBoolConstant(content, "DISALLOW_FILE_EDIT", opts.DisableFileEditing)
 
-	// WP_DEBUG: 开启时写入 debug 三件套，关闭时移除 WP_DEBUG 及其关联常量（移除后 WordPress 默认 false）
+	// WP_DEBUG: write full debug trio when enabled, remove WP_DEBUG and related constants when disabled
 	content = applyBoolConstant(content, "WP_DEBUG", opts.WPDebug)
 	if opts.WPDebug {
 		content = applyBoolConstant(content, "WP_DEBUG_LOG", true)
@@ -42,14 +42,14 @@ func ApplyWPOptimizations(webRoot string, opts WPOptimizations) error {
 		content = removeConstant(content, "WP_DEBUG_DISPLAY")
 	}
 
-	// WP_POST_REVISIONS: -1 不处理，>=0 写入数值
+	// WP_POST_REVISIONS: -1 = don't touch, >=0 = write numeric value
 	if opts.WPPostRevisions >= 0 {
 		content = applyIntConstant(content, "WP_POST_REVISIONS", opts.WPPostRevisions)
 	} else {
 		content = removeConstant(content, "WP_POST_REVISIONS")
 	}
 
-	// WP_MEMORY_LIMIT: 空字符串移除；非法格式拒绝写入（防止单引号等字符破坏 php 文件）
+	// WP_MEMORY_LIMIT: empty string removes it; invalid format is rejected (prevents single-quote etc. from breaking php file)
 	if opts.WPMemoryLimit != "" {
 		if validMemoryLimit.MatchString(strings.ToUpper(opts.WPMemoryLimit)) {
 			content = applyStringConstant(content, "WP_MEMORY_LIMIT", strings.ToUpper(opts.WPMemoryLimit))

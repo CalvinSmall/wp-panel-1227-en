@@ -48,7 +48,7 @@ func TestSaveWPOptimizationsRecordsOperationLog(t *testing.T) {
 	if target != "example.com" {
 		t.Fatalf("target = %q, want example.com", target)
 	}
-	if !strings.Contains(message, "WP_DEBUG=开启") {
+	if !strings.Contains(message, "WP_DEBUG=on") {
 		t.Fatalf("message missing WP_DEBUG state: %q", message)
 	}
 }

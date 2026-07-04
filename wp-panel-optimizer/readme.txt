@@ -7,57 +7,57 @@ Stable tag: 1.1.5
 License: GPL-2.0+
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-与 WP Panel 面板配合使用，在 WordPress 后台管理 FastCGI 缓存、禁止检测更新、禁止文件编辑等优化项，与面板设置双向同步。
+Works with WP Panel to manage FastCGI cache, disable update detection, disable file editing, and other optimizations from the WordPress backend, with two-way sync to panel settings.
 
 == Description ==
 
-WP Panel Optimizer 是 [WP Panel](https://github.com/naibabiji/wp-panel) 的配套插件，通过面板 API 与服务器端面板实时同步优化设置。
+WP Panel Optimizer is the companion plugin for [WP Panel](https://github.com/naibabiji/wp-panel), syncing optimization settings in real-time with the server-side panel via the panel API.
 
-作者：[naibabiji](https://blog.naibabiji.com) | 插件地址：[GitHub](https://github.com/naibabiji/wp-panel)
+Author: [naibabiji](https://blog.naibabiji.com) | Plugin: [GitHub](https://github.com/naibabiji/wp-panel)
 
-= 功能 =
+= Features =
 
-* **FastCGI 缓存管理**：在 WordPress 后台开启/关闭 Nginx FastCGI 全站缓存，设置缓存有效期
-* **缓存预加载**：手动或清缓存后自动访问本站公开页面，让 Nginx 后台生成 FastCGI 缓存文件
-* **禁止检测更新**：完全屏蔽 WordPress 更新检测（仪表盘无红点无通知，检查更新按钮也不生效）。如需更新，先关闭此开关再检查
-* **禁止文件编辑**：写入 DISALLOW_FILE_EDIT 常量到 wp-config.php
-* **管理栏快捷清除**：在 WordPress 管理栏一键清除 Nginx 缓存
-* **自动清除缓存**：发布/更新/删除文章时自动清除缓存
-* **与面板双向同步**：修改设置后自动推送到面板，也自动拉取面板最新状态
+* **FastCGI Cache Management**: Enable/disable Nginx FastCGI full-site cache from the WordPress backend, set cache TTL
+* **Cache Preloading**: Manually or auto-visit public pages after cache clear to generate FastCGI cache files in the background
+* **Disable Update Detection**: Completely block WordPress update detection (no dashboard red dots, no notifications, update buttons also disabled). To update, disable this switch first then check
+* **Disable File Editing**: Writes DISALLOW_FILE_EDIT constant to wp-config.php
+* **Admin Bar Quick Clear**: One-click Nginx cache clear from the WordPress admin bar
+* **Auto Clear Cache**: Auto-clear cache on post publish/update/delete
+* **Two-way Panel Sync**: Settings changes auto-push to panel, also auto-pull latest panel state
 
-= 要求 =
+= Requirements =
 
-* 已安装 WP Panel v1.0.0-beta2+
-* 插件由面板自动安装（网站详情页 → WordPress 优化 → 安装配套插件），无需手动上传
+* WP Panel v1.0.0-beta2+ installed
+* Plugin auto-installed by panel (Site Details → WordPress Optimization → Install Companion Plugin), no manual upload needed
 
 == Installation ==
 
-1. 在 WP Panel 面板中进入网站详情页
-2. 在「WordPress 优化」卡片中勾选需要启用的优化项
-3. 点击「安装配套插件」按钮，面板自动部署插件到网站 wp-content/plugins/
-4. 在 WordPress 后台激活插件，或面板自动激活
+1. In WP Panel, go to the website details page
+2. In the "WordPress Optimization" card, check the optimizations you want to enable
+3. Click the "Install Companion Plugin" button; the panel auto-deploys the plugin to the site's wp-content/plugins/
+4. Activate the plugin in the WordPress backend, or the panel auto-activates it
 
-插件安装后，面板会在 Web 目录外的 /var/wp-panel/site-secrets/<domain>/wp-panel-config.json 写入配置文件（含面板地址和 API Key），无需手动填写凭证。
+After plugin installation, the panel writes a configuration file (containing panel address and API Key) to /var/wp-panel/site-secrets/<domain>/wp-panel-config.json outside the web directory; no manual credential entry needed.
 
 == Changelog ==
 
 = 1.1.5 =
-* 在插件设置页新增“清除 Nginx 缓存”按钮，方便移动端后台手动清理缓存
+* Added "Clear Nginx Cache" button on the plugin settings page for convenient mobile backend manual cache clearing
 
 = 1.1.4 =
-* 优化缓存预加载调度：系统 Cron 每次触发 WordPress 时会主动推进队列，避免单次事件续约不稳定导致队列停滞
+* Optimized cache preload scheduling: system Cron now proactively advances the queue on each WordPress trigger, preventing queue stalls from unstable single-event renewals
 
 = 1.1.3 =
-* 新增 FastCGI 缓存预加载：支持手动预加载、清缓存后自动预加载和后台批处理状态显示
+* Added FastCGI cache preloading: supports manual preloading, auto-preloading after cache clear, and background batch processing status display
 
 = 1.1.2 =
-* 修复启用 open_basedir 时，www/裸域配置探测可能触发 PHP Warning 的问题
-* 更新配置文件位置说明
+* Fixed PHP Warning that could be triggered when open_basedir is enabled and www/bare domain config probing occurs
+* Updated configuration file location description
 
 = 1.0.0 =
-* 初始版本
-* FastCGI 缓存管理
-* 禁止检测更新 / 禁止文件编辑
-* 管理栏清除缓存按钮
-* 发布/更新文章自动清除缓存
-* 与面板 API 双向同步
+* Initial version
+* FastCGI cache management
+* Disable update detection / disable file editing
+* Admin bar cache clear button
+* Auto-clear cache on post publish/update
+* Two-way sync with panel API

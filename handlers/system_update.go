@@ -56,13 +56,13 @@ func (h *SystemUpdateHandler) Check(c *gin.Context) {
 func (h *SystemUpdateHandler) Update(c *gin.Context) {
 	out1, err := exec.Command("bash", "-c", "apt update 2>&1").CombinedOutput()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("apt update 失败: "+string(out1)))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("apt update failed: "+string(out1)))
 		return
 	}
 
 	out2, err := exec.Command("bash", "-c", "apt upgrade -y 2>&1").CombinedOutput()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("apt upgrade 失败: "+string(out2)))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("apt upgrade failed: "+string(out2)))
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *SystemUpdateHandler) Update(c *gin.Context) {
 	executor.ClearSystemUpdateAlertCache()
 
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
-		"message": "系统更新完成",
+		"message": "System update complete",
 		"output":  string(out2),
 	}))
 }

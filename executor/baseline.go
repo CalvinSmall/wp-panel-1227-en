@@ -27,8 +27,8 @@ func ensureNginxBaseline() {
 	data, err := os.ReadFile(path)
 
 	if err != nil {
-		// 文件不存在，创建完整配置
-		content := `# WP Panel — WordPress 安全基线 (安装时自动生成)
+		// File does not exist, create complete configuration
+		content := `# WP Panel — WordPress security baseline (auto-generated on installation)
 client_max_body_size 64m;
 server_names_hash_bucket_size 128;
 `
@@ -37,7 +37,7 @@ server_names_hash_bucket_size 128;
 		return
 	}
 
-	// 文件已存在，检查是否缺少 server_names_hash_bucket_size
+	// File exists, check if server_names_hash_bucket_size is missing
 	content := string(data)
 	if !strings.Contains(content, "server_names_hash_bucket_size") {
 		content = strings.TrimRight(content, "\n") + "\nserver_names_hash_bucket_size 128;\n"
@@ -48,7 +48,7 @@ server_names_hash_bucket_size 128;
 
 func ensureNginxSSLDefaultServer() {
 	confPath := "/etc/nginx/conf.d/wppanel-ssl-default.conf"
-	content := `# WP Panel — 默认 SSL 服务器，拒绝未知域名的 TLS 握手，防止证书跨站泄露
+	content := `# WP Panel — Default SSL server, reject TLS handshake for unknown domains, prevent cross-site certificate leakage
 server {
     listen 443 ssl default_server;
     listen [::]:443 ssl default_server;
@@ -59,7 +59,7 @@ server {
 	os.WriteFile(confPath, []byte(content), 0644)
 
 	if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
-		fmt.Printf("[WP-Panel] Nginx 配置语法错误，跳过重载: %s\n", string(out))
+		fmt.Printf("[WP-Panel] Nginx config syntax error, skipping reload: %s\n", string(out))
 		return
 	}
 	exec.Command("nginx", "-s", "reload").Run()
@@ -80,7 +80,7 @@ func ensureMariaDBBaseline() {
 	default:
 		poolSize = "512M"
 	}
-	content := fmt.Sprintf(`# WP Panel — WordPress 安全基线 (安装时自动生成)
+	content := fmt.Sprintf(`# WP Panel — WordPress security baseline (auto-generated on installation)
 [mysqld]
 innodb_buffer_pool_size = %s
 `, poolSize)
@@ -123,7 +123,7 @@ func ensureRedisBaseline() {
 		}
 	}
 	if !replaced {
-		lines = append(lines, "", "# WP Panel — WordPress 安全基线", "maxmemory "+maxmem)
+		lines = append(lines, "", "# WP Panel — WordPress security baseline", "maxmemory "+maxmem)
 	}
 
 	os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)

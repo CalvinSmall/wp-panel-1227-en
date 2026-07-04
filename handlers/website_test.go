@@ -37,15 +37,15 @@ func TestNormalizeWPSiteURLRejectsInvalidValues(t *testing.T) {
 }
 
 func TestReinstallWordPressErrorMessageShowsSafeStage(t *testing.T) {
-	msg := reinstallWordPressErrorMessage(errors.New("重建数据库失败: mysql: Access denied for /www/server/panel/config.json"))
-	if msg != "WordPress 重装失败：重建数据库失败" {
+	msg := reinstallWordPressErrorMessage(errors.New("Failed to rebuild database: mysql: Access denied for /www/server/panel/config.json"))
+	if msg != "WordPress reinstallation failed：Failed to rebuild database" {
 		t.Fatalf("message = %q", msg)
 	}
 }
 
 func TestReinstallWordPressErrorMessageHidesUnknownDetails(t *testing.T) {
 	msg := reinstallWordPressErrorMessage(errors.New("mysql: Access denied for /www/server/panel/config.json"))
-	if msg != "WordPress 重装失败" {
+	if msg != "WordPress reinstallation failed" {
 		t.Fatalf("message = %q", msg)
 	}
 }

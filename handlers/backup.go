@@ -27,7 +27,7 @@ func (h *BackupHandler) List(c *gin.Context) {
 	rows, err := db.Query(`SELECT id, site_id, filename, file_size, db_name, auto, transport_status, transport_message, created_at
 		FROM db_backups WHERE site_id = ? ORDER BY created_at DESC`, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("query failed"))
 		return
 	}
 	defer rows.Close()
@@ -53,7 +53,7 @@ func (h *BackupHandler) Create(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	site := getWebsiteByID(id)
 	if site == nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("website not found"))
 		return
 	}
 	payload := &executor.CreateBackupPayload{Site: site, Auto: false}
@@ -74,11 +74,11 @@ func (h *BackupHandler) Delete(c *gin.Context) {
 	var filename string
 	err := db.QueryRow("SELECT filename FROM db_backups WHERE id = ? AND site_id = ?", bid, id).Scan(&filename)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("备份记录不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("backup record not found"))
 		return
 	}
 	executor.ExecuteDeleteBackup(id, filename)
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "已删除"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "deleted"}))
 }
 
 func (h *BackupHandler) Download(c *gin.Context) {
@@ -87,7 +87,7 @@ func (h *BackupHandler) Download(c *gin.Context) {
 
 	site := getWebsiteByID(id)
 	if site == nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("website not found"))
 		return
 	}
 
@@ -95,14 +95,14 @@ func (h *BackupHandler) Download(c *gin.Context) {
 	var filename string
 	err := db.QueryRow("SELECT filename FROM db_backups WHERE id = ? AND site_id = ?", bid, id).Scan(&filename)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("备份记录不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("backup record not found"))
 		return
 	}
 
 	backupDir := filepath.Join("/www/server/panel/backups", site.Domain, "db")
 	filePath := filepath.Join(backupDir, filename)
 	if _, err := os.Stat(filePath); err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("备份文件不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("backup file not found"))
 		return
 	}
 	c.FileAttachment(filePath, filename)
@@ -114,7 +114,7 @@ func (h *BackupHandler) Restore(c *gin.Context) {
 
 	site := getWebsiteByID(id)
 	if site == nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("website not found"))
 		return
 	}
 
@@ -122,20 +122,20 @@ func (h *BackupHandler) Restore(c *gin.Context) {
 	var filename string
 	err := db.QueryRow("SELECT filename FROM db_backups WHERE id = ? AND site_id = ?", bid, id).Scan(&filename)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("备份记录不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("backup record not found"))
 		return
 	}
 
-	// 检查本地文件是否存在
+	// Check if the local file exists
 	backupDir := filepath.Join("/www/server/panel/backups", site.Domain, "db")
 	filePath := filepath.Join(backupDir, filename)
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		var remoteEnabled int
 		database.GetDB().QueryRow("SELECT enabled FROM remote_backup_settings WHERE id = 1").Scan(&remoteEnabled)
 		if remoteEnabled == 1 {
-			c.JSON(http.StatusNotFound, models.ErrorResponse("该备份已同步至远程服务器，本地文件已按设置删除。请从远程服务器下载后上传恢复。"))
+			c.JSON(http.StatusNotFound, models.ErrorResponse("This backup has been synced to remote server. The local file was deleted per settings. Please download from remote server and upload to restore."))
 		} else {
-			c.JSON(http.StatusNotFound, models.ErrorResponse("备份文件不存在，可能已被清理"))
+			c.JSON(http.StatusNotFound, models.ErrorResponse("backup file not found, may have been cleaned up"))
 		}
 		return
 	}
@@ -144,7 +144,7 @@ func (h *BackupHandler) Restore(c *gin.Context) {
 	task := executor.GlobalQueue.Enqueue(executor.TaskRestoreBackup, payload)
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
 		"async":   true,
-		"message": "数据库恢复任务已开始",
+		"message": "Database restore task has started",
 		"task_id": task.ID,
 		"status":  task.Status,
 	}))
@@ -154,31 +154,31 @@ func (h *BackupHandler) UploadRestore(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	site := getWebsiteByID(id)
 	if site == nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("website not found"))
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请选择备份文件"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("please select a backup file"))
 		return
 	}
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	if ext != ".gz" && ext != ".sql" && ext != ".zip" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("仅支持 .sql / .sql.gz / .zip 格式"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("only .sql / .sql.gz / .zip formats are supported"))
 		return
 	}
 
 	tmpFile, err := os.CreateTemp("", "wppanel_upload_*"+ext)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建临时文件失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("failed to create temporary file"))
 		return
 	}
 	tmpPath := tmpFile.Name()
 	tmpFile.Close()
 	if err := c.SaveUploadedFile(file, tmpPath); err != nil {
 		os.Remove(tmpPath)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("上传失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("upload failed"))
 		return
 	}
 
@@ -186,7 +186,7 @@ func (h *BackupHandler) UploadRestore(c *gin.Context) {
 	task := executor.GlobalQueue.Enqueue(executor.TaskRestoreBackup, payload)
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{
 		"async":   true,
-		"message": "数据库恢复任务已开始",
+		"message": "Database restore task has started",
 		"task_id": task.ID,
 		"status":  task.Status,
 	}))
@@ -196,25 +196,25 @@ func (h *BackupHandler) RestoreStatus(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	site := getWebsiteByID(id)
 	if site == nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("website not found"))
 		return
 	}
 
 	taskID := strings.TrimSpace(c.Param("task_id"))
 	task, ok := executor.GlobalQueue.GetTask(taskID)
 	if !ok {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("恢复任务不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("restore task not found"))
 		return
 	}
 	payload, ok := task.Payload.(*executor.RestoreBackupPayload)
 	if !ok || task.Type != executor.TaskRestoreBackup || payload.Site == nil || payload.Site.ID != site.ID {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("恢复任务不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("restore task not found"))
 		return
 	}
 
-	message := "数据库恢复等待中"
+	message := "Database restore waiting"
 	if task.Status == executor.TaskStatusRunning {
-		message = "数据库恢复中"
+		message = "Database restoring"
 	}
 	success := false
 	if task.Result != nil {
@@ -245,7 +245,7 @@ func (h *BackupHandler) UpdateSettings(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	var req models.BackupSettings
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("参数错误"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("invalid parameters"))
 		return
 	}
 	if req.KeepCount < 1 {
@@ -262,36 +262,36 @@ func (h *BackupHandler) UpdateSettings(c *gin.Context) {
 	db.Exec(`INSERT INTO backup_settings (site_id, enabled, keep_count) VALUES (?, ?, ?)
 		ON CONFLICT(site_id) DO UPDATE SET enabled = ?, keep_count = ?`,
 		id, enabledVal, req.KeepCount, enabledVal, req.KeepCount)
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "设置已保存"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Settings saved"}))
 }
 
 func (h *BackupHandler) ClearDatabase(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	site := getWebsiteByID(id)
 	if site == nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse("website not found"))
 		return
 	}
 
 	if site.DBName == "" || len(site.DBName) > 64 || !mysqlIdentifierRe.MatchString(site.DBName) {
-		log.Printf("拒绝清空异常数据库名 site=%d db=%q", id, site.DBName)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("数据库名异常，已拒绝执行"))
+		log.Printf("Rejected clearing abnormal database name site=%d db=%q", id, site.DBName)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Abnormal database name, request rejected"))
 		return
 	}
 
 	dbPass := readMariaDBPassword()
 	if dbPass == "" {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("无法读取数据库密码"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("unable to read database password"))
 		return
 	}
 
 	if err := executor.ClearDatabaseTables(site.DBName, dbPass); err != nil {
-		log.Printf("清空数据库失败 site=%s: %v", site.DBName, err)
+		log.Printf("Failed to clear database site=%s: %v", site.DBName, err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "数据库已清空"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "Database cleared"}))
 }
 
 func readMariaDBPassword() string {

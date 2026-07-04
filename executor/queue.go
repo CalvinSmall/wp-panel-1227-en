@@ -32,7 +32,7 @@ func InitQueue(cfg *config.Config) *TaskQueue {
 	}
 	GlobalQueue = q
 	go q.worker()
-	log.Println("任务队列已启动(单线程串行模式)")
+	log.Println("Task queue started (single-threaded serial mode)")
 	return q
 }
 
@@ -159,7 +159,7 @@ func (q *TaskQueue) worker() {
 			case TaskSetFileLock:
 				result = executeSetFileLock(task)
 			default:
-				result = TaskResult{Success: false, Message: "未知任务类型: " + string(task.Type)}
+				result = TaskResult{Success: false, Message: "Unknown task type: " + string(task.Type)}
 			}
 
 			if result.Success {
@@ -335,9 +335,9 @@ var shellExec = func(binary string, args ...string) (string, error) {
 	result, err := Execute(binary, args...)
 	if err != nil {
 		if result != nil && result.Stderr != "" {
-			log.Printf("命令 %s stderr: %s", binary, result.Stderr)
+			log.Printf("Command %s stderr: %s", binary, result.Stderr)
 		}
-		return "", fmt.Errorf("命令 %s 执行失败", binary)
+		return "", fmt.Errorf("Command %s execution failed", binary)
 	}
 	return result.Stdout, nil
 }

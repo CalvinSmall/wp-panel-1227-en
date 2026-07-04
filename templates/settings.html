@@ -300,7 +300,7 @@
             <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-semibold text-white">{{t .Lang "settings.remote_backup"}}</h3><button @click="showHelp = true" class="text-xs py-1 px-2 rounded" style="background-color: #1e3a5f; color: #93c5fd;">{{t .Lang "settings.help"}}</button></div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- 左侧：备份设置 -->
+            <!-- Left side: Backup settings -->
             <div>
                 <div class="flex items-center space-x-3 mb-4">
                     <label class="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer">
@@ -404,7 +404,7 @@
                 </div>
             </div>
 
-            <!-- 右侧：设置助手 -->
+            <!-- Right side: Setup helper -->
             <div x-show="cfg.backup_type === 'rsync'" class="p-4 rounded" style="background-color: #0f172a; border: 1px solid #1e293b;">
                 <div class="flex items-center justify-between mb-3">
                     <h4 class="text-sm font-medium text-gray-300">{{t .Lang "settings.remote_helper_title"}}</h4>
@@ -444,7 +444,7 @@
             </div>
         </div>
 
-            <!-- 使用说明弹窗 -->
+            <!-- Usage instructions modal -->
             <div x-show="showHelp" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" @click.self="showHelp = false">
                 <div class="rounded-lg shadow-xl w-full max-w-xl p-6 max-h-80vh overflow-y-auto" style="background-color: #1e293b; border: 1px solid #334155;">
                     <div class="flex items-center justify-between mb-4">

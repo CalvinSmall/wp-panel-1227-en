@@ -11,93 +11,93 @@
             <h3 class="text-lg font-bold text-white mb-4">{{t .Lang "security.help_title"}}</h3>
             <div class="text-sm text-gray-300 space-y-4">
                 <div>
-                    <p class="text-white font-semibold mb-2">Fail2ban 配置项</p>
+                    <p class="text-white font-semibold mb-2">Fail2ban Configuration</p>
                     <ul class="space-y-3 ml-2">
                         <li>
-                            <p class="text-blue-400 font-medium">触发阈值（次）</p>
-                            <p>在统计窗口内，单个 IP 触发特征规则的次数达到此值即自动封禁。默认 <span class="text-blue-400">5</span> 次。调低更敏感（容易误封），调高更宽松。具体检测特征规则详见「安全防御」页面。</p>
+                            <p class="text-blue-400 font-medium">Trigger Threshold (times)</p>
+                            <p>When a single IP triggers the detection rules this many times within the statistical window, it is automatically banned. Default is <span class="text-blue-400">5</span>. Lower values are more sensitive (higher risk of false bans), higher values are more lenient. See the "Security Defense" page for specific detection rules.</p>
                         </li>
                         <li>
-                            <p class="text-blue-400 font-medium">统计窗口（秒）</p>
-                            <p>用于累计违规次数的时间范围。默认 <span class="text-blue-400">60</span> 秒。与触发阈值配合使用：例如默认配置即"60 秒内违规 5 次则封禁"。窗口越大，累计越容易触发。</p>
+                            <p class="text-blue-400 font-medium">Time Window (seconds)</p>
+                            <p>The time range used to accumulate violation counts. Default is <span class="text-blue-400">60</span> seconds. Works together with the trigger threshold: for example, the default configuration means "ban after 5 violations within 60 seconds." A larger window makes it easier to trigger accumulation.</p>
                         </li>
                         <li>
-                            <p class="text-blue-400 font-medium">封禁时长（秒）</p>
-                            <p>首次违规触发封禁后，IP 被防火墙拦截的时长。默认 <span class="text-blue-400">600</span> 秒（10 分钟）。到期后 fail2ban 自动解封，但若该 IP 在 24 小时内再次违规，将自动升级为 24 小时封禁。</p>
+                            <p class="text-blue-400 font-medium">Ban Duration (seconds)</p>
+                            <p>How long the IP is blocked by the firewall after the first violation triggers a ban. Default is <span class="text-blue-400">600</span> seconds (10 minutes). After expiration, fail2ban automatically unbans, but if the IP violates again within 24 hours, it is automatically escalated to a 24-hour ban.</p>
                         </li>
                     </ul>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-2">白名单机制</p>
+                    <p class="text-white font-semibold mb-2">Whitelist Mechanism</p>
                     <ul class="space-y-3 ml-2">
                         <li>
-                            <p class="text-blue-400 font-medium">官方白名单</p>
-                            <p>面板自动从以下官方来源拉取最新 IP 段，加入 fail2ban 白名单，防止误封合法爬虫和 CDN 节点：</p>
+                            <p class="text-blue-400 font-medium">Official Whitelist</p>
+                            <p>The panel automatically fetches the latest IP ranges from the following official sources and adds them to the fail2ban whitelist to prevent false bans on legitimate crawlers and CDN nodes:</p>
                             <ul class="list-disc list-inside ml-2 mt-1 space-y-0.5">
-                                <li><span class="text-white">Cloudflare</span> — 全球 CDN 和反向代理 IP 段（ipv4 + ipv6）</li>
-                                <li><span class="text-white">Googlebot</span> — Google 搜索爬虫官方 IP 段</li>
-                                <li><span class="text-white">Bingbot</span> — Bing 搜索爬虫官方 IP 段</li>
+                                <li><span class="text-white">Cloudflare</span> — Global CDN and reverse proxy IP ranges (ipv4 + ipv6)</li>
+                                <li><span class="text-white">Googlebot</span> — Google search crawler official IP ranges</li>
+                                <li><span class="text-white">Bingbot</span> — Bing search crawler official IP ranges</li>
                             </ul>
-                            <p class="text-gray-500 mt-1">勾选"每周自动更新"后，系统将在每周一凌晨 4:00 自动重新拉取最新 IP。</p>
+                            <p class="text-gray-500 mt-1">After enabling "Weekly Auto-Update," the system automatically re-fetches the latest IPs every Monday at 4:00 AM.</p>
                         </li>
                         <li>
-                            <p class="text-blue-400 font-medium">自定义白名单</p>
-                            <p>手动添加不会被封禁的 IP 或 IP 段，每行一个。支持 IPv4/IPv6 地址和 CIDR 格式（如 <code>10.0.0.0/8</code>）。自定义白名单不会被官方拉取覆盖。</p>
+                            <p class="text-blue-400 font-medium">Custom Whitelist</p>
+                            <p>Manually add IPs or IP ranges that should never be banned, one per line. Supports IPv4/IPv6 addresses and CIDR format (e.g., <code>10.0.0.0/8</code>). Custom whitelist entries are not overwritten by official fetches.</p>
                         </li>
                         <li>
-                            <p class="text-blue-400 font-medium">WordPress 安全日志路径白名单</p>
-                            <p>用于排除搜索引擎、广告平台、站点所有权验证等正常文件。该配置只影响 WordPress 异常访问统计，不影响通用 PHP 网站，不会直接放行或封禁请求。</p>
-                        </li>
-                    </ul>
-                </div>
-                <div>
-                    <p class="text-white font-semibold mb-2">请求频率限制详解</p>
-                    <ul class="space-y-3 ml-2">
-                        <li>
-                            <p class="text-blue-400 font-medium">工作原理：令牌桶算法</p>
-                            <p>系统为每个 IP 维护一个容量等于「突发缓冲」的令牌桶，每秒自动补充 1 个令牌（由请求频率决定）。请求到达时消耗令牌，耗尽后返回 429。<span class="text-green-400">人类浏览有自然停顿（阅读页面），停顿期间桶自动回满</span>；机器人持续不断请求，令牌耗尽后被限制在每秒仅 1 次请求。</p>
-                        </li>
-                        <li>
-                            <p class="text-blue-400 font-medium">请求频率（次/分钟）</p>
-                            <p>控制长期持续速率，即令牌补充速度。默认 <span class="text-blue-400">60</span> 次/分钟（= 1 次/秒）。机器人扫描通常远超此值，因此会在数秒内耗尽令牌桶，几乎所有请求都被返回 429。</p>
-                        </li>
-                        <li>
-                            <p class="text-blue-400 font-medium">突发缓冲（次）</p>
-                            <p>控制令牌桶容量，即页面打开瞬间允许的最大并发请求数。默认 <span class="text-blue-400">300</span> 次，可覆盖 Elementor + 多插件站点（单页 100+ 请求）同时打开 2-3 个标签页的场景。如需同时打开更多标签页，请设置更大值（如 500-600）。非 Elementor / 轻量站点可适当调低至 30-120。</p>
-                            <p class="text-green-400 mt-1">增大此值<span class="text-green-300 font-semibold">不会</span>延迟拦截机器人——机器人被持续速率（1 次/秒）压制，与突发缓冲大小无关，安全防护不削弱。</p>
-                        </li>
-                        <li>
-                            <p class="text-red-400 font-semibold">⚠ 警告：多次返回 429 的 IP 将被 Fail2ban 自动封禁</p>
-                            <p class="text-red-400">429 响应会被 Fail2ban 规则捕获并计入违规次数（与 wp-login 暴力破解等同级处理）。累计触发阈值后将导致该 IP 被防火墙封锁。请确保突发缓冲足够日常使用，避免正常访客误触发 429 而被拉黑。</p>
-                        </li>
-                        <li>
-                            <p class="text-green-400 font-semibold">✓ 提高突发缓冲不影响拦截机器人</p>
-                            <p>机器人的特征是持续不断发请求（无人类浏览停顿），会被「请求频率」死死限制在 1 次/秒，令牌桶耗尽后几乎所有请求都返回 429。提高突发缓冲只会给人类访客更宽松的首屏加载空间，<span class="text-green-400">安全防护能力完全不受影响</span>。真正的限制来自持续速率，而非突发上限。</p>
-                        </li>
-                        <li>
-                            <p class="text-blue-400 font-medium">如何测试配置是否合适</p>
-                            <p>用浏览器无痕窗口打开网站，随机浏览 5-10 个页面（含首页、分类页、文章页）。打开开发者工具（F12）→ Network 标签，观察是否有红色 429 状态码。全部 200/304 即表示配置合理。</p>
+                            <p class="text-blue-400 font-medium">WordPress Security Log Path Whitelist</p>
+                            <p>Used to exclude search engines, ad platforms, site ownership verification, and other legitimate files. This setting only affects WordPress abnormal access statistics, not generic PHP sites, and does not directly allow or block requests.</p>
                         </li>
                     </ul>
                 </div>
                 <div>
-                    <p class="text-white font-semibold mb-2">爬虫限速说明</p>
+                    <p class="text-white font-semibold mb-2">Rate Limiting Explained</p>
                     <ul class="space-y-3 ml-2">
                         <li>
-                            <p class="text-blue-400 font-medium">限速范围</p>
-                            <p>爬虫限速默认关闭。开启后，每个站点拥有独立的爬虫限速桶；同一站点内命中的常见 Bot UA 共享该桶，普通浏览器不会进入此限速层。</p>
+                            <p class="text-blue-400 font-medium">How It Works: Token Bucket Algorithm</p>
+                            <p>The system maintains a token bucket for each IP with a capacity equal to the "Burst Buffer." Tokens are replenished at a rate of 1 per second (determined by the request frequency). Each request consumes a token; when depleted, a 429 is returned. <span class="text-green-400">Human browsing has natural pauses (reading pages), during which the bucket refills automatically</span>; bots send continuous requests, so once tokens are depleted, they are limited to 1 request per second.</p>
                         </li>
                         <li>
-                            <p class="text-blue-400 font-medium">搜索引擎豁免</p>
-                            <p>Googlebot/Bingbot 只有在来源 IP 命中官方 IP 段时才豁免爬虫限速。伪装成搜索引擎的请求会进入站点的爬虫限速桶。</p>
+                            <p class="text-blue-400 font-medium">Request Frequency (requests/minute)</p>
+                            <p>Controls the long-term sustained rate, i.e., token replenishment speed. Default is <span class="text-blue-400">60</span> requests/minute (= 1/second). Bot scanning typically far exceeds this value, so they deplete the token bucket within seconds, and nearly all requests receive a 429.</p>
                         </li>
                         <li>
-                            <p class="text-blue-400 font-medium">默认识别的 Bot</p>
-                            <p>当前默认匹配 Googlebot、Bingbot、Facebook/Meta（facebookexternalhit、facebook、meta-externalagent）、Twitterbot、LinkedInBot、Slackbot、Discordbot、TelegramBot、SemrushBot、AhrefsBot、MJ12Bot、DotBot，以及 UA 中包含 bot、crawler、spider、scraper、scan 的请求。</p>
+                            <p class="text-blue-400 font-medium">Burst Buffer (requests)</p>
+                            <p>Controls the token bucket capacity, i.e., the maximum concurrent requests allowed the instant a page opens. Default is <span class="text-blue-400">300</span>, sufficient for Elementor + multi-plugin sites (100+ requests per page) opening 2-3 tabs simultaneously. For more concurrent tabs, set a higher value (e.g., 500-600). Non-Elementor / lightweight sites can reduce to 30-120.</p>
+                            <p class="text-green-400 mt-1">Increasing this value <span class="text-green-300 font-semibold">does not</span> delay bot blocking — bots are throttled by the sustained rate (1/second) regardless of burst buffer size; security is not weakened.</p>
                         </li>
                         <li>
-                            <p class="text-blue-400 font-medium">建议默认值</p>
-                            <p>默认 30 次/分钟、突发 20 次，主要用于压制多 IP 假爬虫持续扫描，降低 WordPress 动态 404 压力。调整后可观察访问日志中 429 数量和正常抓取情况。</p>
+                            <p class="text-red-400 font-semibold">⚠ Warning: IPs receiving multiple 429 responses will be automatically banned by Fail2ban</p>
+                            <p class="text-red-400">429 responses are captured by Fail2ban rules and counted as violations (treated at the same level as wp-login brute force attacks). Accumulating violations beyond the threshold will cause the IP to be blocked by the firewall. Ensure the burst buffer is sufficient for daily use to prevent legitimate visitors from accidentally triggering 429 and being blacklisted.</p>
+                        </li>
+                        <li>
+                            <p class="text-green-400 font-semibold">✓ Increasing burst buffer does not affect bot blocking</p>
+                            <p>Bots continuously send requests (no human browsing pauses), so they are strictly limited by the "Request Frequency" to 1/second. Once tokens are depleted, nearly all requests return 429. Increasing the burst buffer only gives human visitors more headroom for initial page loads; <span class="text-green-400">security is completely unaffected</span>. The real limiting factor is the sustained rate, not the burst cap.</p>
+                        </li>
+                        <li>
+                            <p class="text-blue-400 font-medium">How to Test if Configuration Is Appropriate</p>
+                            <p>Open the site in a browser incognito window and randomly browse 5-10 pages (including homepage, category pages, and article pages). Open Developer Tools (F12) → Network tab and check for any red 429 status codes. All 200/304 responses indicate a well-tuned configuration.</p>
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="text-white font-semibold mb-2">Crawler Rate Limiting</p>
+                    <ul class="space-y-3 ml-2">
+                        <li>
+                            <p class="text-blue-400 font-medium">Rate Limit Scope</p>
+                            <p>Crawler rate limiting is disabled by default. When enabled, each site has its own independent crawler rate limit bucket; common Bot UAs hitting the same site share this bucket. Normal browsers do not enter this rate limiting layer.</p>
+                        </li>
+                        <li>
+                            <p class="text-blue-400 font-medium">Search Engine Exemption</p>
+                            <p>Googlebot/Bingbot are only exempt from crawler rate limiting when the source IP matches the official IP ranges. Requests impersonating search engines will enter the site's crawler rate limit bucket.</p>
+                        </li>
+                        <li>
+                            <p class="text-blue-400 font-medium">Default Recognized Bots</p>
+                            <p>Currently matched by default: Googlebot, Bingbot, Facebook/Meta (facebookexternalhit, facebook, meta-externalagent), Twitterbot, LinkedInBot, Slackbot, Discordbot, TelegramBot, SemrushBot, AhrefsBot, MJ12Bot, DotBot, and any request with "bot," "crawler," "spider," "scraper," or "scan" in the User-Agent.</p>
+                        </li>
+                        <li>
+                            <p class="text-blue-400 font-medium">Recommended Defaults</p>
+                            <p>Default is 30 requests/minute with a burst of 20, primarily to suppress multi-IP fake crawlers from continuous scanning and reduce WordPress dynamic 404 pressure. After adjusting, monitor the 429 count in access logs and normal crawl behavior.</p>
                         </li>
                     </ul>
                 </div>

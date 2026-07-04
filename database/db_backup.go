@@ -10,10 +10,10 @@ import (
 	"time"
 )
 
-// BackupDatabase 使用 VACUUM INTO 对在线数据库做一致性热备
+// BackupDatabase performs a consistent hot backup of the live database using VACUUM INTO
 func BackupDatabase(backupDir string) (string, error) {
 	if err := os.MkdirAll(backupDir, 0700); err != nil {
-		return "", fmt.Errorf("创建备份目录失败: %w", err)
+		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
 	ts := time.Now().Format("20060102_150405")
@@ -21,13 +21,13 @@ func BackupDatabase(backupDir string) (string, error) {
 
 	if _, err := DB.Exec("VACUUM INTO ?", backupPath); err != nil {
 		os.Remove(backupPath)
-		return "", fmt.Errorf("VACUUM INTO 失败: %w", err)
+		return "", fmt.Errorf("VACUUM INTO failed: %w", err)
 	}
 
 	return backupPath, nil
 }
 
-// DBBackupInfo 备份文件信息
+// DBBackupInfo holds metadata about a backup file
 type DBBackupInfo struct {
 	Filename  string `json:"filename"`
 	Size      int64  `json:"size"`
@@ -35,7 +35,7 @@ type DBBackupInfo struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// ListDBBackups 列出所有面板数据库备份
+// ListDBBackups lists all panel database backups
 func ListDBBackups(backupDir string) ([]DBBackupInfo, error) {
 	entries, err := os.ReadDir(backupDir)
 	if err != nil {
@@ -54,7 +54,7 @@ func ListDBBackups(backupDir string) ([]DBBackupInfo, error) {
 		if err != nil {
 			continue
 		}
-		// 从文件名解析时间: panel_20260107_023000.db
+		// Parse time from filename: panel_20260107_023000.db
 		name := strings.TrimPrefix(e.Name(), "panel_")
 		name = strings.TrimSuffix(name, ".db")
 		displayTime := name
@@ -70,7 +70,7 @@ func ListDBBackups(backupDir string) ([]DBBackupInfo, error) {
 		})
 	}
 
-	// 按时间降序
+	// Sort by time descending
 	sort.Slice(backups, func(i, j int) bool {
 		return backups[i].Filename > backups[j].Filename
 	})
@@ -81,7 +81,7 @@ func ListDBBackups(backupDir string) ([]DBBackupInfo, error) {
 	return backups, nil
 }
 
-// CleanupOldDBBackups 保留最近的 keepCount 份备份，删除其余
+// CleanupOldDBBackups keeps the most recent keepCount backups and deletes the rest
 func CleanupOldDBBackups(backupDir string, keepCount int) int {
 	backups, err := ListDBBackups(backupDir)
 	if err != nil || len(backups) <= keepCount {
@@ -98,38 +98,38 @@ func CleanupOldDBBackups(backupDir string, keepCount int) int {
 	return removed
 }
 
-// RestoreDBBackupPath 返回指定备份文件的完整路径，校验文件存在
+// RestoreDBBackupPath returns the full path of the specified backup file, validating its existence
 func RestoreDBBackupPath(backupDir, filename string) (string, error) {
-	// 安全校验：防止路径遍历
+	// Security check: prevent path traversal
 	clean := filepath.Clean(filename)
 	if clean != filename || strings.Contains(clean, "/") || strings.Contains(clean, "\\") {
-		return "", fmt.Errorf("非法文件名")
+		return "", fmt.Errorf("invalid filename")
 	}
 	if !strings.HasPrefix(clean, "panel_") || !strings.HasSuffix(clean, ".db") {
-		return "", fmt.Errorf("非法备份文件名")
+		return "", fmt.Errorf("invalid backup filename")
 	}
 
 	fullPath := filepath.Join(backupDir, clean)
 	if _, err := os.Stat(fullPath); err != nil {
-		return "", fmt.Errorf("备份文件不存在")
+		return "", fmt.Errorf("backup file does not exist")
 	}
 	return fullPath, nil
 }
 
-// VerifyDBBackup 打开备份文件执行 PRAGMA integrity_check，校验备份完整性
+// VerifyDBBackup opens the backup file and runs PRAGMA integrity_check to verify backup integrity
 func VerifyDBBackup(backupPath string) error {
 	db, err := sql.Open("sqlite", backupPath)
 	if err != nil {
-		return fmt.Errorf("打开备份文件失败: %w", err)
+		return fmt.Errorf("failed to open backup file: %w", err)
 	}
 	defer db.Close()
 
 	var result string
 	if err := db.QueryRow("PRAGMA integrity_check").Scan(&result); err != nil {
-		return fmt.Errorf("完整性校验执行失败: %w", err)
+		return fmt.Errorf("integrity check failed: %w", err)
 	}
 	if result != "ok" {
-		return fmt.Errorf("备份文件损坏: %s", result)
+		return fmt.Errorf("backup file corrupted: %s", result)
 	}
 	return nil
 }

@@ -146,7 +146,7 @@ func (h *SoftwareHandler) ClearLog(c *gin.Context) {
 		return
 	}
 	if err := os.WriteFile(path, []byte{}, 0644); err != nil {
-		log.Printf("清空软件日志失败 name=%s: %v", name, err)
+		log.Printf("Failed to clear software log name=%s: %v", name, err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.T(lang, "software.clear_failed")))
 		return
 	}
@@ -185,7 +185,7 @@ func (h *SoftwareHandler) GuardAction(c *gin.Context) {
 		return
 	}
 	if err := executor.SetServiceState(req.Service, req.Action); err != nil {
-		log.Printf("守护操作失败 service=%s action=%s: %v", req.Service, req.Action, err)
+		log.Printf("Daemon operation failed service=%s action=%s: %v", req.Service, req.Action, err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.T(lang, "software.operation_failed_with_error", i18n.P{"error": err.Error()})))
 		return
 	}
@@ -295,7 +295,7 @@ func (h *SoftwareHandler) SaveConfig(c *gin.Context) {
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		if req.Name == "PHP" {
 			if _, err := executor.EnsurePHPRuntimeConfigFile(); err != nil {
-				log.Printf("创建 PHP 配置文件失败: %v", err)
+				log.Printf("Failed to create PHP config file: %v", err)
 				c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.T(lang, "software.create_php_config_failed")))
 				return
 			}
@@ -363,7 +363,7 @@ func (h *SoftwareHandler) SaveConfig(c *gin.Context) {
 	// Reload
 	if req.Name == "PHP" && phpConfigRequiresPoolRebuild(req.Key) {
 		if err := executor.RegenerateAllSitesFPM(); err != nil {
-			log.Printf("PHP 配置已写入，但部分站点 PHP-FPM Pool 重建失败: %v", err)
+			log.Printf("PHP config written, but some site PHP-FPM Pool rebuild failed: %v", err)
 			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.T(lang, "software.php_pool_rebuild_failed", i18n.P{"error": err.Error()})))
 			return
 		}
@@ -452,7 +452,7 @@ func replaceIniValue(content, key, value string) string {
 		}
 	}
 	if !found {
-		lines = append(lines, "", "; WP Panel — WordPress 优化", key+" = "+value)
+		lines = append(lines, "", "; WP Panel — WordPress optimization", key+" = "+value)
 	}
 	return strings.Join(lines, "\n")
 }

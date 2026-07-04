@@ -109,7 +109,7 @@ type ExecResult struct {
 
 func Execute(binary string, args ...string) (*ExecResult, error) {
 	if !IsCommandAllowed(binary, args) {
-		return nil, fmt.Errorf("命令 %s 不在白名单中", binary)
+		return nil, fmt.Errorf("Command %s is not in the whitelist", binary)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -129,16 +129,16 @@ func Execute(binary string, args ...string) (*ExecResult, error) {
 
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("命令 %s 执行超时(30秒)", binary)
+			return nil, fmt.Errorf("Command %s execution timed out (30s)", binary)
 		}
 		result.ExitCode = 1
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			result.ExitCode = exitErr.ExitCode()
 		}
 		if result.Stderr != "" {
-			log.Printf("命令 %s stderr: %s", binary, result.Stderr)
+			log.Printf("Command %s stderr: %s", binary, result.Stderr)
 		}
-		return result, fmt.Errorf("命令 %s 执行失败", binary)
+		return result, fmt.Errorf("Command %s execution failed", binary)
 	}
 
 	return result, nil
@@ -146,7 +146,7 @@ func Execute(binary string, args ...string) (*ExecResult, error) {
 
 func ExecuteWithInput(binary string, input string, args ...string) (*ExecResult, error) {
 	if !IsCommandAllowed(binary, args) {
-		return nil, fmt.Errorf("命令 %s 不在白名单中", binary)
+		return nil, fmt.Errorf("Command %s is not in the whitelist", binary)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -167,12 +167,12 @@ func ExecuteWithInput(binary string, input string, args ...string) (*ExecResult,
 
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("命令 %s 执行超时(30秒)", binary)
+			return nil, fmt.Errorf("Command %s execution timed out (30s)", binary)
 		}
 		if result.Stderr != "" {
-			log.Printf("命令 %s stderr: %s", binary, result.Stderr)
+			log.Printf("Command %s stderr: %s", binary, result.Stderr)
 		}
-		return result, fmt.Errorf("命令 %s 执行失败", binary)
+		return result, fmt.Errorf("Command %s execution failed", binary)
 	}
 
 	return result, nil

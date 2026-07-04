@@ -2,10 +2,10 @@ name = "wp-panel-stats"
 main = "index.js"
 compatibility_date = "2025-01-01"
 
-# Worker 接收面板匿名心跳上报，并提供公开统计 API。
-# 部署前需要先创建 KV namespace：
+# Worker receives panel anonymous heartbeat reports and provides public statistics API.
+# Before deployment, create the KV namespace first:
 #   npx wrangler kv namespace create "STATS_KV"
-# 然后把输出的 id 填入下方双引号内。
+# Then fill in the output id in the double quotes below.
 
 [[kv_namespaces]]
 binding = "STATS_KV"

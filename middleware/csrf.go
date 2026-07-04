@@ -32,7 +32,7 @@ func CSRF() gin.HandlerFunc {
 		if err != nil || cookieToken == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"success": false,
-				"message": "CSRF token 缺失",
+				"message": "CSRF token missing",
 			})
 			return
 		}
@@ -40,7 +40,7 @@ func CSRF() gin.HandlerFunc {
 		if headerToken != cookieToken {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"success": false,
-				"message": "CSRF token 不匹配",
+				"message": "CSRF token mismatch",
 			})
 			return
 		}

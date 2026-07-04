@@ -210,7 +210,7 @@ func TestValidateRestoreBackupFileRejectsSQLWithoutSchema(t *testing.T) {
 	if err == nil {
 		t.Fatal("validateRestoreBackupFile schema-less sql error = nil, want error")
 	}
-	if !strings.Contains(err.Error(), "建表") {
+	if !strings.Contains(err.Error(), "CREATE TABLE") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

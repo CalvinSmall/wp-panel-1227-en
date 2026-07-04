@@ -31,17 +31,17 @@ func FetchLatestPanelRelease(proxy string) (*GithubRelease, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Get(apiURL)
 	if err != nil {
-		return nil, fmt.Errorf("网络请求失败: %w", err)
+		return nil, fmt.Errorf("Network request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API 返回 %d", resp.StatusCode)
+		return nil, fmt.Errorf("GitHub API returned %d", resp.StatusCode)
 	}
 
 	var release GithubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, fmt.Errorf("解析版本信息失败: %w", err)
+		return nil, fmt.Errorf("Failed to parse version info: %w", err)
 	}
 	return &release, nil
 }

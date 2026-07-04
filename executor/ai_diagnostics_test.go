@@ -20,37 +20,37 @@ import (
 )
 
 func TestParseAIReportJSON(t *testing.T) {
-	report, raw, ok := ParseAIReport(`{"summary":"发现 PHP Fatal","risk_level":"high","likely_causes":[],"recommended_actions":[],"needs_more_info":false,"user_friendly_explanation":"请查看错误日志"}`)
+	report, raw, ok := ParseAIReport(`{"summary":"PHP Fatal error found","risk_level":"high","likely_causes":[],"recommended_actions":[],"needs_more_info":false,"user_friendly_explanation":"Please check the error logs"}`)
 	if !ok {
 		t.Fatalf("ParseAIReport() ok = false, raw=%q", raw)
 	}
-	if report.Summary != "发现 PHP Fatal" || report.RiskLevel != "high" {
+	if report.Summary != "PHP Fatal error found" || report.RiskLevel != "high" {
 		t.Fatalf("unexpected report: %#v", report)
 	}
 }
 
 func TestParseAIReportFlexibleStringEvidence(t *testing.T) {
 	report, raw, ok := ParseAIReport(`{
-		"summary": "站点未开启缓存",
+		"summary": "Site does not have caching enabled",
 		"risk_level": "medium",
 		"likely_causes": [
 			{
-				"title": "未启用 FastCGI 缓存且无 WordPress 缓存插件",
+				"title": "FastCGI cache not enabled and no WordPress cache plugin installed",
 				"confidence": "high",
-				"evidence": "fastcgi_cache_enabled 为 false，page_cache_plugins 为空"
+				"evidence": "fastcgi_cache_enabled is false, page_cache_plugins is empty"
 			}
 		],
 		"recommended_actions": [
 			{
-				"label": "启用 FastCGI 缓存",
-				"description": "降低 PHP 动态请求压力",
+				"label": "Enable FastCGI cache",
+				"description": "Reduce PHP dynamic request load",
 				"risk": "low",
-				"manual_steps": "进入网站详情启用 FastCGI 缓存",
-				"panel_action_hint": "网站详情 -> WordPress优化"
+				"manual_steps": "Go to site details and enable FastCGI cache",
+				"panel_action_hint": "Site details -> WordPress optimization"
 			}
 		],
 		"needs_more_info": false,
-		"user_friendly_explanation": "当前缺少缓存。"
+		"user_friendly_explanation": "The site currently lacks caching."
 	}`)
 	if !ok {
 		t.Fatalf("ParseAIReport() ok = false, raw=%q", raw)
@@ -58,7 +58,7 @@ func TestParseAIReportFlexibleStringEvidence(t *testing.T) {
 	if report == nil || len(report.LikelyCauses) != 1 || len(report.LikelyCauses[0].Evidence) != 1 {
 		t.Fatalf("unexpected report causes: %#v", report)
 	}
-	if report.LikelyCauses[0].Evidence[0] != "fastcgi_cache_enabled 为 false，page_cache_plugins 为空" {
+	if report.LikelyCauses[0].Evidence[0] != "fastcgi_cache_enabled is false, page_cache_plugins is empty" {
 		t.Fatalf("evidence = %#v", report.LikelyCauses[0].Evidence)
 	}
 	if len(report.RecommendedActions) != 1 || len(report.RecommendedActions[0].ManualSteps) != 1 {
@@ -136,7 +136,7 @@ func TestAIExtractChatContentReportsNonJSONPreview(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !strings.Contains(err.Error(), "响应片段：<html><title>Proxy Error</title></html>") {
+	if !strings.Contains(err.Error(), "response snippet: <html><title>Proxy Error</title></html>") {
 		t.Fatalf("error = %q", err.Error())
 	}
 }
@@ -228,7 +228,7 @@ func TestBuildAIDiagnosticPromptIncludesWPConfigSyntaxError(t *testing.T) {
 		return &ExecResult{
 			Stderr:   "PHP Parse error: syntax error, unexpected end of file in " + path + " on line 12\nErrors parsing " + path,
 			ExitCode: 255,
-		}, errors.New("命令 php 执行失败")
+		}, errors.New("php command execution failed")
 	}
 	t.Cleanup(func() { aiRunPHPLint = oldRunPHPLint })
 
@@ -254,7 +254,7 @@ func TestBuildAIDiagnosticPromptIncludesWPConfigSyntaxError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildAIDiagnosticPrompt() error = %v", err)
 	}
-	for _, want := range []string{`"php_syntax_check"`, `"ok": false`, "PHP Parse error", "wp-config.php PHP 语法检查失败"} {
+	for _, want := range []string{`"php_syntax_check"`, `"ok": false`, "PHP Parse error", "wp-config.php PHP syntax check failed"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt missing %q:\n%s", want, prompt)
 		}
@@ -311,7 +311,7 @@ func TestAICodeSuspectsDetectsActiveThemeWPDie(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := string(data)
-	for _, want := range []string{"wp_die(", "wp-content/themes/demo-theme/functions.php", "顶层 wp_die"} {
+	for _, want := range []string{"wp_die(", "wp-content/themes/demo-theme/functions.php", "Top-level wp_die"} {
 		if !strings.Contains(raw, want) {
 			t.Fatalf("code suspects missing %q:\n%s", want, raw)
 		}
@@ -377,7 +377,7 @@ func TestAIPromptWithinBudgetPreservesHighCodeSuspect(t *testing.T) {
 	}
 	ctx := aiDiagnosticContext{
 		DiagnosisType:  models.AIDiagnosisSite500,
-		DiagnosisLabel: "网站 500 / 白屏",
+		DiagnosisLabel: "Site 500 / White Screen",
 		PanelContext:   aiPanelContext(),
 		SiteSummary:    map[string]interface{}{"domain": "example.com"},
 		LocalChecks:    map[string]interface{}{"has_hits": true},
@@ -399,7 +399,7 @@ func TestAIPromptWithinBudgetPreservesHighCodeSuspect(t *testing.T) {
 					"line":     12,
 					"pattern":  "wp_die(",
 					"severity": "high",
-					"reason":   "文件中存在顶层 wp_die 调用，可能直接终止 WordPress 请求并造成白屏/500",
+					"reason":   "Top-level wp_die call in file may directly terminate WordPress request causing white screen / 500",
 					"snippet":  strings.Repeat("wp_die();\n", 200),
 				},
 				{
@@ -408,7 +408,7 @@ func TestAIPromptWithinBudgetPreservesHighCodeSuspect(t *testing.T) {
 					"line":     8,
 					"pattern":  "include/require",
 					"severity": "low",
-					"reason":   "低风险 include 线索",
+					"reason":   "Low-risk include clue",
 					"snippet":  strings.Repeat("require 'optional.php';\n", 200),
 				},
 			},
@@ -420,8 +420,8 @@ func TestAIPromptWithinBudgetPreservesHighCodeSuspect(t *testing.T) {
 			},
 		},
 		RecentPanelOperations: []map[string]string{
-			{"operation": "wp_optimizations", "message": strings.Repeat("保存优化 ", 100)},
-			{"operation": "set_cdn_realip", "message": strings.Repeat("保存 CDN ", 100)},
+			{"operation": "wp_optimizations", "message": strings.Repeat("Save optimization ", 100)},
+			{"operation": "set_cdn_realip", "message": strings.Repeat("Save CDN ", 100)},
 		},
 		Constraints:  map[string]interface{}{"phase": "readonly_diagnosis"},
 		OutputSchema: aiOutputSchema(),
@@ -462,12 +462,12 @@ func TestBuildAIDiagnosticPromptIncludesWPPanelBoundaries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildAIDiagnosticPrompt() error = %v", err)
 	}
-	for _, want := range []string{"宝塔面板", "1Panel", "cPanel", "Plesk", "WP Panel 的实际产品能力", "不要把它表述为“服务未宕机”", "软件管理", "context=conditional_block", "不要编造“仪表盘 -> 监控设置”"} {
+	for _, want := range []string{"BT Panel", "1Panel", "cPanel", "Plesk", "WP Panel's actual product capabilities", 		"Do not describe it as 'service is not down'", "Software Management", "context=conditional_block", "Do not fabricate non-existent entries like 'Dashboard -> Monitoring Settings'"} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Fatalf("system prompt missing %q:\n%s", want, systemPrompt)
 		}
 	}
-	for _, want := range []string{"panel_context", "仪表盘", "网站管理 -> 对应站点 -> 详情", "网站详情 -> 基本信息 -> 文件管理", "网站详情 -> 网站监控", "软件管理", "不要声称已经完成运行状态检查", "不要写“登录宝塔面板”", "WP Panel 没有这个入口", "不是资源监控或性能数据采集开关"} {
+	for _, want := range []string{"panel_context", "Dashboard", "Website Management -> Site -> Details", "Site Details -> Basic Info -> File Management", "Site Details -> Website Monitoring", "Software Management", "do not claim to have completed runtime status checks", "Do not write 'Log in to BT Panel'", "WP Panel does not have this entry", "not a resource monitoring or performance data collection toggle"} {
 		if !strings.Contains(userPrompt, want) {
 			t.Fatalf("user prompt missing %q:\n%s", want, userPrompt)
 		}
@@ -558,7 +558,7 @@ func TestBuildAIDiagnosticPromptIncludesPerformanceSummary(t *testing.T) {
 			t.Fatalf("performance prompt missing %q:\n%s", want, userPrompt)
 		}
 	}
-	if !strings.Contains(systemPrompt, "不要把性能问题默认当成 500 或服务宕机") {
+	if !strings.Contains(systemPrompt, "do not default performance issues to 500 or service downtime") {
 		t.Fatalf("system prompt missing performance rule:\n%s", systemPrompt)
 	}
 }
@@ -601,9 +601,9 @@ func TestBuildAIDiagnosticPromptForbidsPageCachePluginWhenFastCGIEnabled(t *test
 		t.Fatalf("BuildAIDiagnosticPrompt() error = %v", err)
 	}
 	for _, want := range []string{
-		"不能建议安装或启用 WordPress 页面缓存插件",
-		"例如 WP Super Cache",
-		"验证 FastCGI 缓存命中",
+		"do not suggest installing or enabling WordPress page cache plugins",
+		"such as WP Super Cache",
+		"verifying FastCGI cache hits",
 	} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Fatalf("system prompt missing %q:\n%s", want, systemPrompt)
@@ -612,10 +612,10 @@ func TestBuildAIDiagnosticPromptForbidsPageCachePluginWhenFastCGIEnabled(t *test
 	for _, want := range []string{
 		`"fastcgi_cache_enabled": true`,
 		"cache_recommendation_policy",
-		"WP Panel FastCGI 缓存已开启时，不要建议安装或启用 WordPress 页面缓存插件。",
-		"WP Super Cache 页面缓存",
-		"验证 X-FastCGI-Cache 是否命中",
-		"检查 FastCGI 缓存 TTL、清理机制和绕过规则",
+		"If fastcgi_cache_enabled=true, do not suggest installing or enabling WordPress page cache plugins;",
+		"WP Super Cache page caching",
+		"Verify whether X-FastCGI-Cache is hitting",
+		"Check FastCGI cache TTL, cleanup mechanisms, and bypass rules",
 	} {
 		if !strings.Contains(userPrompt, want) {
 			t.Fatalf("user prompt missing %q:\n%s", want, userPrompt)
@@ -655,13 +655,13 @@ func TestBuildAIDiagnosticPromptIncludesCurrentHTTPChecksOverHistorical5xx(t *te
 		`"status_code": 200`,
 		`"status_code": 302`,
 		"access_5xx",
-		"不能单独证明当前仍然 500",
+		"cannot alone prove the current site is still returning 500",
 	} {
 		if !strings.Contains(userPrompt, want) {
 			t.Fatalf("prompt missing %q:\n%s", want, userPrompt)
 		}
 	}
-	if !strings.Contains(systemPrompt, "不要声称“当前网站 500”") {
+	if !strings.Contains(systemPrompt, "do not claim 'current site is 500'") {
 		t.Fatalf("system prompt missing current HTTP rule:\n%s", systemPrompt)
 	}
 }
@@ -691,29 +691,29 @@ func TestBuildAIFollowupPromptIncludesConversationAndCurrentContext(t *testing.T
 		Symptom:   models.AIDiagnosisSite500,
 		Status:    models.AISessionCompleted,
 		RiskLevel: "high",
-		Summary:   "之前发现 500",
+		Summary:   "Previously found 500",
 		Report: &models.AIDiagnosticReport{
-			Summary: "主题 functions.php 有 wp_die",
+			Summary: "Theme functions.php has wp_die",
 		},
 	}
 	messages := []models.AIMessage{
-		{Role: "assistant", Content: "建议开启调试模式", CreatedAt: time.Now()},
-		{Role: "user", Content: "我已经开启了调试模式", CreatedAt: time.Now()},
+		{Role: "assistant", Content: "Suggest enabling debug mode", CreatedAt: time.Now()},
+		{Role: "user", Content: "I have already enabled debug mode", CreatedAt: time.Now()},
 	}
 
-	systemPrompt, userPrompt, err := BuildAIFollowupPrompt(site, session, messages, "你再次检查")
+	systemPrompt, userPrompt, err := BuildAIFollowupPrompt(site, session, messages, "Check again")
 	if err != nil {
 		t.Fatalf("BuildAIFollowupPrompt() error = %v", err)
 	}
 	for _, want := range []string{
-		"诊断追问助手",
+		"diagnostic follow-up assistant",
 		"current_site_context",
 		"recent_conversation",
 		"latest_user_message",
-		"你再次检查",
-		"建议开启调试模式",
+		"Check again",
+		"Suggest enabling debug mode",
 		`"status_code": 200`,
-		"用中文直接回答用户本轮反馈，不要输出 JSON",
+		"Respond naturally in concise English. Do not output JSON or use Markdown code blocks.",
 	} {
 		combined := systemPrompt + "\n" + userPrompt
 		if !strings.Contains(combined, want) {
@@ -767,10 +767,10 @@ func stubAIHTTPProbe(t *testing.T, homeStatus, adminStatus int) {
 }
 
 func TestAIOperationLabel(t *testing.T) {
-	if got := aiOperationLabel("wp_optimizations"); got != "WordPress 优化设置" {
+	if got := aiOperationLabel("wp_optimizations"); got != "WordPress optimization settings" {
 		t.Fatalf("wp_optimizations label = %q", got)
 	}
-	if got := aiOperationLabel("set_cdn_realip"); got != "CDN 真实 IP 设置" {
+	if got := aiOperationLabel("set_cdn_realip"); got != "CDN real IP settings" {
 		t.Fatalf("set_cdn_realip label = %q", got)
 	}
 	if got := aiOperationLabel("custom_op"); got != "custom_op" {

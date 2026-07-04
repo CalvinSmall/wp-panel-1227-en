@@ -128,10 +128,10 @@ type aiLogSnippet struct {
 
 func BuildAIDiagnosticPrompt(site *models.Website, symptom string) (systemPrompt, userPrompt string, err error) {
 	if site == nil {
-		return "", "", fmt.Errorf("网站不存在")
+		return "", "", fmt.Errorf("website not found")
 	}
 	if !models.IsValidAIDiagnosisSymptom(symptom) {
-		return "", "", fmt.Errorf("诊断类型无效")
+		return "", "", fmt.Errorf("invalid diagnosis type")
 	}
 
 	ctx := aiDiagnosticContext{
@@ -189,14 +189,14 @@ func BuildAIDiagnosticPrompt(site *models.Website, symptom string) (systemPrompt
 
 func BuildAIFollowupPrompt(site *models.Website, session *models.AISessionDetail, messages []models.AIMessage, userMessage string) (systemPrompt, userPrompt string, err error) {
 	if site == nil {
-		return "", "", fmt.Errorf("网站不存在")
+		return "", "", fmt.Errorf("website not found")
 	}
 	if session == nil || session.ID <= 0 {
-		return "", "", fmt.Errorf("诊断会话不存在")
+		return "", "", fmt.Errorf("diagnostic session not found")
 	}
 	userMessage = strings.TrimSpace(userMessage)
 	if userMessage == "" {
-		return "", "", fmt.Errorf("追问内容不能为空")
+		return "", "", fmt.Errorf("follow-up message cannot be empty")
 	}
 	_, currentContext, err := BuildAIDiagnosticPrompt(site, session.Symptom)
 	if err != nil {
@@ -226,12 +226,12 @@ func BuildAIFollowupPrompt(site *models.Website, session *models.AISessionDetail
 			"no_shell":         true,
 		},
 		"response_rules": []string{
-			"用中文直接回答用户本轮反馈，不要输出 JSON。",
-			"先说明重新检查到的当前状态是否与原诊断不同。",
-			"如果用户说已经完成某个操作，结合 current_site_context 判断是否有新证据；不能凭用户一句话声称已经修复。",
-			"只能建议 WP Panel 中真实存在的入口；没有入口时明确说明当前没有直接入口。",
-			"不要建议执行 shell 命令，不要声称你已经修改文件、数据库或服务。",
-			"给出下一步 1-3 个最具体的排查或处理建议。",
+			"Respond directly to the user's latest feedback in English. Do not output JSON.",
+			"First state whether the current rechecked status differs from the original diagnosis.",
+			"If the user says they have completed an action, cross-reference current_site_context for new evidence; do not accept a user's claim of fixing something at face value.",
+			"Only suggest real entries that exist in WP Panel; if no entry exists, explicitly state there is no direct entry available.",
+			"Do not suggest shell commands, and do not claim to have modified files, databases, or services.",
+			"Provide 1-3 of the most specific next troubleshooting or remediation suggestions.",
 		},
 	}
 	data, err := aiMarshalMap(ctx)
@@ -253,12 +253,12 @@ func BuildAIFollowupPrompt(site *models.Website, session *models.AISessionDetail
 
 func aiFollowupSystemPrompt() string {
 	return strings.Join([]string{
-		"你是 WP Panel 的 WordPress 诊断追问助手，正在同一个 AI 诊断会话中继续排查。",
-		"你必须基于 original_session、recent_conversation、latest_user_message 和 current_site_context 回答。",
-		"current_site_context 是本轮重新采集的当前状态，优先级高于 original_session 中的旧结论和历史日志。",
-		"不要编造 WP Panel 不存在的入口；只能使用 panel_context.known_panel_entries 中的真实入口，且避开 forbidden_panel_entries。",
-		"不要建议 shell 命令，不要声称已执行修复，不要要求用户提供密码、API Key、SSL 私钥或数据库密码。",
-		"用简洁中文自然回复，不要输出 JSON，不要使用 Markdown 代码块。",
+		"You are the WP Panel WordPress diagnostic follow-up assistant, continuing to troubleshoot within the same AI diagnostic session.",
+		"You must answer based on original_session, recent_conversation, latest_user_message, and current_site_context.",
+		"current_site_context is the freshly collected current state for this round and takes priority over older conclusions and historical logs in original_session.",
+		"Do not fabricate WP Panel entries that do not exist; only use real entries from panel_context.known_panel_entries and avoid forbidden_panel_entries.",
+		"Do not suggest shell commands, do not claim to have performed fixes, and do not ask the user for passwords, API keys, SSL private keys, or database passwords.",
+		"Respond naturally in concise English. Do not output JSON or use Markdown code blocks.",
 	}, "\n")
 }
 
@@ -302,7 +302,7 @@ func aiPromptWithinBudget(ctx *aiDiagnosticContext) (string, error) {
 
 func aiPromptWithinBudgetLimit(ctx *aiDiagnosticContext, limit int) (string, error) {
 	if ctx == nil {
-		return "", fmt.Errorf("AI 诊断上下文为空")
+		return "", fmt.Errorf("AI diagnostic context is empty")
 	}
 	marshal := func() (string, error) {
 		data, err := aiMarshalDiagnosticContext(*ctx)
@@ -325,29 +325,29 @@ func aiPromptWithinBudgetLimit(ctx *aiDiagnosticContext, limit int) (string, err
 	}
 	steps := []budgetStep{
 		{
-			note: fmt.Sprintf("Prompt 超过 %d 字符，日志片段已进一步截断。", limit),
+			note: fmt.Sprintf("Prompt exceeds %d characters; log snippets further truncated.", limit),
 			run:  func() { aiShrinkLogs(ctx.Logs, 1200) },
 		},
 		{
-			note: "已压缩低风险代码片段和最近 PHP 文件列表以控制上下文长度。",
+			note: "Compressed low-risk code snippets and recent PHP file list to control context length.",
 			run: func() {
 				aiTrimCodeSuspectSnippets(ctx.CodeSuspects, false, 320)
 				aiLimitRecentPHPFiles(ctx.CodeSuspects, 4)
 			},
 		},
 		{
-			note: "已缩减近期面板操作记录数量。",
+			note: "Reduced recent panel operations record count.",
 			run:  func() { ctx.RecentPanelOperations = aiLimitStringMapSlice(ctx.RecentPanelOperations, 8) },
 		},
 		{
-			note: "已压缩 debug.log 摘要和低优先级日志。",
+			note: "Compressed debug.log summary and low-priority logs.",
 			run: func() {
 				aiTrimDebugLog(ctx.CodeSuspects, 30, 1200)
-				aiClearLogLines(ctx.Logs, []string{"wp_security", "access_5xx"}, "因上下文预算限制未发送该日志片段")
+				aiClearLogLines(ctx.Logs, []string{"wp_security", "access_5xx"}, "Log snippet not sent due to context budget limit")
 			},
 		},
 		{
-			note: "已进一步压缩代码疑点，只保留最高优先级证据。",
+			note: "Further compressed code suspects, keeping only highest priority evidence.",
 			run: func() {
 				aiLimitCodeSuspects(ctx.CodeSuspects, 4)
 				aiTrimCodeSuspectSnippets(ctx.CodeSuspects, true, 260)
@@ -355,11 +355,11 @@ func aiPromptWithinBudgetLimit(ctx *aiDiagnosticContext, limit int) (string, err
 			},
 		},
 		{
-			note: "已清空全部日志正文，只保留日志状态和本地检查结果。",
-			run:  func() { aiClearAllLogLines(ctx.Logs, "因上下文预算限制未发送日志正文") },
+			note: "Cleared all log bodies, keeping only log status and local check results.",
+			run:  func() { aiClearAllLogLines(ctx.Logs, "Log body not sent due to context budget limit") },
 		},
 		{
-			note: "已移除低优先级代码列表和 debug.log 正文，只保留代码疑点摘要。",
+			note: "Removed low-priority code list and debug.log body, keeping only code suspect summary.",
 			run: func() {
 				aiLimitRecentPHPFiles(ctx.CodeSuspects, 0)
 				aiTrimDebugLog(ctx.CodeSuspects, 0, 0)
@@ -367,11 +367,11 @@ func aiPromptWithinBudgetLimit(ctx *aiDiagnosticContext, limit int) (string, err
 			},
 		},
 		{
-			note: "已使用精简输出 schema 和面板上下文以满足上下文预算。",
+			note: "Used compact output schema and panel context to meet context budget.",
 			run: func() {
 				ctx.PanelContext = map[string]interface{}{
 					"product_name": "WP Panel",
-					"scope":        "WordPress 专用服务器管理面板；不要引用其他面板入口。",
+					"scope":        "WordPress-dedicated server management panel; do not reference other panel entries.",
 				}
 				ctx.OutputSchema = aiCompactOutputSchema()
 				ctx.RecentPanelOperations = nil
@@ -403,7 +403,7 @@ func aiMarshalDiagnosticContext(ctx aiDiagnosticContext) ([]byte, error) {
 
 func CallAIChat(ctx context.Context, settings *models.AISettings, systemPrompt, userPrompt string) (string, int64, error) {
 	if settings == nil {
-		return "", 0, &AIProviderError{Type: "bad_config", Message: "AI 设置不存在"}
+		return "", 0, &AIProviderError{Type: "bad_config", Message: "AI settings not found"}
 	}
 	endpoint, err := aiChatEndpoint(settings.BaseURL)
 	if err != nil {
@@ -419,7 +419,7 @@ func CallAIChat(ctx context.Context, settings *models.AISettings, systemPrompt, 
 		Stream:      false,
 	}
 	if reqBody.Model == "" {
-		return "", 0, &AIProviderError{Type: "bad_config", Message: "模型不能为空"}
+		return "", 0, &AIProviderError{Type: "bad_config", Message: "Model cannot be empty"}
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -444,9 +444,9 @@ func CallAIChat(ctx context.Context, settings *models.AISettings, systemPrompt, 
 		elapsed := time.Since(start).Milliseconds()
 		if err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) || strings.Contains(strings.ToLower(err.Error()), "timeout") {
-				return "", elapsed, &AIProviderError{Type: "timeout", Message: "AI 服务请求超时"}
+				return "", elapsed, &AIProviderError{Type: "timeout", Message: "AI service request timed out"}
 			}
-			return "", elapsed, &AIProviderError{Type: "network_error", Message: "无法连接 AI 服务: " + err.Error()}
+			return "", elapsed, &AIProviderError{Type: "network_error", Message: "Cannot connect to AI service: " + err.Error()}
 		}
 
 		respData, _ := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
@@ -472,7 +472,7 @@ func CallAIChat(ctx context.Context, settings *models.AISettings, systemPrompt, 
 			return "", elapsed, err
 		}
 		if strings.TrimSpace(content) == "" {
-			lastErr = &AIProviderError{Type: "empty_response", Message: "AI 服务返回空内容"}
+			lastErr = &AIProviderError{Type: "empty_response", Message: "AI service returned empty content"}
 			if attempt < aiProviderMaxRetries && aiSleepWithContext(ctx, aiProviderRetryDelay) == nil {
 				req, err = http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 				if err != nil {
@@ -511,8 +511,8 @@ func aiSleepWithContext(ctx context.Context, d time.Duration) error {
 }
 
 func TestAISettings(ctx context.Context, settings *models.AISettings) (int64, string, error) {
-	system := "你是 WP Panel 的 AI 连接测试助手。"
-	user := `请只返回 JSON：{"ok":true}`
+	system := "You are the WP Panel AI connection test assistant."
+	user := `Please return only JSON: {"ok":true}`
 	content, elapsed, err := CallAIChat(ctx, settings, system, user)
 	if err != nil {
 		return elapsed, "", err
@@ -658,9 +658,9 @@ func aiExtractChatContent(data []byte) (string, error) {
 		}
 		preview := aiResponsePreview(data, 240)
 		if preview != "" {
-			return "", &AIProviderError{Type: "bad_response", Message: "AI 服务返回的不是有效 JSON，响应片段：" + preview}
+			return "", &AIProviderError{Type: "bad_response", Message: "AI service returned invalid JSON, response snippet: " + preview}
 		}
-		return "", &AIProviderError{Type: "bad_response", Message: "AI 服务返回的不是有效 JSON"}
+		return "", &AIProviderError{Type: "bad_response", Message: "AI service returned invalid JSON"}
 	}
 	if parsed.Error != nil && parsed.Error.Message != "" {
 		return "", &AIProviderError{Type: "provider_error", Message: parsed.Error.Message}
@@ -676,7 +676,7 @@ func aiExtractChatContent(data []byte) (string, error) {
 	if ok && strings.TrimSpace(content) != "" {
 		return strings.TrimSpace(content), nil
 	}
-	return "", &AIProviderError{Type: "bad_response", Message: "AI 服务响应中未找到可用文本内容"}
+	return "", &AIProviderError{Type: "bad_response", Message: "No usable text content found in AI service response"}
 }
 
 func aiExtractSSEContent(data []byte) (string, bool) {
@@ -796,108 +796,108 @@ func aiResponsePreview(data []byte, maxRunes int) string {
 
 func aiSystemPrompt() string {
 	return strings.Join([]string{
-		"你是 WP Panel 的 WordPress 站点级诊断助手。你只能分析输入中的站点摘要、日志摘要和检查结果。",
-		"你必须以 WP Panel 的实际产品能力作答，不能引用或编造宝塔面板、BT Panel、aaPanel、1Panel、cPanel、Plesk 等其他面板的菜单、按钮、路径或操作方式。",
-		"如果建议管理员在面板中操作，只能使用 user prompt 中 panel_context.known_panel_entries 列出的 WP Panel 入口；如果没有对应入口，请明确说明“WP Panel 当前没有直接入口，需要通过文件管理或人工处理”。",
-		"不要编造“仪表盘 -> 监控设置”“开启站点资源监控”等不存在的入口。WP Panel 的仪表盘只展示资源图表和站点资源排行；网站详情的“网站监控”只做 HTTP 可用性监控，不是性能资源采集开关。",
-		"service_checks 只表示站点配置文件、网站目录和日志目录是否存在，不代表 Nginx、PHP-FPM 或 MariaDB 服务正在运行；不要把它表述为“服务未宕机”。如果需要确认服务状态，可以建议管理员到“软件管理”页查看服务状态。",
-		"current_http_checks 是本次诊断即时发起的 HTTP 探测，优先级高于历史 access_5xx 日志。若 current_http_checks.home 和 wp_admin 均不是 5xx，不要声称“当前网站 500”；只能说历史日志曾出现 5xx，当前探测未复现。",
-		"code_suspects 是面板只读扫描当前启用主题、启用插件和少量高价值文件得到的证据。若 code_suspects 中存在 high 且有文件行号，应优先作为可能原因；不要要求用户再手动查同一处证据。",
-		"code_suspects 中 context=conditional_block 的 die/wp_die/exit 表示位于条件代码块内，通常只作为低优先级线索；除非日志或请求条件能直接对应，不要把它写成主要原因。",
-		"当 diagnosis_profile.profile=performance 时，优先分析 performance_summary 中的服务器负载、站点 PHP-FPM 资源占用、WP Panel FastCGI 缓存状态、活跃插件结构和缓存插件冲突；不要把性能问题默认当成 500 或服务宕机。",
-		"如果 site_summary.fastcgi_cache_enabled=true，不能建议安装或启用 WordPress 页面缓存插件，例如 WP Super Cache、W3 Total Cache、WP Fastest Cache、Cache Enabler、WP Rocket 页面缓存等功能；应建议验证 FastCGI 缓存命中、清理机制、绕过规则，并排查对象缓存、主题插件、数据库查询、图片资源和外部请求。",
-		"recent_panel_operations 是面板操作审计线索，不是故障原因结论。只有操作类型、时间和日志证据能直接对应时，才可作为可能原因；不要把 CDN 真实 IP、SSL、备份等无直接证据的近期操作表述为原因。",
-		"不要声称已经修改服务器。不要建议任意 shell 命令。不要输出需要 root 权限的操作。",
-		"不要要求用户提供密码、API Key、SSL 私钥或面板数据库。",
-		"对每个结论给出证据，不确定时降低置信度。",
-		"请用中文返回 JSON 对象，字段必须包含 summary、risk_level、likely_causes、recommended_actions、needs_more_info、user_friendly_explanation。",
-		"不要包含 Markdown 代码块，不要输出 JSON 以外的文字。",
+		"You are the WP Panel WordPress site-level diagnostic assistant. You may only analyze the site summary, log summaries, and check results provided in the input.",
+		"You must answer based on WP Panel's actual product capabilities. You must not reference or fabricate menus, buttons, paths, or operations from BT Panel, aaPanel, 1Panel, cPanel, Plesk, or any other panel.",
+		"If suggesting the administrator operate in the panel, only use WP Panel entries listed in panel_context.known_panel_entries from the user prompt; if no corresponding entry exists, explicitly state 'WP Panel currently has no direct entry for this; please use file management or manual processing'.",
+		"Do not fabricate non-existent entries like 'Dashboard -> Monitoring Settings' or 'Enable site resource monitoring'. WP Panel's dashboard only shows resource charts and site resource rankings; the 'Website Monitoring' in site details only performs HTTP availability monitoring, not a performance resource collection toggle.",
+		"service_checks only indicates whether the site config file, website directory, and log directory exist; it does not mean Nginx, PHP-FPM, or MariaDB services are running. Do not describe it as 'service is not down'. To confirm service status, suggest the administrator check the service status on the 'Software Management' page.",
+		"current_http_checks are real-time HTTP probes initiated during this diagnosis and take priority over historical access_5xx logs. If current_http_checks.home and wp_admin are not 5xx, do not claim 'current site is 500'; only state that historical logs previously showed 5xx but current probes did not reproduce it.",
+		"code_suspects are evidence from read-only scans of currently active themes, active plugins, and a few high-value files by the panel. If code_suspects has high severity with file line numbers, prioritize it as a likely cause; do not ask the user to manually check the same evidence again.",
+		"code_suspects with context=conditional_block for die/wp_die/exit indicates they are inside conditional code blocks, usually only low-priority clues; unless logs or request conditions directly correspond, do not write them as primary causes.",
+		"When diagnosis_profile.profile=performance, prioritize analyzing server load, site PHP-FPM resource usage, WP Panel FastCGI cache status, active plugin structure, and cache plugin conflicts in performance_summary; do not default performance issues to 500 or service downtime.",
+		"If site_summary.fastcgi_cache_enabled=true, do not suggest installing or enabling WordPress page cache plugins such as WP Super Cache, W3 Total Cache, WP Fastest Cache, Cache Enabler, WP Rocket page caching, etc.; instead suggest verifying FastCGI cache hits, cleanup mechanisms, bypass rules, and troubleshooting object cache, theme/plugin code, database queries, image resources, and external HTTP requests.",
+		"recent_panel_operations are panel operation audit trails, not fault cause conclusions. Only when operation type, time, and log evidence directly correspond can they be considered as likely causes; do not state CDN real IP, SSL, backup, or other recent operations without direct evidence as causes.",
+		"Do not claim to have modified the server. Do not suggest arbitrary shell commands. Do not output operations requiring root privileges.",
+		"Do not ask the user for passwords, API keys, SSL private keys, or panel database.",
+		"Provide evidence for each conclusion; reduce confidence when uncertain.",
+		"Return a JSON object in English. Fields must include summary, risk_level, likely_causes, recommended_actions, needs_more_info, user_friendly_explanation.",
+		"Do not include Markdown code blocks, and do not output text other than JSON.",
 	}, "\n")
 }
 
 func aiPanelContext() map[string]interface{} {
 	return map[string]interface{}{
 		"product_name": "WP Panel",
-		"scope":        "WordPress 专用服务器管理面板，不是宝塔面板、1Panel、cPanel 或通用 Linux 面板。",
+		"scope":        "WordPress-dedicated server management panel, not BT Panel, 1Panel, cPanel, or a generic Linux panel.",
 		"answer_rules": []string{
-			"推荐操作必须使用 WP Panel 的真实页面和按钮名称。",
-			"不要写“登录宝塔面板”“进入宝塔网站设置”“软件商店”等其他面板文案。",
-			"不要写“仪表盘 -> 监控设置”“开启站点资源监控”；WP Panel 没有这个入口。",
-			"网站详情的“网站监控”只用于定期检测网站 HTTP 可用性和告警，不是服务器资源监控开关。",
-			"不知道 WP Panel 是否有某个入口时，不要猜测菜单路径。",
-			"不要建议执行 shell 命令；Phase 1 只提供诊断和人工修复建议。",
+			"Recommended operations must use WP Panel's actual page and button names.",
+			"Do not write 'Log in to BT Panel', 'Go to BT site settings', 'Software Store', or other panel-specific text.",
+			"Do not write 'Dashboard -> Monitoring Settings' or 'Enable site resource monitoring'; WP Panel does not have this entry.",
+			"'Website Monitoring' in site details is only for periodic HTTP availability checks and alerts, not a server resource monitoring toggle.",
+			"When unsure whether WP Panel has a certain entry, do not guess the menu path.",
+			"Do not suggest executing shell commands; Phase 1 only provides diagnostic and manual fix suggestions.",
 		},
 		"forbidden_panel_entries": []string{
-			"仪表盘 -> 监控设置",
-			"WP Panel 仪表盘 -> 监控设置",
-			"开启站点资源监控",
-			"开启资源监控",
+			"Dashboard -> Monitoring Settings",
+			"WP Panel Dashboard -> Monitoring Settings",
+			"Enable site resource monitoring",
+			"Enable resource monitoring",
 		},
 		"known_panel_entries": []map[string]string{
 			{
-				"page":        "仪表盘",
-				"entry":       "仪表盘",
-				"description": "查看服务器 CPU、内存、负载趋势和站点资源排行；这里只能查看，不能开启资源监控。",
+				"page":        "Dashboard",
+				"entry":       "Dashboard",
+				"description": "View server CPU, memory, load trends, and site resource rankings; you can only view here, not enable resource monitoring.",
 			},
 			{
-				"page":        "网站管理",
-				"entry":       "网站管理 -> 对应站点 -> 详情",
-				"description": "查看网站基本信息、数据库、SSL、Nginx 自定义配置、WordPress 优化和网站日志。",
+				"page":        "Website Management",
+				"entry":       "Website Management -> Site -> Details",
+				"description": "View website basic info, database, SSL, Nginx custom config, WordPress optimization, and website logs.",
 			},
 			{
-				"page":        "AI 诊断",
-				"entry":       "AI 诊断 -> 选择网站和问题类型 -> 开始诊断",
-				"description": "发起站点级只读诊断，查看结构化结果和历史诊断记录。",
+				"page":        "AI Diagnostics",
+				"entry":       "AI Diagnostics -> Select site and issue type -> Start diagnosis",
+				"description": "Initiate site-level read-only diagnostics, view structured results and historical diagnosis records.",
 			},
 			{
-				"page":        "网站详情",
-				"entry":       "网站详情 -> 基本信息 -> 文件管理",
-				"description": "进入该站点的网站根目录，查看或编辑 wp-config.php、主题、插件等站点文件。",
+				"page":        "Site Details",
+				"entry":       "Site Details -> Basic Info -> File Management",
+				"description": "Enter the site's web root directory to view or edit wp-config.php, themes, plugins, and other site files.",
 			},
 			{
-				"page":        "网站详情",
-				"entry":       "网站详情 -> 数据库 -> 同步数据库信息",
-				"description": "用面板记录的数据库名和用户名同步 wp-config.php 中的 DB_NAME、DB_USER，并可同步表前缀。",
+				"page":        "Site Details",
+				"entry":       "Site Details -> Database -> Sync Database Info",
+				"description": "Use the panel-recorded database name and username to sync DB_NAME, DB_USER in wp-config.php, and optionally sync table prefix.",
 			},
 			{
-				"page":        "网站详情",
-				"entry":       "网站详情 -> 数据库 -> 修改密码",
-				"description": "修改该站点数据库用户密码；WordPress 站点需要同步 wp-config.php。",
+				"page":        "Site Details",
+				"entry":       "Site Details -> Database -> Change Password",
+				"description": "Change the site's database user password; WordPress sites need to sync wp-config.php.",
 			},
 			{
-				"page":        "网站详情",
-				"entry":       "网站详情 -> 数据库 -> 修改站点URL",
-				"description": "修改 WordPress 数据库中的 siteurl 和 home。",
+				"page":        "Site Details",
+				"entry":       "Site Details -> Database -> Change Site URL",
+				"description": "Modify siteurl and home in the WordPress database.",
 			},
 			{
-				"page":        "网站详情",
-				"entry":       "网站详情 -> 网站日志",
-				"description": "查看访问日志、错误日志和 WordPress 安全日志。",
+				"page":        "Site Details",
+				"entry":       "Site Details -> Website Logs",
+				"description": "View access logs, error logs, and WordPress security logs.",
 			},
 			{
-				"page":        "网站详情",
-				"entry":       "网站详情 -> 网站监控",
-				"description": "启用或关闭该站点的 HTTP 可用性定时检测和异常告警；不是资源监控或性能数据采集开关。",
+				"page":        "Site Details",
+				"entry":       "Site Details -> Website Monitoring",
+				"description": "Enable or disable HTTP availability periodic checks and anomaly alerts for this site; not a resource monitoring or performance data collection toggle.",
 			},
 			{
-				"page":        "网站详情",
-				"entry":       "网站详情 -> Nginx 自定义配置",
-				"description": "编辑 pre.conf 和 .conf 自定义片段，并由面板校验后生效。",
+				"page":        "Site Details",
+				"entry":       "Site Details -> Nginx Custom Config",
+				"description": "Edit pre.conf and .conf custom snippets, which take effect after panel validation.",
 			},
 			{
-				"page":        "网站详情",
-				"entry":       "网站详情 -> WordPress优化",
-				"description": "管理 WP_DEBUG、XML-RPC、FastCGI 缓存等站点优化项。",
+				"page":        "Site Details",
+				"entry":       "Site Details -> WordPress Optimization",
+				"description": "Manage WP_DEBUG, XML-RPC, FastCGI cache, and other site optimization items.",
 			},
 			{
-				"page":        "文件管理",
-				"entry":       "文件管理 -> 选择站点",
-				"description": "浏览、上传、编辑、删除站点根目录内文件；不要跨站点操作。",
+				"page":        "File Management",
+				"entry":       "File Management -> Select site",
+				"description": "Browse, upload, edit, and delete files in the site root directory; do not operate across sites.",
 			},
 			{
-				"page":        "软件管理",
-				"entry":       "软件管理",
-				"description": "查看 Nginx、PHP-FPM、MariaDB、Redis 等基础服务状态；诊断报告只能建议管理员查看，不要声称已经完成运行状态检查。",
+				"page":        "Software Management",
+				"entry":       "Software Management",
+				"description": "View Nginx, PHP-FPM, MariaDB, Redis, and other base service status; diagnostic reports can only suggest the administrator check, do not claim to have completed runtime status checks.",
 			},
 		},
 	}
@@ -906,17 +906,17 @@ func aiPanelContext() map[string]interface{} {
 func aiDiagnosisLabel(symptom string) string {
 	switch symptom {
 	case models.AIDiagnosisSite500:
-		return "网站 500 / 白屏"
+		return "Site 500 / White Screen"
 	case models.AIDiagnosisWPAdminDown:
-		return "后台打不开"
+		return "Backend inaccessible"
 	case models.AIDiagnosisSSLFailure:
-		return "SSL 失败"
+		return "SSL failure"
 	case models.AIDiagnosisDBConnection:
-		return "数据库连接问题"
+		return "Database connection issue"
 	case models.AIDiagnosisCacheIssue:
-		return "缓存异常"
+		return "Cache anomaly"
 	case models.AIDiagnosisPerformance:
-		return "网站速度慢"
+		return "Slow website"
 	default:
 		return symptom
 	}
@@ -927,25 +927,25 @@ func aiDiagnosisProfile(symptom string) map[string]interface{} {
 		return map[string]interface{}{
 			"profile": "performance",
 			"focus": []string{
-				"服务器整体 CPU、内存和 load 是否异常",
-				"当前站点或同机其他站点的 PHP-FPM 资源占用",
-				"WP Panel 的 Nginx FastCGI 缓存是否开启和是否可能未命中",
-				"WordPress 缓存插件、优化插件、页面构建器或重型插件是否导致冲突或开销过高",
+				"Whether overall server CPU, memory, and load are abnormal",
+				"Current site or co-hosted sites' PHP-FPM resource usage",
+				"Whether WP Panel's Nginx FastCGI cache is enabled and possibly missing hits",
+				"Whether WordPress cache plugins, optimization plugins, page builders, or heavy plugins cause conflicts or excessive overhead",
 			},
 			"answer_rules": []string{
-				"先区分服务器资源瓶颈、同机站点资源争抢、当前站点自身优化问题，再给建议。",
-				"没有性能数据时，可以建议用户到“仪表盘”查看已有资源图表，或到“网站详情 -> 网站日志”查看日志；不要建议开启不存在的资源监控设置。",
-				"缓存异常重点分析 FastCGI 缓存、WordPress 缓存插件和多层缓存冲突；网站速度慢重点分析资源、插件、主题和缓存命中。",
-				"如果 fastcgi_cache_enabled=true，不要再建议安装或启用 WordPress 页面缓存插件；如果已存在页面缓存插件，只能建议检查是否与 FastCGI 缓存重复并按需关闭其页面缓存功能。",
+				"First distinguish between server resource bottlenecks, co-hosted site resource contention, and current site optimization issues, then give recommendations.",
+				"Without performance data, suggest the user check existing resource charts on the 'Dashboard' or view logs at 'Site Details -> Website Logs'; do not suggest enabling non-existent resource monitoring settings.",
+				"Cache anomaly should focus on analyzing FastCGI cache, WordPress cache plugins, and multi-layer cache conflicts; slow website should focus on resources, plugins, themes, and cache hit rates.",
+				"If fastcgi_cache_enabled=true, do not suggest installing or enabling WordPress page cache plugins; if a page cache plugin already exists, only suggest checking if it overlaps with FastCGI cache and disabling its page cache feature as needed.",
 			},
 		}
 	}
 	return map[string]interface{}{
 		"profile": "availability",
 		"focus": []string{
-			"请求是否返回 500、502、503、504 或后台不可访问",
-			"wp-config.php、数据库连接、PHP fatal、主题插件代码和 Nginx/PHP 日志证据",
-			"SSL 或数据库连接问题是否直接导致站点不可用",
+			"Whether requests return 500, 502, 503, 504 or the backend is inaccessible",
+			"wp-config.php, database connection, PHP fatal, theme/plugin code, and Nginx/PHP log evidence",
+			"Whether SSL or database connection issues directly cause site unavailability",
 		},
 	}
 }
@@ -958,26 +958,26 @@ func aiCacheRecommendationPolicy(site *models.Website) map[string]interface{} {
 	if site != nil && site.FCacheEnabled {
 		return map[string]interface{}{
 			"fastcgi_cache_enabled": true,
-			"rule":                  "WP Panel FastCGI 缓存已开启时，不要建议安装或启用 WordPress 页面缓存插件。",
+			"rule":                  "When WP Panel FastCGI cache is enabled, do not suggest installing or enabling WordPress page cache plugins.",
 			"avoid_recommending": []string{
-				"WP Super Cache 页面缓存",
-				"W3 Total Cache 页面缓存",
-				"WP Fastest Cache 页面缓存",
-				"Cache Enabler 页面缓存",
-				"WP Rocket 页面缓存",
-				"任何额外的 WordPress 全页/静态 HTML 页面缓存",
+				"WP Super Cache page caching",
+				"W3 Total Cache page caching",
+				"WP Fastest Cache page caching",
+				"Cache Enabler page caching",
+				"WP Rocket page caching",
+				"Any additional WordPress full-page/static HTML page caching",
 			},
 			"prefer_recommending": []string{
-				"验证 X-FastCGI-Cache 是否命中",
-				"检查 FastCGI 缓存 TTL、清理机制和绕过规则",
-				"检查登录态、后台、购物车、结账页等动态路径是否绕过缓存",
-				"排查对象缓存、慢查询、重型插件、主题代码、图片资源、CDN 和外部 HTTP 请求",
+				"Verify whether X-FastCGI-Cache is hitting",
+				"Check FastCGI cache TTL, cleanup mechanisms, and bypass rules",
+				"Check whether login state, backend, shopping cart, checkout pages, and other dynamic paths bypass the cache",
+				"Troubleshoot object cache, slow queries, heavy plugins, theme code, image resources, CDN, and external HTTP requests",
 			},
 		}
 	}
 	return map[string]interface{}{
 		"fastcgi_cache_enabled": false,
-		"rule":                  "WP Panel FastCGI 缓存未开启时，可优先建议使用 WP Panel 的 FastCGI 缓存；不要默认要求同时叠加多个页面缓存插件。",
+		"rule":                  "When WP Panel FastCGI cache is not enabled, prefer suggesting WP Panel's FastCGI cache; do not default to requiring multiple page cache plugins stacked together.",
 	}
 }
 
@@ -988,14 +988,14 @@ func aiOutputSchema() map[string]interface{} {
 		"likely_causes": []map[string]interface{}{{
 			"title":      "string",
 			"confidence": "low|medium|high",
-			"evidence":   []string{"string，必须是字符串数组，即使只有一条证据也要用数组"},
+			"evidence":   []string{"string, must be a string array even if there is only one piece of evidence"},
 		}},
 		"recommended_actions": []map[string]interface{}{{
 			"label":             "string",
 			"description":       "string",
 			"risk":              "low|medium|high",
-			"manual_steps":      []string{"string，必须是字符串数组，即使只有一步也要用数组"},
-			"panel_action_hint": "string，必须是 WP Panel 真实入口；如果没有入口则为空字符串",
+			"manual_steps":      []string{"string, must be a string array even if there is only one step"},
+			"panel_action_hint": "string, must be a real WP Panel entry; empty string if no entry exists",
 		}},
 		"needs_more_info":           false,
 		"user_friendly_explanation": "string",
@@ -1016,14 +1016,14 @@ func aiCompactOutputSchema() map[string]interface{} {
 func aiReadLogSnippet(logDir, filename string) aiLogSnippet {
 	path := filepath.Join(logDir, filename)
 	if _, err := os.Stat(path); err != nil {
-		return aiLogSnippet{Source: filename, Status: "not_found", Message: "日志不可读或不存在"}
+		return aiLogSnippet{Source: filename, Status: "not_found", Message: "Log unreadable or not found"}
 	}
 	if !aiPathWithin(logDir, path) {
-		return aiLogSnippet{Source: filename, Status: "forbidden", Message: "日志路径越界"}
+		return aiLogSnippet{Source: filename, Status: "forbidden", Message: "Log path escape detected"}
 	}
 	lines, truncated, err := aiTailInterestingLines(path, aiMaxLinesPerLog, aiMaxLogCharsPerFile, false)
 	if err != nil {
-		return aiLogSnippet{Source: filename, Status: "not_found", Message: "日志不可读或不存在"}
+		return aiLogSnippet{Source: filename, Status: "not_found", Message: "Log unreadable or not found"}
 	}
 	return aiLogSnippet{Source: filename, Status: "ok", Lines: lines, Truncated: truncated}
 }
@@ -1031,14 +1031,14 @@ func aiReadLogSnippet(logDir, filename string) aiLogSnippet {
 func aiReadAccess5xxSnippet(logDir string) aiLogSnippet {
 	path := filepath.Join(logDir, "access.log")
 	if _, err := os.Stat(path); err != nil {
-		return aiLogSnippet{Source: "access.log", Status: "not_found", Message: "访问日志不可读或不存在"}
+		return aiLogSnippet{Source: "access.log", Status: "not_found", Message: "Access log unreadable or not found"}
 	}
 	if !aiPathWithin(logDir, path) {
-		return aiLogSnippet{Source: "access.log", Status: "forbidden", Message: "日志路径越界"}
+		return aiLogSnippet{Source: "access.log", Status: "forbidden", Message: "Log path escape detected"}
 	}
 	lines, truncated, err := aiTailInterestingLines(path, aiMaxLinesPerLog, aiMaxLogCharsPerFile, true)
 	if err != nil {
-		return aiLogSnippet{Source: "access.log", Status: "not_found", Message: "访问日志不可读或不存在"}
+		return aiLogSnippet{Source: "access.log", Status: "not_found", Message: "Access log unreadable or not found"}
 	}
 	return aiLogSnippet{Source: "access.log", Status: "ok", Lines: lines, Truncated: truncated}
 }
@@ -1128,17 +1128,17 @@ func aiWPConfigSummary(site *models.Website) map[string]interface{} {
 		"exists":  false,
 	}
 	if site == nil || site.SiteType != "wordpress" {
-		result["message"] = "非 WordPress 站点，未检查 wp-config.php"
+		result["message"] = "Non-WordPress site, wp-config.php not checked"
 		return result
 	}
 	path := filepath.Join(site.WebRoot, "wp-config.php")
 	if !aiPathWithin(site.WebRoot, path) {
-		result["message"] = "wp-config.php 路径越界"
+		result["message"] = "wp-config.php path escape detected"
 		return result
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		result["message"] = "wp-config.php 不存在或不可读"
+		result["message"] = "wp-config.php not found or unreadable"
 		return result
 	}
 	text := string(data)
@@ -1168,15 +1168,15 @@ func aiWPConfigSyntaxCheck(site *models.Website, path string) map[string]interfa
 		"ok":      false,
 	}
 	if site == nil || site.SiteType != "wordpress" {
-		result["message"] = "非 WordPress 站点，未检查 wp-config.php 语法"
+		result["message"] = "Non-WordPress site, wp-config.php syntax not checked"
 		return result
 	}
 	if !aiPathWithin(site.WebRoot, path) {
-		result["message"] = "wp-config.php 路径越界"
+		result["message"] = "wp-config.php path escape detected"
 		return result
 	}
 	if _, err := os.Stat(path); err != nil {
-		result["message"] = "wp-config.php 不存在或不可读"
+		result["message"] = "wp-config.php not found or unreadable"
 		return result
 	}
 
@@ -1184,18 +1184,18 @@ func aiWPConfigSyntaxCheck(site *models.Website, path string) map[string]interfa
 	output := aiSanitizeWPConfigLintOutput(aiLintOutput(lintResult), path)
 	if err != nil {
 		if output == "" {
-			result["message"] = "php -l 检查不可用: " + err.Error()
+			result["message"] = "php -l check unavailable: " + err.Error()
 			return result
 		}
 		result["checked"] = true
-		result["message"] = "wp-config.php PHP 语法检查失败"
+		result["message"] = "wp-config.php PHP syntax check failed"
 		result["output"] = output
 		return result
 	}
 
 	result["checked"] = true
 	result["ok"] = true
-	result["message"] = "wp-config.php PHP 语法检查通过"
+	result["message"] = "wp-config.php PHP syntax check passed"
 	if output != "" {
 		result["output"] = output
 	}
@@ -1259,16 +1259,16 @@ func aiExtractWPConstant(content, name string) string {
 func aiDBCheck(site *models.Website) map[string]interface{} {
 	result := map[string]interface{}{"checked": false}
 	if site == nil || site.SiteType != "wordpress" {
-		result["message"] = "非 WordPress 站点，未检查数据库"
+		result["message"] = "Non-WordPress site, database not checked"
 		return result
 	}
 	if config.AppConfig == nil {
-		result["message"] = "面板配置未初始化"
+		result["message"] = "Panel config not initialized"
 		return result
 	}
 	prefix, err := ReadWPTablePrefix(site.WebRoot)
 	if err != nil {
-		result["message"] = "未能读取表前缀: " + err.Error()
+		result["message"] = "Unable to read table prefix: " + err.Error()
 		return result
 	}
 	result["checked"] = true
@@ -1300,7 +1300,7 @@ func aiServiceChecks(site *models.Website) map[string]interface{} {
 func aiCurrentHTTPChecks(site *models.Website) map[string]interface{} {
 	result := map[string]interface{}{"checked": false}
 	if site == nil {
-		result["message"] = "网站不存在，未执行 HTTP 探测"
+		result["message"] = "Website not found, HTTP probe not executed"
 		return result
 	}
 	baseURL, err := aiSiteProbeBaseURL(site)
@@ -1314,24 +1314,24 @@ func aiCurrentHTTPChecks(site *models.Website) map[string]interface{} {
 	if site.SiteType == "wordpress" {
 		result["wp_admin"] = aiProbeHTTP(aiJoinURLPath(baseURL, "/wp-admin/"))
 	}
-	result["note"] = "本字段为本次诊断即时 HTTP 探测；access_5xx 是历史日志片段，不能单独证明当前仍然 500。"
+	result["note"] = "This field is a real-time HTTP probe during this diagnosis; access_5xx is a historical log snippet and cannot alone prove the current site is still returning 500."
 	return result
 }
 
 func aiSiteProbeBaseURL(site *models.Website) (string, error) {
 	domain := strings.TrimSpace(site.Domain)
 	if domain == "" {
-		return "", fmt.Errorf("网站域名为空，未执行 HTTP 探测")
+		return "", fmt.Errorf("Website domain is empty, HTTP probe not executed")
 	}
 	if strings.Contains(domain, "://") {
 		parsed, err := url.Parse(domain)
 		if err != nil || parsed.Host == "" {
-			return "", fmt.Errorf("网站域名格式异常，未执行 HTTP 探测")
+			return "", fmt.Errorf("Website domain format is abnormal, HTTP probe not executed")
 		}
 		domain = parsed.Host
 	}
 	if strings.ContainsAny(domain, "/?#") {
-		return "", fmt.Errorf("网站域名包含路径或查询参数，未执行 HTTP 探测")
+		return "", fmt.Errorf("Website domain contains path or query parameters, HTTP probe not executed")
 	}
 	scheme := "http"
 	if site.SSLEnabled {
@@ -1366,7 +1366,7 @@ func aiProbeHTTPURL(target string) map[string]interface{} {
 		return result
 	}
 	if resp == nil {
-		result["error"] = "HTTP 探测未返回响应"
+		result["error"] = "HTTP probe did not return a response"
 		return result
 	}
 	defer resp.Body.Close()
@@ -1426,8 +1426,8 @@ func aiPerformanceSummary(site *models.Website) map[string]interface{} {
 		"site_resource_summary":   aiSiteResourceSummary(site),
 		"wordpress_structure":     aiWPPerformanceStructure(site),
 		"limitations": []string{
-			"当前 access.log 使用 combined 格式，不包含 request_time，无法仅凭访问日志证明单个请求耗时。",
-			"当前磁盘 IO 采集仍为占位值，不能把磁盘 IO 高作为已确认原因。",
+			"Current access.log uses combined format without request_time; cannot prove single request latency from access logs alone.",
+			"Current disk IO collection is still a placeholder value; cannot treat high disk IO as a confirmed cause.",
 		},
 	}
 	if site != nil {
@@ -1454,7 +1454,7 @@ func aiServerResourceSummary() map[string]interface{} {
 	}
 	db := database.GetDB()
 	if db == nil {
-		result["message"] = "面板数据库未初始化，无法读取历史监控指标"
+		result["message"] = "Panel database not initialized, cannot read historical monitoring metrics"
 		return result
 	}
 	result["checked"] = true
@@ -1473,7 +1473,7 @@ func aiLatestMonitoringMetric(db *sql.DB, cores int) map[string]interface{} {
 	var recordedAt string
 	err := db.QueryRow(`SELECT cpu_percent, memory_percent, load_avg_1, load_avg_5, load_avg_15, recorded_at FROM monitoring_metrics ORDER BY recorded_at DESC LIMIT 1`).Scan(&cpu, &memory, &load1, &load5, &load15, &recordedAt)
 	if err != nil {
-		item["message"] = "暂无历史监控数据"
+		item["message"] = "No historical monitoring data available"
 		return item
 	}
 	item["available"] = true
@@ -1495,7 +1495,7 @@ func aiMonitoringWindow(db *sql.DB, modifier string, cores int) map[string]inter
 		FROM monitoring_metrics WHERE recorded_at >= datetime('now', ?)`, modifier).Scan(&count, &avgCPU, &maxCPU, &avgMemory, &maxMemory, &avgLoad1, &maxLoad1, &avgLoad5, &maxLoad5)
 	if err != nil || count == 0 {
 		item["sample_count"] = count
-		item["message"] = "该时间窗口暂无监控数据"
+		item["message"] = "No monitoring data available for this time window"
 		return item
 	}
 	item["available"] = true
@@ -1515,11 +1515,11 @@ func aiMonitoringWindow(db *sql.DB, modifier string, cores int) map[string]inter
 func aiCurrentLoadSummary(cores int) map[string]interface{} {
 	data, err := os.ReadFile("/proc/loadavg")
 	if err != nil {
-		return map[string]interface{}{"available": false, "message": "无法读取 /proc/loadavg"}
+		return map[string]interface{}{"available": false, "message": "Cannot read /proc/loadavg"}
 	}
 	fields := strings.Fields(string(data))
 	if len(fields) < 3 {
-		return map[string]interface{}{"available": false, "message": "loadavg 格式异常"}
+		return map[string]interface{}{"available": false, "message": "loadavg format is abnormal"}
 	}
 	load1, _ := strconv.ParseFloat(fields[0], 64)
 	load5, _ := strconv.ParseFloat(fields[1], 64)
@@ -1536,7 +1536,7 @@ func aiCurrentLoadSummary(cores int) map[string]interface{} {
 func aiCurrentMemorySummary() map[string]interface{} {
 	data, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
-		return map[string]interface{}{"available": false, "message": "无法读取 /proc/meminfo"}
+		return map[string]interface{}{"available": false, "message": "Cannot read /proc/meminfo"}
 	}
 	var total, available int64
 	for _, line := range strings.Split(string(data), "\n") {
@@ -1554,7 +1554,7 @@ func aiCurrentMemorySummary() map[string]interface{} {
 		}
 	}
 	if total <= 0 {
-		return map[string]interface{}{"available": false, "message": "内存信息格式异常"}
+		return map[string]interface{}{"available": false, "message": "Memory info format is abnormal"}
 	}
 	used := total - available
 	percent := float64(used) / float64(total) * 100
@@ -1582,7 +1582,7 @@ func aiSiteResourceSummary(site *models.Website) map[string]interface{} {
 	}
 	db := database.GetDB()
 	if db == nil {
-		result["message"] = "面板数据库未初始化，无法读取站点资源占用"
+		result["message"] = "Panel database not initialized, cannot read site resource usage"
 		return result
 	}
 	result["active_site_count"] = aiWebsiteCount(db, "active")
@@ -1613,7 +1613,7 @@ func aiWebsiteCount(db *sql.DB, status string) int {
 func aiCollectPHPSiteResources(db *sql.DB) ([]aiPHPSiteResource, error) {
 	out, err := aiRunProcessList()
 	if err != nil {
-		return nil, fmt.Errorf("读取 PHP-FPM 进程资源失败: %v", err)
+		return nil, fmt.Errorf("Failed to read PHP-FPM process resources: %v", err)
 	}
 	agg := map[string]*aiPHPSiteResource{}
 	for _, line := range strings.Split(string(out), "\n") {
@@ -1684,7 +1684,7 @@ func aiFindSiteResource(resources []aiPHPSiteResource, systemUser, domain string
 	return map[string]interface{}{
 		"found":   false,
 		"domain":  domain,
-		"message": "当前未发现该站点的活跃 php-fpm 进程；可能刚好无请求，或进程采样时未命中。",
+		"message": "No active php-fpm processes found for this site; there may be no requests at the moment, or the process sample did not hit.",
 	}
 }
 
@@ -1701,16 +1701,16 @@ func aiSiteResourceMap(item aiPHPSiteResource) map[string]interface{} {
 func aiWPPerformanceStructure(site *models.Website) map[string]interface{} {
 	result := map[string]interface{}{"checked": false}
 	if site == nil || site.SiteType != "wordpress" {
-		result["message"] = "非 WordPress 站点，未检查插件结构"
+		result["message"] = "Non-WordPress site, plugin structure not checked"
 		return result
 	}
 	prefix, err := ReadWPTablePrefix(site.WebRoot)
 	if err != nil {
-		result["message"] = "未能读取表前缀: " + err.Error()
+		result["message"] = "Unable to read table prefix: " + err.Error()
 		return result
 	}
 	if config.AppConfig == nil {
-		result["message"] = "面板配置未初始化"
+		result["message"] = "Panel config not initialized"
 		return result
 	}
 	opts, err := aiReadWPDiagnosticOptions(site.DBName, prefix, config.AppConfig)
@@ -1843,20 +1843,20 @@ func aiCodeSuspects(site *models.Website) map[string]interface{} {
 		"suspects": []map[string]interface{}{},
 	}
 	if site == nil || site.SiteType != "wordpress" {
-		result["message"] = "非 WordPress 站点，未扫描主题或插件代码"
+		result["message"] = "Non-WordPress site, theme or plugin code not scanned"
 		return result
 	}
 	if !aiDirExists(site.WebRoot) {
-		result["message"] = "网站根目录不存在或不可读"
+		result["message"] = "Website root directory does not exist or is unreadable"
 		return result
 	}
 	result["checked"] = true
 
 	prefix, err := ReadWPTablePrefix(site.WebRoot)
 	if err != nil {
-		result["wp_options_error"] = "未能读取表前缀: " + err.Error()
+		result["wp_options_error"] = "Unable to read table prefix: " + err.Error()
 	} else if config.AppConfig == nil {
-		result["wp_options_error"] = "面板配置未初始化"
+		result["wp_options_error"] = "Panel config not initialized"
 	} else if opts, err := aiReadWPDiagnosticOptions(site.DBName, prefix, config.AppConfig); err != nil {
 		result["wp_options_error"] = err.Error()
 	} else {
@@ -1886,20 +1886,20 @@ func aiCodeSuspects(site *models.Website) map[string]interface{} {
 
 func aiScanActiveTheme(webRoot, stylesheetName string) []map[string]interface{} {
 	if strings.TrimSpace(stylesheetName) == "" {
-		return []map[string]interface{}{aiCodeSuspect("theme", "", 0, "active_theme_missing", "high", "WordPress 当前主题 stylesheet 为空", "")}
+		return []map[string]interface{}{aiCodeSuspect("theme", "", 0, "active_theme_missing", "high", "WordPress current theme stylesheet is empty", "")}
 	}
 	if !aiSafeThemeName(stylesheetName) {
-		return []map[string]interface{}{aiCodeSuspect("theme", "", 0, "active_theme_invalid", "high", "WordPress 当前主题 stylesheet 包含不安全路径字符", "")}
+		return []map[string]interface{}{aiCodeSuspect("theme", "", 0, "active_theme_invalid", "high", "WordPress current theme stylesheet contains unsafe path characters", "")}
 	}
 	themeDir := filepath.Join(webRoot, "wp-content", "themes", stylesheetName)
 	relThemeDir := filepath.ToSlash(filepath.Join("wp-content", "themes", stylesheetName))
 	if !aiPathWithin(webRoot, themeDir) || !aiDirExists(themeDir) {
-		return []map[string]interface{}{aiCodeSuspect("theme", relThemeDir, 0, "active_theme_not_found", "high", "当前启用主题目录不存在或不可读", "")}
+		return []map[string]interface{}{aiCodeSuspect("theme", relThemeDir, 0, "active_theme_not_found", "high", "Currently active theme directory does not exist or is unreadable", "")}
 	}
 	functionsPath := filepath.Join(themeDir, "functions.php")
 	relFunctions := filepath.ToSlash(filepath.Join(relThemeDir, "functions.php"))
 	if !aiFileExists(functionsPath) {
-		return []map[string]interface{}{aiCodeSuspect("theme", relFunctions, 0, "functions_php_missing", "medium", "当前主题没有 functions.php；这不一定是错误，但无法从该文件扫描代码疑点", "")}
+		return []map[string]interface{}{aiCodeSuspect("theme", relFunctions, 0, "functions_php_missing", "medium", "Current theme has no functions.php; this is not necessarily an error, but code suspects cannot be scanned from this file", "")}
 	}
 	return aiScanPHPFileForSuspects(webRoot, functionsPath, "active_theme_functions")
 }
@@ -1908,13 +1908,13 @@ func aiScanActivePlugins(webRoot string, plugins []string) []map[string]interfac
 	var suspects []map[string]interface{}
 	for _, plugin := range plugins {
 		if !aiSafePluginPath(plugin) {
-			suspects = append(suspects, aiCodeSuspect("plugin", plugin, 0, "active_plugin_invalid", "high", "active_plugins 中存在不安全插件路径", ""))
+			suspects = append(suspects, aiCodeSuspect("plugin", plugin, 0, "active_plugin_invalid", "high", "Unsafe plugin path found in active_plugins", ""))
 			continue
 		}
 		path := filepath.Join(webRoot, "wp-content", "plugins", filepath.FromSlash(plugin))
 		rel := filepath.ToSlash(filepath.Join("wp-content", "plugins", filepath.FromSlash(plugin)))
 		if !aiPathWithin(webRoot, path) || !aiFileExists(path) {
-			suspects = append(suspects, aiCodeSuspect("plugin", rel, 0, "active_plugin_not_found", "high", "启用插件文件不存在或不可读", ""))
+			suspects = append(suspects, aiCodeSuspect("plugin", rel, 0, "active_plugin_not_found", "high", "Active plugin file does not exist or is unreadable", ""))
 			continue
 		}
 		fileSuspects := aiScanPHPFileForSuspects(webRoot, path, "active_plugin_main")
@@ -2004,21 +2004,21 @@ func aiSuspiciousPHPLine(line string, braceDepth int) (pattern, severity, reason
 	}
 	if regexp.MustCompile(`^\s*wp_die\s*\(`).MatchString(trimmed) {
 		if braceDepth == 0 {
-			return "wp_die(", "high", "文件中存在顶层 wp_die 调用，可能直接终止 WordPress 请求并造成白屏/500", false, true
+			return "wp_die(", "high", "Top-level wp_die call found in file, may directly terminate WordPress request and cause white screen/500", false, true
 		}
-		return "wp_die(", "low", "代码块内存在 wp_die 调用，通常需要特定条件触发；仅作为低优先级线索", true, true
+		return "wp_die(", "low", "wp_die call found inside code block, usually requires specific conditions to trigger; low-priority clue only", true, true
 	}
 	if regexp.MustCompile(`^\s*die\s*\(`).MatchString(trimmed) {
 		if braceDepth == 0 {
-			return "die(", "high", "文件中存在顶层 die 调用，可能直接终止 PHP 请求", false, true
+			return "die(", "high", "Top-level die call found in file, may directly terminate PHP request", false, true
 		}
-		return "die(", "low", "代码块内存在 die 调用，通常需要特定条件触发；仅作为低优先级线索", true, true
+		return "die(", "low", "die call found inside code block, usually requires specific conditions to trigger; low-priority clue only", true, true
 	}
 	if regexp.MustCompile(`^\s*exit\s*(\(|;)`).MatchString(trimmed) {
 		if braceDepth == 0 {
-			return "exit", "high", "文件中存在顶层 exit 调用，可能直接终止 PHP 请求", false, true
+			return "exit", "high", "Top-level exit call found in file, may directly terminate PHP request", false, true
 		}
-		return "exit", "low", "代码块内存在 exit 调用，通常需要特定条件触发；仅作为低优先级线索", true, true
+		return "exit", "low", "exit call found inside code block, usually requires specific conditions to trigger; low-priority clue only", true, true
 	}
 	checks := []struct {
 		re       *regexp.Regexp
@@ -2026,9 +2026,9 @@ func aiSuspiciousPHPLine(line string, braceDepth int) (pattern, severity, reason
 		severity string
 		reason   string
 	}{
-		{regexp.MustCompile(`trigger_error\s*\([^,\)]*,\s*E_USER_ERROR\s*\)`), "trigger_error(E_USER_ERROR)", "medium", "代码中存在 E_USER_ERROR，特定条件下可能触发 fatal error"},
-		{regexp.MustCompile(`throw\s+new\s+(Error|Exception|RuntimeException)\b`), "throw new", "medium", "代码中存在抛出异常/错误，若未捕获可能导致 500"},
-		{regexp.MustCompile(`\b(require|require_once|include|include_once)\s*\(?\s*['"][^'"]+['"]`), "include/require", "low", "代码中存在 include/require，若目标文件缺失可能导致错误；需结合具体路径验证"},
+		{regexp.MustCompile(`trigger_error\s*\([^,\)]*,\s*E_USER_ERROR\s*\)`), "trigger_error(E_USER_ERROR)", "medium", "E_USER_ERROR found in code, may trigger fatal error under certain conditions"},
+		{regexp.MustCompile(`throw\s+new\s+(Error|Exception|RuntimeException)\b`), "throw new", "medium", "Exception/error throw found in code, if uncaught may cause 500"},
+		{regexp.MustCompile(`\b(require|require_once|include|include_once)\s*\(?\s*['"][^'"]+['"]`), "include/require", "low", "include/require found in code, may cause error if target file is missing; needs verification with specific path"},
 	}
 	for _, check := range checks {
 		if check.re.MatchString(trimmed) {
@@ -2119,12 +2119,12 @@ func aiDebugLogSummary(webRoot string) map[string]interface{} {
 		"file":    "wp-content/debug.log",
 	}
 	if !aiPathWithin(webRoot, path) || !aiFileExists(path) {
-		result["message"] = "debug.log 不存在或不可读"
+		result["message"] = "debug.log does not exist or is unreadable"
 		return result
 	}
 	lines, truncated, err := aiTailInterestingLines(path, 80, 2500, false)
 	if err != nil {
-		result["message"] = "debug.log 不可读"
+		result["message"] = "debug.log is unreadable"
 		return result
 	}
 	result["exists"] = true
@@ -2280,35 +2280,35 @@ func aiRecentPanelOperations(domain string, limit int) []map[string]string {
 func aiOperationLabel(operation string) string {
 	switch operation {
 	case "wp_optimizations":
-		return "WordPress 优化设置"
+		return "WordPress optimization settings"
 	case "set_cdn_realip":
-		return "CDN 真实 IP 设置"
+		return "CDN real IP settings"
 	case "set_access_log_mode":
-		return "访问日志设置"
+		return "Access log settings"
 	case "save_nginx_custom":
-		return "Nginx 自定义配置"
+		return "Nginx custom config"
 	case "change_db_password":
-		return "数据库密码修改"
+		return "Database password change"
 	case "update_domains":
-		return "域名设置"
+		return "Domain settings"
 	case "enable_ssl":
-		return "启用 SSL"
+		return "Enable SSL"
 	case "remove_ssl":
-		return "删除 SSL"
+		return "Remove SSL"
 	case "create_backup":
-		return "创建备份"
+		return "Create backup"
 	case "restore_backup":
-		return "恢复备份"
+		return "Restore backup"
 	case "create_site":
-		return "创建网站"
+		return "Create website"
 	case "delete_site":
-		return "删除网站"
+		return "Delete website"
 	case "pause_site":
-		return "暂停网站"
+		return "Pause website"
 	case "enable_site":
-		return "启用网站"
+		return "Enable website"
 	case "ssl_certificate_export":
-		return "SSL 证书导出"
+		return "SSL certificate export"
 	default:
 		return operation
 	}
@@ -2500,7 +2500,7 @@ func aiTrimDebugLog(code map[string]interface{}, maxLines, maxChars int) {
 	if maxLines <= 0 || maxChars <= 0 {
 		delete(debugLog, "lines")
 		debugLog["truncated"] = true
-		debugLog["message"] = "因上下文预算限制未发送 debug.log 正文"
+		debugLog["message"] = "debug.log body not sent due to context budget limit"
 		return
 	}
 	lines, ok := debugLog["lines"].([]string)
@@ -2529,17 +2529,17 @@ func aiTrimDebugLog(code map[string]interface{}, maxLines, maxChars int) {
 func aiChatEndpoint(baseURL string) (string, error) {
 	baseURL = strings.TrimSpace(baseURL)
 	if baseURL == "" {
-		return "", fmt.Errorf("Base URL 不能为空")
+		return "", fmt.Errorf("Base URL cannot be empty")
 	}
 	u, err := url.Parse(baseURL)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return "", fmt.Errorf("Base URL 格式无效")
+		return "", fmt.Errorf("Base URL format is invalid")
 	}
 	if u.User != nil {
-		return "", fmt.Errorf("Base URL 不能包含用户名或密码")
+		return "", fmt.Errorf("Base URL cannot contain username or password")
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return "", fmt.Errorf("Base URL 仅支持 http 或 https")
+		return "", fmt.Errorf("Base URL only supports http or https")
 	}
 	u.Path = strings.TrimRight(u.Path, "/")
 	if strings.HasSuffix(u.Path, "/chat/completions") {
