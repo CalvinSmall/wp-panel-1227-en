@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: WP Panel Optimizer
- * Plugin URI:  https://github.com/naibabiji/wp-panel
+ * Plugin URI:  https://github.com/CalvinSmall/wp-panel-1227-en
  * Description: Works with WP Panel to manage FastCGI cache, preloading, debug mode, post revisions, memory limit, and other optimizations. Auto-clears cache on post publish/update.
  * Version:     1.1.7
  * Author:      WP Panel
@@ -279,7 +279,7 @@ class WP_Panel_Optimizer {
         <div class="wrap">
             <?php $pluginVersion = WP_Panel_Optimizer::VERSION; ?>
             <h1>WP Panel Optimizer</h1>
-            <p>Managed by <a href="https://github.com/naibabiji/wp-panel" target="_blank">WP Panel</a>. Current site: <code><?php echo esc_html($currentDomain); ?></code></p>
+            <p>Managed by <a href="https://github.com/CalvinSmall/wp-panel-1227-en" target="_blank">WP Panel</a>. Current site: <code><?php echo esc_html($currentDomain); ?></code></p>
             <p>Plugin version: <code><?php echo esc_html($pluginVersion); ?></code>
                 <button type="button" id="wpp-check-update-btn" class="button">Check for Updates</button>
                 <span id="wpp-update-result"></span>
@@ -1029,7 +1029,7 @@ class WP_Panel_Optimizer {
         $transient = get_transient('wpp_optimizer_release_v2');
         if ($transient !== false) return $transient;
 
-        $resp = wp_remote_get('https://raw.githubusercontent.com/naibabiji/wp-panel/main/wp-panel-optimizer/wp-panel-optimizer.php', [
+        $resp = wp_remote_get('https://raw.githubusercontent.com/CalvinSmall/wp-panel-1227-en/main/wp-panel-optimizer/wp-panel-optimizer.php', [
             'timeout'   => 10,
             'sslverify' => true,
             'headers'   => ['User-Agent' => 'WP-Panel-Optimizer'],
@@ -1045,7 +1045,7 @@ class WP_Panel_Optimizer {
 
         $result = [
             'tag_name' => 'v' . $m[1],
-            'html_url' => 'https://github.com/naibabiji/wp-panel/releases',
+            'html_url' => 'https://github.com/CalvinSmall/wp-panel-1227-en/releases',
         ];
         set_transient('wpp_optimizer_release_v2', $result, HOUR_IN_SECONDS);
         return $result;

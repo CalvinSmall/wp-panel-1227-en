@@ -12,7 +12,7 @@ If you want the Chinese project README, see [README.md](README.md).
 ## Official Sources
 
 - Official website: <https://wp-panel.org>
-- GitHub repository: <https://github.com/naibabiji/wp-panel>
+- GitHub repository: <https://github.com/CalvinSmall/wp-panel-1227-en>
 
 Any domain other than `wp-panel.org` and this GitHub repository is not an official WP Panel website.
 
@@ -48,13 +48,13 @@ WP Panel focuses on one job: **running WordPress sites efficiently on VPS server
 ## One-Click Installation
 
 ```bash
-apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh | bash
+apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://raw.githubusercontent.com/CalvinSmall/wp-panel-1227-en/main/install.sh | bash
 ```
 
 If GitHub is not reachable from your server, use the China-friendly installer:
 
 ```bash
-apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://gh.wp-panel.org/https://raw.githubusercontent.com/naibabiji/wp-panel/main/install-cn.sh | bash
+apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://gh.wp-panel.org/https://raw.githubusercontent.com/CalvinSmall/wp-panel-1227-en/main/install-cn.sh | bash
 ```
 
 After installation, the script prints the panel URL and the two login layers: BasicAuth and web login.
@@ -153,7 +153,7 @@ Only users who pass all four layers can enter the panel. Five failures at any la
 
 White-hat researchers are welcome to test this project. If you find a security issue, please report it in one of these ways:
 
-- **Public report**: open a [GitHub Issue](https://github.com/naibabiji/wp-panel/issues) and prefix the title with `[Security]`
+- **Public report**: open a [GitHub Issue](https://github.com/CalvinSmall/wp-panel-1227-en/issues) and prefix the title with `[Security]`
 - **Private report**: submit a Private Vulnerability Report through the GitHub Security tab
 - Valid reports will be acknowledged in the Release Notes after the issue is fixed
 

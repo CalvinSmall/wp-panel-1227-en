@@ -313,7 +313,7 @@ All configuration is written to a single JSON file:
 cp "$SCRIPT_DIR/wp-panel" "$BIN_PATH"
 
 # Otherwise download from GitHub Release
-GITHUB_RELEASE="https://github.com/naibabiji/wp-panel/releases/latest/download/wp-panel"
+GITHUB_RELEASE="https://github.com/CalvinSmall/wp-panel-1227-en/releases/latest/download/wp-panel"
 ```
 
 - If you place the compiled `wp-panel` binary and install script in the same directory, the script **uses the local file directly** without downloading from the network.
@@ -437,7 +437,7 @@ The value of open source is not just "code is public", but "you can verify it yo
 
 ```bash
 # Download first, look before executing
-curl -fsSL https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/CalvinSmall/wp-panel-1227-en/main/install.sh -o install.sh
 # Open with a text editor, search for these keywords:
 # passwd, shadow, ssh, rm -rf /etc/nginx, wget non-wordpress.org URLs
 # You'll find: the above keywords either don't exist or appear in safe contexts.
@@ -447,7 +447,7 @@ curl -fsSL https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh 
 
 ```bash
 # 1. Clone source and compile locally
-git clone https://github.com/naibabiji/wp-panel.git
+git clone https://github.com/CalvinSmall/wp-panel-1227-en.git
 cd wp-panel
 go build -o wp-panel .
 

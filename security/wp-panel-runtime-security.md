@@ -700,7 +700,7 @@ The panel only writes cron files when you **proactively create scheduled tasks**
 sha256sum /usr/local/bin/wp-panel
 
 # Compare with checksum from GitHub Release
-# https://github.com/naibabiji/wp-panel/releases
+# https://github.com/CalvinSmall/wp-panel-1227-en/releases
 ```
 
 ### 8.4 View Panel Operation Logs

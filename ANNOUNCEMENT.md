@@ -1,1 +1,1 @@
-Thank you for using WP Panel! If you have any questions, you can provide feedback by adding WeChat <strong>vv15_zhi</strong>, or <a href="https://raw.githubusercontent.com/naibabiji/wp-panel/main/wechat-group.png" target="_blank">click here</a> to join the WeChat group for discussion.
+Thank you for using WP Panel! If you have any questions, you can provide feedback by adding WeChat <strong>vv15_zhi</strong>, or <a href="https://raw.githubusercontent.com/CalvinSmall/wp-panel-1227-en/main/wechat-group.png" target="_blank">click here</a> to join the WeChat group for discussion.

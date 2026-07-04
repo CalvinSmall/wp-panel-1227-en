@@ -10,7 +10,7 @@ WordPress server management panel for Debian 13 VPS environments, focused on sit
 ## Official Sources
 
 - Official website: <https://wp-panel.org>
-- GitHub project: <https://github.com/naibabiji/wp-panel>
+- GitHub project: <https://github.com/CalvinSmall/wp-panel-1227-en>
 
 Other than `wp-panel.org` and this GitHub repository, no other domain names are official WP Panel websites or affiliated with this project.
 
@@ -46,13 +46,13 @@ WP Panel does one thing: **manage WordPress sites efficiently on a VPS**. No Doc
 ## One-Click Installation
 
 ```bash
-apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh | bash
+apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://raw.githubusercontent.com/CalvinSmall/wp-panel-1227-en/main/install.sh | bash
 ```
 
 **China servers**: When GitHub is inaccessible, use the China-optimized script:
 
 ```bash
-apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://gh.wp-panel.org/https://raw.githubusercontent.com/naibabiji/wp-panel/main/install-cn.sh | bash
+apt-get update && apt-get install -y wget ca-certificates && wget -qO- https://gh.wp-panel.org/https://raw.githubusercontent.com/CalvinSmall/wp-panel-1227-en/main/install-cn.sh | bash
 ```
 
 After installation, the panel address and two-layer login credentials (BasicAuth + Web login) are displayed.
@@ -129,7 +129,7 @@ More detailed security mechanisms:
 
 White-hat hackers and security researchers are welcome to test this project. If you find a security vulnerability, please report it via:
 
-- **Public feedback**: Submit a [GitHub Issue](https://github.com/naibabiji/wp-panel/issues), tag the title with `[Security]`
+- **Public feedback**: Submit a [GitHub Issue](https://github.com/CalvinSmall/wp-panel-1227-en/issues), tag the title with `[Security]`
 - **Private feedback**: Submit a Private Vulnerability Report through the GitHub Security tab
 - Valid vulnerabilities will be credited to the reporter in Release Notes after a fix
 

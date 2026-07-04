@@ -13,10 +13,10 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-GITHUB_INSTALL_URL="https://raw.githubusercontent.com/naibabiji/wp-panel/main/install.sh"
+GITHUB_INSTALL_URL="https://raw.githubusercontent.com/CalvinSmall/wp-panel-1227-en/main/install.sh"
 INSTALL_SCRIPT_SOURCES=(
     "gh.wp-panel.org reverse proxy|https://gh.wp-panel.org/${GITHUB_INSTALL_URL}"
-    "jsDelivr reverse proxy|https://cdn.jsdelivr.net/gh/naibabiji/wp-panel@main/install.sh"
+    "jsDelivr reverse proxy|https://cdn.jsdelivr.net/gh/CalvinSmall/wp-panel-1227-en@main/install.sh"
     "GitHub direct|${GITHUB_INSTALL_URL}"
 )
 

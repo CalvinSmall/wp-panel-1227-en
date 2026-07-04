@@ -11,9 +11,9 @@ Works with WP Panel to manage FastCGI cache, disable update detection, disable f
 
 == Description ==
 
-WP Panel Optimizer is the companion plugin for [WP Panel](https://github.com/naibabiji/wp-panel), syncing optimization settings in real-time with the server-side panel via the panel API.
+WP Panel Optimizer is the companion plugin for [WP Panel](https://github.com/CalvinSmall/wp-panel-1227-en), syncing optimization settings in real-time with the server-side panel via the panel API.
 
-Author: [naibabiji](https://blog.naibabiji.com) | Plugin: [GitHub](https://github.com/naibabiji/wp-panel)
+Author: [naibabiji](https://blog.naibabiji.com) | Plugin: [GitHub](https://github.com/CalvinSmall/wp-panel-1227-en)
 
 = Features =
 
